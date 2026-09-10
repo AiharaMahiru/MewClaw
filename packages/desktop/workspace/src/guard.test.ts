@@ -6,6 +6,32 @@ import { expect, it } from 'vitest';
 import * as workspace from './index.js';
 import { workspaceJournal } from './journal.js';
 
+it('默认关闭桥接时允许普通归档父链，但归档本机父链仍拒绝', async () => {
+  const ctx = new Context();
+  await ctx.plugin(SessionStore); await ctx.plugin(SystemPrompt); await ctx.plugin(Tools, { mode: 'native' });
+  let desktop = false, closed = 0, executions = 0;
+  ctx.reflect.provide('credentials', { resolve: async () => undefined });
+  ctx.reflect.provide('webServer', { register: () => () => {}, tapIndex: () => () => {} });
+  ctx.reflect.provide('sessionPersistence', { open: async (id: string, access: string) => {
+    expect(id).toBe('archived-parent'); expect(access).toBe('read');
+    return { header: {}, read: async () => ({ events: desktop ? [{ type: 'desktop/workspace', data: { owner: 'scope', mode: 'desktop', generation: 'revision' } }] : [] }),
+      close: async () => { closed++; } };
+  } });
+  ctx.reflect.provide('larkScopeIndex', { get: () => undefined });
+  await ctx.plugin(workspace, { enabled: false, tokenRef: 'unused', requestTimeoutMs: 1000, heartbeatTimeoutMs: 3000, maxBindings: 10 });
+  const session = ctx.sessions.create(SessionId('cloud-fork'), { meta: { cwd: process.cwd(), parentSession: SessionId('archived-parent') } });
+  ctx.tools.register(defineTool({ name: 'cloud_probe', description: 'fixture', parameters: {},
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+    execute: async () => { executions++; return 'cloud'; } }));
+  const execute = () => ctx.tools.execute({ name: 'cloud_probe', callId: 'fixture' as never, arguments: {},
+    agent: ctx.extend({ id: session.id, session }) as never, signal: new AbortController().signal });
+  try {
+    await execute(); expect(executions).toBe(1);
+    desktop = true; await execute(); expect(executions).toBe(1);
+    expect(closed).toBe(2);
+  } finally { await ctx.fiber.dispose(); }
+});
+
 it('真实Tools运行时阻止父子会话的云端工具，后续allow策略不能重新放行', async () => {
   const ctx = new Context();
   await ctx.plugin(SessionStore); await ctx.plugin(SystemPrompt); await ctx.plugin(Tools, { mode: 'native' });

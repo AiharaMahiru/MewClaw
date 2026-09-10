@@ -5,10 +5,11 @@
 ## Web 与共享能力
 
 - `pnpm build`、`pnpm typecheck`：通过。
-- `pnpm exec vitest run packages/desktop packages/auth/edge/src/desktop-workspace.test.ts packages/auth/edge/src/server.test.ts packages/lark/contracts/src tests/composition.test.ts`：17 文件、98 测试通过。
+- `pnpm exec vitest run packages/desktop packages/auth/edge/src/desktop-workspace.test.ts packages/auth/edge/src/server.test.ts packages/lark/contracts/src tests/composition.test.ts`：17 文件、100 测试通过。
 - 后续同步边界小修补跑 `packages/desktop/host/src/sync.test.ts`：5 测试通过。
 - 变更文件 ESLint、`pnpm verify:dsh-brand`、`pnpm verify:official-integrity`：通过，官方补丁豁免为 0。
 - 真实配置合并测试覆盖默认关闭、显式 overlay 启用，以及 Worker 直接依赖解析；不是仅检查 YAML 文本。
+- 默认关闭时普通归档父会话不被误拦截；通过官方只读持久化句柄分页读取父链，本机父会话的执行限制仍被继承。桌面取消请求会沿 Auth Edge 关闭 Worker 在途传输。
 
 ## 桌面候选
 
