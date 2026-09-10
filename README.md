@@ -35,7 +35,7 @@ git submodule update --init --recursive
 # 在本仓库 desktop 分支根目录执行；目标候选目录必须尚不存在。
 node scripts/prepare-desktop-candidate.mjs /absolute/MewClaw/upstream/dsh-desktop /absolute/new-candidate
 cd /absolute/new-candidate
-npm install --ignore-scripts --no-audit --no-fund
+npm ci --ignore-scripts --no-audit --no-fund
 npm run build
 node /absolute/MewClaw/apps/desktop/verify-workspace.mjs /absolute/new-candidate
 ```

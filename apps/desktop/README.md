@@ -25,12 +25,14 @@
 git submodule update --init --recursive
 node scripts/prepare-desktop-candidate.mjs /absolute/MewClaw/upstream/dsh-desktop /absolute/new-candidate
 cd /absolute/new-candidate
-npm install --ignore-scripts --no-audit --no-fund
+npm ci --ignore-scripts --no-audit --no-fund
 npm run build
 node /absolute/MewClaw/apps/desktop/verify-workspace.mjs /absolute/new-candidate
 ```
 
 需要 Node 24。安装生命周期默认关闭，Electron 下载及平台原生依赖必须另行审核处理；上述命令不是安装包构建流程。
+
+准备脚本复制版本化的 `candidate.package-lock.json`，使用 `npm ci` 固定依赖；上游版本或依赖变更时，必须在隔离候选重新生成、审阅并更新此锁文件，不手工修改校验摘要。
 
 ## Windows 开发包
 

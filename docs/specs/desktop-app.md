@@ -13,7 +13,7 @@
 
 ## 1 目的与边界
 
-在独立目录复用社区 dsh-desktop，不修改官方 DSH 依赖。首阶段只验证可运行的纯净依赖底座，不宣称 APP 或云端接入已完成。不继承上游依赖补丁、社区市场或 Agents Anywhere 后端。
+在独立目录复用社区 dsh-desktop，不修改官方 DSH 依赖。开发源码提供云端会话接入、本机工作区、独立授权的 Shell 与双向同步；源码验收不代表生产发布或 Windows 实机验收。不继承上游依赖补丁、社区市场或 Agents Anywhere 后端。
 
 ## 2 服务契约
 
@@ -35,7 +35,7 @@ MewClaw 发行入口使用社区包 package.json 的 main 字段启动完整 lau
 
 ## 5 模型可见面
 
-桌面不新增模型执行；配套云端 desktop_workspace 工具及执行限制见 desktop-workspace.md。
+桌面不新增模型执行；配套云端 desktop_workspace、desktop_shell 工具及同步授权边界见 desktop-workspace.md。
 
 ## 6 行为契约
 
@@ -55,7 +55,7 @@ MewClaw 发行入口使用社区包 package.json 的 main 字段启动完整 lau
 
 ## 8 测试契约
 
-候选准备拒绝覆盖；完整构建与类型检查；桌面公开 profile 的加载与卸载烟雾；官方依赖文件完整性；后续才进行云端会话与本地工作区 e2e。Windows 产物构建与 Windows 实机验收分别记录。
+候选准备拒绝覆盖并复制版本化 npm 锁文件；完整构建与类型检查；桌面公开 profile 的加载与卸载烟雾；官方依赖文件完整性；离线云端桥接到本机文件/Shell/同步。真实云端模型、Windows 产物构建与 Windows 实机验收分别记录。
 
 ## 9 迁移映射
 

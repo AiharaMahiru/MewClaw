@@ -84,4 +84,5 @@ await writeFile(resolve(destination, 'UPSTREAM.json'), `${JSON.stringify({
   officialPatches: [], sourceChanges,
   manifestChanges: ['排除可选市场与 AA 依赖', '关闭发行 prepack 全仓库钩子'],
 }, null, 2)}\n`);
-console.log(`候选已创建：${destination}；仅生成候选清单，尚未验证兼容性`);
+await cp(fileURLToPath(new URL('../apps/desktop/candidate.package-lock.json', import.meta.url)), resolve(destination, 'package-lock.json'));
+console.log(`候选已创建：${destination}；已复制冻结锁文件，尚未验证兼容性`);
