@@ -1,6 +1,6 @@
 /** Node 二进制同步 Provider：规范路径、条件发布、恢复副本；不是 OS 沙箱。 */
 import { createHash, randomUUID } from 'node:crypto';
-import { lstat, realpath, readdir, mkdir, open, link, rename, unlink } from 'node:fs/promises';
+import { lstat, realpath, opendir, mkdir, open, link, rename, unlink } from 'node:fs/promises';
 import { join, resolve, relative, sep } from 'node:path';
 import type { SyncEndpoint, SyncManifest } from './sync.js';
 
@@ -64,7 +64,7 @@ export class NodeSyncDirectory implements SyncEndpoint {
     const names = new Set<string>(); let count = 0, total = 0;
     const walk = async (dir: string, prefix: string): Promise<void> => {
       signal.throwIfAborted();
-      for (const entry of await readdir(dir, { withFileTypes: true })) {
+      for await (const entry of await opendir(dir)) {
         if (excluded(entry.name)) continue;
         const path = prefix + entry.name; syncPath(path);
         const folded = path.normalize('NFC').toLowerCase();
@@ -121,6 +121,7 @@ export class NodeSyncDirectory implements SyncEndpoint {
   write(path: string, data: string, expected: string | null, signal: AbortSignal): Promise<void> {
     return this.serial(async () => {
       signal.throwIfAborted();
+      if (data.length > Math.ceil(this.limits.maxBytes / 3) * 4) throw new Error('SYNC_LIMIT');
       const bytes = Buffer.from(data, 'base64');
       if (bytes.length > this.limits.maxBytes || bytes.toString('base64') !== data) throw new Error('SYNC_LIMIT');
       const target = await this.target(path, true);
