@@ -4,6 +4,8 @@
 
 | SPEC | 包 | 角色 | 里程碑 | 状态 |
 | --- | --- | --- | --- | --- |
+| [desktop-app.md](desktop-app.md) | 桌面发行组合 | App / Bundle | Desktop 1 | implementing |
+| [desktop-workspace.md](desktop-workspace.md) | 桌面本地工作区 | Definition / Provider / Consumer | Desktop 1 | implementing |
 | [contracts.md](contracts.md) | `dsh-lark-contracts` | Contracts | M1 | implemented |
 | [lark.md](lark.md) | `dsh-lark` | Definition + Provider | M1 | implemented |
 | [lark-ws.md](lark-ws.md) | `dsh-lark-ws` | Plugin（长连接入口） | M1 | implemented |

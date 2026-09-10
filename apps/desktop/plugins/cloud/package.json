@@ -1,0 +1,17 @@
+{
+  "name": "dsh-lark-desktop-cloud",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": { ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" } },
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-client-connection": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-host-webserver": "0.1.2-rc.1",
+    "@deepseek-ai/schemastery": "3.18.2",
+    "dsh-plugin-desktop": "2.0.6"
+  }
+}
