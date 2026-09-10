@@ -38,6 +38,8 @@
 
 ## 5. 验证与回滚边界
 
+- 本轮共享源码已同步至 `master@b999dca`，桌面已集成这些修改。最终源码验收：Web 17 个文件、100 项测试通过；桌面候选 12 个文件、36 项测试通过，输出 `WORKSPACE_OFFLINE_VERIFIED`。完整命令与覆盖范围见 [源码验收记录](docs/specs/desktop-workspace-verification.md)。
+- 收尾修复包括默认关闭桥接时的普通归档父会话兼容，以及 Auth Edge 向 Worker 传播桌面取消请求；本机会话父链的工具限制仍然继承，不因兼容修复而放开。
 - 已有隔离候选验证：严格 Host/Cloud 编译、HTTP 桥接到真实临时目录与官方 Shell、三种布局及客户端回归。
 - Web 门禁：build、typecheck、Auth/Worker/文件/Shell/同步定向测试、真实 Cordis overlay 合并与模块解析、品牌和官方完整性。
 - 未覆盖：本轮 Windows 实机、新版 Electron 安装包、生产真实模型链路。单测和离线集成不能替代这些证据。
