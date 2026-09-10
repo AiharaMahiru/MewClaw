@@ -18,9 +18,14 @@ export function localWorkspaceRoute(options: { origin: string; controller: Works
         chunks.push(bytes);
       }
       const value = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>;
-      if (!value || Object.keys(value).some(key => !['sessionId', 'mode'].includes(key)) || typeof value.sessionId !== 'string' || !value.sessionId) throw new Error('INVALID_WORKSPACE_REQUEST');
+      if (!value || Object.keys(value).some(key => !['sessionId', 'mode', 'permission', 'enabled'].includes(key)) || typeof value.sessionId !== 'string' || !value.sessionId) throw new Error('INVALID_WORKSPACE_REQUEST');
       const transport = workspaceTransport(req, options.origin);
-      if (value.mode === undefined) return send(200, await transport({ action: 'status', sessionId: value.sessionId }, new AbortController().signal));
+      if (value.permission !== undefined) {
+        if (value.mode !== undefined || !['shell', 'sync'].includes(String(value.permission)) || typeof value.enabled !== 'boolean') throw new Error('INVALID_WORKSPACE_REQUEST');
+        return send(200, await options.controller.permission(value.sessionId, value.permission as 'shell' | 'sync', value.enabled, transport));
+      }
+      if (value.enabled !== undefined) throw new Error('INVALID_WORKSPACE_REQUEST');
+      if (value.mode === undefined) return send(200, await options.controller.status(value.sessionId, transport));
       if (value.mode !== 'cloud' && value.mode !== 'desktop') throw new Error('INVALID_WORKSPACE_REQUEST');
       send(200, await options.controller.select({ sessionId: value.sessionId, mode: value.mode }, transport));
     } catch (error) {

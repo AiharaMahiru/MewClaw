@@ -11,8 +11,10 @@ import { createHash } from 'node:crypto';
 import { DESKTOP_CLIENT_PATH, desktopCloudHtml } from './boot.js';
 import { WorkspaceController } from './workspace-controller.js';
 import { localWorkspaceRoute } from './workspace-route.js';
+import type {} from '@deepseek-ai/dsh-shell';
+import type { ControllerOptions } from './workspace-controller.js';
 
-export interface Config extends WebConfig { cloudOrigin: string; cloudTimeoutMs: number; cloudSessionRetentionSeconds?: number; workspaceMaxBytes?: number; workspaceMaxEntries?: number; cloudMaxIndexBytes?: number }
+export interface Config extends WebConfig, Omit<ControllerOptions, 'fs' | 'pick' | 'shell' | 'confirm' | 'maxBytes' | 'maxEntries'> { cloudOrigin: string; cloudTimeoutMs: number; cloudSessionRetentionSeconds?: number; workspaceMaxBytes?: number; workspaceMaxEntries?: number; cloudMaxIndexBytes?: number }
 
 /** 桌面私有控制面始终留在本机，不发送到云端。 */
 export function isLocalDesktopPath(raw: string): boolean {
@@ -24,6 +26,14 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
   static override Config = z.intersect([WebServer.Config, z.object({
     workspaceMaxBytes: z.number().step(1).min(1024).max(1048576).default(262144),
     workspaceMaxEntries: z.number().step(1).min(1).max(2000).default(500),
+    maxBindings: z.number().step(1).min(1).max(100).default(10),
+    pollIntervalMs: z.number().step(1).min(250).max(5000).default(1000),
+    shellTimeoutMs: z.number().step(1).min(1000).max(120000).default(30000),
+    shellMaxOutputBytes: z.number().step(1).min(1024).max(262144).default(65536),
+    syncIntervalMs: z.number().step(1).min(1000).max(60000).default(5000),
+    syncMaxBytes: z.number().step(1).min(1024).max(4194304).default(1048576),
+    syncMaxEntries: z.number().step(1).min(1).max(10000).default(2000),
+    syncMaxTotalBytes: z.number().step(1).min(1024).max(268435456).default(33554432),
     cloudOrigin: z.string().default('https://chat.rwr.ink'),
     cloudTimeoutMs: z.number().step(1).min(1000).max(600000).default(120000),
     cloudSessionRetentionSeconds: z.number().step(1).min(0).max(2592000).default(2592000),
@@ -61,6 +71,18 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
       return connection ? connection.requestRejection(req) : 503;
     };
     this.workspace = new WorkspaceController({
+      ...config,
+      shell: () => { const shell = ctx.get('shell'); if (!shell) throw new Error('LOCAL_SHELL_UNAVAILABLE'); return shell; },
+      confirm: async kind => {
+        // Electron 主进程的官方原生对话框，不以网页确认框代替宿主授权。
+        const { dialog } = await import('electron');
+        const result = await dialog.showMessageBox({ type: 'warning', title: 'MewClaw 本机授权',
+          message: kind === 'shell' ? '允许云端模型在这台电脑执行 Shell 命令？' : '允许当前目录与当前会话的云端目录双向同步？',
+          detail: kind === 'shell' ? '命令以你的系统账号权限运行，工作目录不是沙箱，可能访问目录之外的文件和网络。命令输出会发送到云端。退出登录或撤销会终止当前命令。'
+            : '目录中的文件（包括二进制文件）将上传到云端，也会下载云端修改。两边同时修改会保留冲突；传播删除和替换时保留恢复副本。默认排除 .env、.git、node_modules。',
+          buttons: ['取消', '允许'], defaultId: 0, cancelId: 0, noLink: true });
+        return result.response === 1;
+      },
       fs: () => { const fs = ctx.get('fs'); if (!fs) throw new Error('WORKSPACE_STARTING'); return fs; },
       pick: () => { const runtime = ctx.get('desktopRuntime') as { pickDirectory(): Promise<string | null> } | undefined;
         if (!runtime) throw new Error('WORKSPACE_STARTING'); return runtime.pickDirectory(); },

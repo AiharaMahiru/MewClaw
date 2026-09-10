@@ -44,7 +44,7 @@ export function desktopCloudHtml(html: string, client: { revision: string; injec
     html = html.slice(0, valueStart) + JSON.stringify(graph).replaceAll('<', '\\u003c') + ';' + html.slice(end);
   }
   const safeParameters = JSON.stringify(parameters).replaceAll('<', '\\u003c');
-  const restore = `(()=>{const p=new URLSearchParams(${safeParameters});const u=new URL(location.href);for(const [k,v] of p)u.searchParams.set(k,v);history.replaceState(null,'',u);})();`;
+  const restore = `globalThis.__MEWCLAW_DESKTOP_WORKSPACE__=true;(()=>{const p=new URLSearchParams(${safeParameters});const u=new URL(location.href);for(const [k,v] of p)u.searchParams.set(k,v);history.replaceState(null,'',u);})();`;
   const loginHealth = start < 0 ? `addEventListener('DOMContentLoaded',()=>{if(document.querySelector('#email')&&document.querySelector('#password')&&document.querySelector('form'))void fetch('${BOOT_REPORT_PATH}',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({status:'healthy'})}).catch(()=>{});},{once:true});` : '';
   // 将真实认证页面主体标为可见内容根；不添加空节点绕过桌面看门狗。
   if (start < 0 && html.includes('<main class="auth-page">')) html = html.replace('<main class="auth-page">', '<main id="root" class="auth-page">');

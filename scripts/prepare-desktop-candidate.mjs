@@ -19,6 +19,19 @@ await mkdir(destination, { recursive: true });
 await cp(resolve(source, 'dsh-plugin-desktop'), resolve(destination, 'dsh-plugin-desktop'), { recursive: true });
 await cp(resolve(source, 'LICENSE'), resolve(destination, 'UPSTREAM-LICENSE'));
 await cp(fileURLToPath(new URL('../apps/desktop/plugins/cloud', import.meta.url)), resolve(destination, 'mewclaw-cloud'), { recursive: true });
+await cp(fileURLToPath(new URL('../packages/desktop/host', import.meta.url)), resolve(destination, 'mewclaw-host'), { recursive: true, filter: path => !path.split(/[\\/]/).includes('lib') });
+const hostManifestPath = resolve(destination, 'mewclaw-host/package.json');
+const hostManifest = JSON.parse(await readFile(hostManifestPath, 'utf8'));
+// 桌面与服务器各自锁定官方版本，共享 Consumer 不把服务端版本带进 Electron。
+hostManifest.devDependencies = { '@deepseek-ai/dsh-fs': '0.1.2-rc.1', '@deepseek-ai/dsh-shell': '0.1.2-rc.1' };
+await writeFile(hostManifestPath, JSON.stringify(hostManifest, null, 2) + '\n');
+const hostTsconfigPath = resolve(destination, 'mewclaw-host/tsconfig.json');
+const hostTsconfig = JSON.parse(await readFile(hostTsconfigPath, 'utf8'));
+delete hostTsconfig.extends;
+hostTsconfig.compilerOptions = { ...JSON.parse(await readFile(fileURLToPath(new URL('../tsconfig.base.json', import.meta.url)), 'utf8')).compilerOptions, ...hostTsconfig.compilerOptions };
+delete hostTsconfig.compilerOptions.baseUrl;
+hostTsconfig.compilerOptions.types = ['node'];
+await writeFile(hostTsconfigPath, JSON.stringify(hostTsconfig, null, 2) + '\n');
 await cp(fileURLToPath(new URL('../apps/desktop/launcher.mjs', import.meta.url)), resolve(destination, 'launcher.mjs'));
 await cp(fileURLToPath(new URL('../apps/desktop/electron-builder.cjs', import.meta.url)), resolve(destination, 'electron-builder.cjs'));
 const sourceChanges = [];
@@ -60,8 +73,8 @@ await writeFile(resolve(destination, 'package.json'), `${JSON.stringify({
   description: 'MewClaw desktop development build', author: 'MewClaw contributors', license: 'MIT',
   private: true, type: 'module', main: 'launcher.mjs',
   dependencies: { 'dsh-plugin-desktop': manifest.version, 'dsh-lark-desktop-cloud': '0.1.0' },
-  workspaces: ['dsh-plugin-desktop', 'mewclaw-cloud'],
-  scripts: { build: 'npm run build --workspace dsh-plugin-desktop' },
+  workspaces: ['dsh-plugin-desktop', 'mewclaw-cloud', 'mewclaw-host'],
+  scripts: { build: 'npm run build --workspace mewclaw-host && npm run build --workspace dsh-plugin-desktop && npm run build --workspace mewclaw-cloud' },
 }, null, 2)}\n`);
 await writeFile(resolve(destination, 'UPSTREAM.json'), `${JSON.stringify({
   repository: 'https://github.com/anywhere-labs/dsh-desktop', revision,

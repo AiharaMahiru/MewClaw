@@ -14,10 +14,16 @@ export function workspaceTransport(req: IncomingMessage, origin: string) {
     const chunks: Uint8Array[] = []; let size = 0;
     for await (const chunk of response.body ?? []) {
       size += chunk.length;
-      if (size > 1048576) throw new Error('WORKSPACE_RESPONSE_TOO_LARGE');
+      if (size > 8 * 1024 * 1024) throw new Error('WORKSPACE_RESPONSE_TOO_LARGE');
       chunks.push(chunk);
     }
-    if (!response.ok) throw new Error(response.status === 401 ? 'WORKSPACE_LOGIN_REQUIRED' : 'WORKSPACE_CLOUD_UNAVAILABLE');
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) throw new Error('WORKSPACE_LOGIN_REQUIRED');
+      let code: unknown;
+      try { code = (JSON.parse(Buffer.concat(chunks).toString('utf8')) as { error?: unknown }).error; }
+      catch { /* 非 JSON 上游错误只返回固定错误分类。 */ }
+      throw new Error(typeof code === 'string' && /^(SYNC|WORKSPACE)_[A-Z_]+$/.test(code) ? code : 'WORKSPACE_CLOUD_UNAVAILABLE');
+    }
     const result: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
     if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('INVALID_WORKSPACE_RESPONSE');
     return result as Record<string, unknown>;
