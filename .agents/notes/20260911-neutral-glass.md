@@ -1,0 +1,3 @@
+# 中性玻璃视觉统一
+
+生产截图揭示绿色语义色阶及全局button阴影造成视觉冲突；sidebar和composer消费specific变量，原alias覆盖不完整。修订为中性双色，同时覆盖实际消费的specific变量，保持官方源码与布局不变。移除全局按钮阴影，在dialog/menu/option语义层统一圆角和内间距；参考gracefullight/liquid-glass低着色设计，不引入第二个滤镜实现。浏览器测试新增菜单padding、相邻项margin、圆角与无阴影断言，测试主题卸载同时清除specific变量。

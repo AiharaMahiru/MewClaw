@@ -8,6 +8,7 @@ export default tseslint.config(
       // esbuild 生成且包含第三方代码；源入口仍由 TypeScript/ESLint 检查。
       "packages/lark/web-auth/client.js",
       "packages/lark/atw-brand/client.js",
+      "packages/ui/liquid-glass/client.js",
       "examples/**",
       "node_modules/**",
       "var/**",

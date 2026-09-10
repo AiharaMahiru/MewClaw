@@ -1,6 +1,7 @@
 {
   "files": [],
   "references": [
+    { "path": "packages/ui/liquid-glass" },
     { "path": "packages/desktop/host" },
     { "path": "packages/desktop/workspace" },
     { "path": "packages/desktop/workspace/tsconfig.client.json" },

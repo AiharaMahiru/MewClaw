@@ -6,6 +6,8 @@ MewClaw 是基于 **DeepSeek Harness（DSH）与 Cordis** 的智能体平台，�
 
 ## 状态
 
+可选 [液态玻璃主题插件](packages/ui/liquid-glass/README.md)：官方 token 配合自有双色 SVG 壁纸与语义表面材质，设置页提供个人开关和 `liquid-glass-react` 折射预览。Linux 生产已启用，开发组合可追加 [主题 overlay](config/liquid-glass.patch.yml)。不修改官方 UI，不代表桌面已发布。
+
 桌面工作区云端配套已加入源码：自有插件支持本机文件工具、独立授权的 Shell 和目录双向同步。普通 Web 保持云端默认行为，桌面连接需显式启用 [部署 overlay](config/desktop-workspace.patch.yml)，不随 Git 更新自动上线。架构、安全边界和测试入口见 [工作区 SPEC](docs/specs/desktop-workspace.md) 与 [插件说明](packages/desktop/workspace/README.md)；桌面发行和原生授权界面由 `desktop` 分支维护。
 
 DSH 核心及官方插件锁定 `0.1.5-rc.1`。lightweight 不再裁剪执行能力，保留模式 ID 并复用官方 standard；Scope、目录授权、审批及 OCI 边界不变。2026-09-10 已切换生产 `R3-dsh-015-rc1-presetfix-20260910`，包含模式人设与PTC兼容修复，基础健康检查通过，等待用户实际功能测试；尚未提交或推送。见 [升级说明](docs/dsh-0.1.5-upgrade.md)。

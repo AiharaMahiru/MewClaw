@@ -437,6 +437,9 @@ importers:
       dsh-lark-image:
         specifier: workspace:*
         version: link:packages/lark/image
+      dsh-lark-liquid-glass:
+        specifier: workspace:*
+        version: link:packages/ui/liquid-glass
       dsh-lark-postgres-runtime:
         specifier: workspace:*
         version: link:infra/postgres
@@ -785,6 +788,9 @@ importers:
       dsh-lark-desktop-workspace:
         specifier: workspace:*
         version: link:../../packages/desktop/workspace
+      dsh-lark-liquid-glass:
+        specifier: workspace:*
+        version: link:../../packages/ui/liquid-glass
       dsh-lark-run:
         specifier: workspace:*
         version: link:../../packages/lark/run
@@ -1064,6 +1070,9 @@ importers:
       dsh-lark-atw-brand:
         specifier: workspace:*
         version: link:../../lark/atw-brand
+      dsh-lark-liquid-glass:
+        specifier: workspace:*
+        version: link:../../ui/liquid-glass
       dsh-lark-web-auth:
         specifier: workspace:*
         version: link:../../lark/web-auth
@@ -2160,6 +2169,22 @@ importers:
       '@deepseek-ai/cordis':
         specifier: 4.0.2
         version: 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.7)(@deepseek-ai/cordis-plugin-loader@1.0.3)
+
+  packages/ui/liquid-glass:
+    dependencies:
+      liquid-glass-react:
+        specifier: 1.1.1
+        version: 1.1.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+    devDependencies:
+      '@types/react':
+        specifier: ~18.3.1
+        version: 18.3.28
+      react:
+        specifier: 18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: 18.3.1
+        version: 18.3.1(react@18.3.1)
 
   packages/web/firecrawl:
     dependencies:
@@ -6948,6 +6973,12 @@ packages:
 
   linkify-it@5.0.0:
     resolution: {integrity: sha512-5aHCbzQRADcdP+ATqnDuhhJ/MRIqDkZX5pyjFHRRysS8vZ5AbqGEoFIb6pYHPZ+L/OC2Lc+xT8uHVVR5CAK/wQ==}
+
+  liquid-glass-react@1.1.1:
+    resolution: {integrity: sha512-pKzaktaMAEztd93wpWcz2Z5Z9qdLJUNJdMX+n00Ca4XsnrLTQ5xJzm/+GQXZUeuFXe/PQ8ziVMZO6531PyaFJw==}
+    peerDependencies:
+      react: '>=19'
+      react-dom: '>=19'
 
   locate-path@6.0.0:
     resolution: {integrity: sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==}
@@ -13745,6 +13776,11 @@ snapshots:
   linkify-it@5.0.0:
     dependencies:
       uc.micro: 2.1.0
+
+  liquid-glass-react@1.1.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+    dependencies:
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   locate-path@6.0.0:
     dependencies:

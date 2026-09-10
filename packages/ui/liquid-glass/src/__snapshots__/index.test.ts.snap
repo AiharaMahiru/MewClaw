@@ -1,0 +1,62 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`液态玻璃主题配置 > 所有覆盖都是公开 alias 并提供双色模式 1`] = `
+{
+  "--dsw-alias-bg-base": {
+    "dark": "rgb(25 25 29 / 28%)",
+    "light": "rgb(242 242 244 / 28%)",
+  },
+  "--dsw-alias-bg-layer-1": {
+    "dark": "rgb(35 35 39 / 78%)",
+    "light": "rgb(250 250 252 / 68%)",
+  },
+  "--dsw-alias-bg-layer-2": {
+    "dark": "rgb(35 35 40 / 96%)",
+    "light": "rgb(255 255 255 / 94%)",
+  },
+  "--dsw-alias-bg-layer-3": {
+    "dark": "#303035",
+    "light": "#ffffff",
+  },
+  "--dsw-alias-bg-module-platform": {
+    "dark": "rgb(37 37 43 / 84%)",
+    "light": "rgb(233 233 238 / 76%)",
+  },
+  "--dsw-alias-border-l1": {
+    "dark": "#494951",
+    "light": "#ceced6",
+  },
+  "--dsw-alias-border-l2": {
+    "dark": "#393940",
+    "light": "#dddde3",
+  },
+  "--dsw-alias-interactive-bg-active": {
+    "dark": "rgb(220 220 235 / 17%)",
+    "light": "rgb(50 50 65 / 14%)",
+  },
+  "--dsw-alias-interactive-bg-hover": {
+    "dark": "rgb(220 220 235 / 10%)",
+    "light": "rgb(50 50 65 / 8%)",
+  },
+  "--dsw-specific-input-major": {
+    "dark": "rgb(36 36 44 / 78%)",
+    "light": "rgb(250 250 252 / 76%)",
+  },
+  "--dsw-specific-menu": {
+    "dark": "rgb(36 36 44 / 88%)",
+    "light": "rgb(250 250 252 / 86%)",
+  },
+  "--dsw-specific-selector": {
+    "dark": "rgb(255 255 255 / 9%)",
+    "light": "rgb(255 255 255 / 28%)",
+  },
+  "--dsw-specific-sidebar-fill": {
+    "dark": "rgb(28 28 35 / 50%)",
+    "light": "rgb(250 250 252 / 48%)",
+  },
+  "--dsw-specific-sidebar-nav-item-active": {
+    "dark": "#41414b",
+    "light": "#dddde5",
+  },
+}
+`;

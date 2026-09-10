@@ -1,5 +1,7 @@
 # Web 共享能力交接（2026-09-10）
 
+主题 `packages/ui/liquid-glass` 已随 `R3-title-nav-20260911` 发布 Linux 生产：官方双色 token、设置个人开关、自有 SVG 背景和 HTML/ARIA 语义材质；标题和横向标签保持透明无框，官方和其他包未改。49项测试及候选 Chromium 通过，六个生产服务均运行于当前 release，真实登录交互仍需用户实测。后续向 desktop 合入时保留共享包唯一实现，先核对桌面固定版 DSH 的主题 API，再创建独立候选验证；不可直接复制 Web 的官方版本锁定或修改社区子模块。当前尚未合入桌面分支，具体边界见 `packages/ui/liquid-glass/README.md`。
+
 桌面工作区已从 desktop-dev 候选按文件迁入 `packages/desktop`，增加本机 Shell 和目录双向同步；桌面 Host/原生授权/打包仍由 `desktop` 分支维护。不要把 desktop-dev 整分支反向合并 master。
 
 共享实现：`packages/desktop/host`、`packages/desktop/workspace`；认证入口：`packages/auth/edge/src/desktop-workspace.ts`；启用示例：`config/desktop-workspace.patch.yml`。默认禁用新绑定但保留持久化模式 guard；源码推送不等于生产启用。契约见 `docs/specs/desktop-workspace.md`。
