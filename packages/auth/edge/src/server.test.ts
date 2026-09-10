@@ -212,8 +212,7 @@ describe("AuthEdgeServer", () => {
     expect(adminHome.headers.get("cache-control")).toBe("private, no-store");
     const adminHtml = await adminHome.text();
     expect(adminHtml).toContain("remoteAdminSettings:true");
-    expect(adminHtml).toContain("const t=globalThis.__DSH_TRANSPORT__??={};t.ownsHost=true");
-    expect(adminHtml.indexOf("t.ownsHost=true")).toBeLessThan(adminHtml.indexOf('globalThis["__DSH_BOOT__"]'));
+    expect(adminHtml).not.toContain("ownsHost");
     expect(adminHtml).toContain("dsh.auth.account.v1");
     expect(adminHtml).toContain("@deepseek-ai/dsh-cordis-client-runner");
     expect(adminHtml).toContain("@deepseek-ai/dsh-client-ui-cordis");
@@ -238,7 +237,7 @@ describe("AuthEdgeServer", () => {
     const memberHome = await fetch(`${base}/`, { headers: { cookie: cookies(memberVerified).join("; ") } });
     const memberHtml = await memberHome.text();
     expect(memberHtml).toContain("__DSH_AUTH_EDGE__={remoteSettings:true};");
-    expect(memberHtml).toContain("const t=globalThis.__DSH_TRANSPORT__??={};t.ownsHost=true");
+    expect(memberHtml).not.toContain("ownsHost");
     expect(memberHtml).toContain("localStorage.removeItem(x)");
     expect(memberHtml).not.toContain("remoteAdminSettings:true");
     expect(memberHtml).not.toContain("@deepseek-ai/dsh-cordis-client-runner");

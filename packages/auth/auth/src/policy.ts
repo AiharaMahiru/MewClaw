@@ -6,7 +6,7 @@ import type { AuthMode, AuthRole, AuthUser } from "./types.js";
 export interface AuthAccessPolicy {
   role: AuthRole;
   mode: AuthMode;
-  defaultPreset: "lark-standard" | "lark-lightweight";
+  defaultPreset: "standard" | "lark-lightweight";
   allowedPresets: readonly string[];
   workspaceRoot: string;
 }
@@ -22,8 +22,8 @@ export function accessPolicy(user: AuthUser, roots: { user: string; admin: strin
   return {
     role: user.role,
     mode: admin ? "full" : "lightweight",
-    defaultPreset: admin ? "lark-standard" : "lark-lightweight",
-    allowedPresets: admin ? FULL_PRESETS : USER_PRESETS,
+    defaultPreset: admin ? "standard" : "lark-lightweight",
+    allowedPresets: USER_PRESETS,
     workspaceRoot: resolve(admin ? roots.admin : roots.user, user.id),
   };
 }

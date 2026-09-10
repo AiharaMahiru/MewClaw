@@ -2,6 +2,7 @@ import { AccountCenterSection } from "./client-account.js";
 import type { AccountUser, ClientContext, ModuleLoader, ReactApi } from "./client-contracts.js";
 import { useAccountUser } from "./client-data.js";
 import { installAccountStyles } from "./client-styles.js";
+import { installRemoteSettings } from "./client-settings.js";
 
 const loader = (globalThis as typeof globalThis & { __ModuleLoader__?: ModuleLoader }).__ModuleLoader__;
 
@@ -102,6 +103,10 @@ loader?.load({
     }
 
     function apply(ctx: ClientContext): void {
+      if ((globalThis as typeof globalThis & { __DSH_AUTH_EDGE__?: { remoteSettings?: boolean } }).__DSH_AUTH_EDGE__?.remoteSettings) {
+        const { Service } = require("@deepseek-ai/cordis") as { Service: Parameters<typeof installRemoteSettings>[1] };
+        installRemoteSettings(ctx as unknown as Parameters<typeof installRemoteSettings>[0], Service);
+      }
       ctx.effect(() => installNetworkStatus(ctx), "dsh-lark-web-auth: network status");
       ctx.effect(() => ctx.slots.inject("settings.trigger", () => ctx.slots.register({
         name: "settings.trigger",
@@ -116,6 +121,6 @@ loader?.load({
       }, () => AccountCenterSection(React))), "dsh-lark-web-auth: account center section");
     }
 
-    return { apply, inject: ["slots", "connection"] };
+    return { apply, inject: ["slots", "connection", "remote", "remote.settings"] };
   },
 });

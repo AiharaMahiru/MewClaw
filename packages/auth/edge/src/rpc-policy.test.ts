@@ -135,7 +135,7 @@ describe("RPC authorization policy", () => {
 
     const presetDecision = await authorizeRpc({ method: "agentPreset.list", payload: {} }, { service, user: userA, roots });
     const presets = await filterRpcResponse({ result: { value: { presets: [{ id: "lark-lightweight" }, { id: "lark-standard" }, { id: "liangshen" }, { id: "standard" }, { id: "ptc" }, { id: "minimal" }, { id: "cordis" }, { id: "user-experiment" }] } } }, presetDecision, { service, user: userA, roots });
-    expect((presets.result as { value: { presets: Array<{ id: string }> } }).value.presets.map((item) => item.id)).toEqual(["lark-lightweight", "lark-standard", "liangshen", "standard", "ptc", "minimal", "cordis"]);
+    expect((presets.result as { value: { presets: Array<{ id: string }> } }).value.presets.map((item) => item.id)).toEqual(["lark-lightweight", "liangshen", "standard", "cordis"]);
   });
 
   it("filters nested workspace sessions and archived session ids", async () => {
@@ -414,7 +414,7 @@ describe("RPC authorization policy", () => {
   it("keeps the full roster and protects session export ownership", async () => {
     const store = new MemoryAuthStore();
     const service = new AuthService({ store, mail: { sendVerification: async () => undefined, sendPasswordReset: async () => undefined } });
-    expect(accessPolicy({ ...userA, role: "admin", defaultMode: "full" }, roots).allowedPresets).toEqual(["lark-standard", "liangshen", "standard", "ptc", "minimal", "cordis"]);
+    expect(accessPolicy({ ...userA, role: "admin", defaultMode: "full" }, roots).allowedPresets).toEqual(["lark-lightweight", "lark-standard", "liangshen", "standard", "ptc", "minimal", "cordis"]);
     await service.saveResource({ resourceType: "session", resourceId: "foreign", userId: "user-b", resourcePath: "D:/workspaces/users/user-b", createdAt: "2026-01-01T00:00:00.000Z" });
     await expect(authorizeRpc({ method: "session.export", payload: { sessionId: "foreign" } }, { service, user: userA, roots })).resolves.toMatchObject({ denied: "RESOURCE_NOT_ALLOWED" });
   });

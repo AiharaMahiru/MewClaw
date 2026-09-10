@@ -227,7 +227,10 @@ export async function filterRpcResponse(body: Record<string, unknown>, decision:
   if ((decision.method === "host.createDirectory" || decision.method === "directoryPicker.createDirectory") && options.user.role !== "admin") await sanitizeCreatedDirectory(nextValue, policy.workspaceRoot);
   if (decision.method === "agentPreset.list" || decision.method === "agentPresets.list") {
     const key = Array.isArray(nextValue.presets) ? "presets" : Array.isArray(nextValue.items) ? "items" : undefined;
-    if (key) nextValue[key] = (nextValue[key] as unknown[]).filter((item) => item && typeof item === "object" && policy.allowedPresets.includes(stringValue((item as Record<string, unknown>).id) ?? ""));
+    const names: Record<string, string> = { "lark-lightweight": "日常助手", standard: "通用工作", liangshen: "高效执行", cordis: "插件开发" };
+    if (key) nextValue[key] = (nextValue[key] as unknown[])
+      .filter((item) => item && typeof item === "object" && Object.hasOwn(names, stringValue((item as Record<string, unknown>).id) ?? "") && policy.allowedPresets.includes(stringValue((item as Record<string, unknown>).id) ?? ""))
+      .map((item) => { const row = item as Record<string, unknown>; return { ...row, name: names[String(row.id)] }; });
   }
   if (decision.method === "session.list" && Array.isArray(nextValue.items)) {
     nextValue.items = await filterSessionItems(nextValue.items, options, (item) => stringValue(item.sessionId));
