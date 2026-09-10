@@ -32,9 +32,16 @@ describe('真实客户端布局模块与Cordis释放', () => {
     expect(typeof clientModule('@deepseek-ai/dsh-client-ui-conversation').apply).toBe('function');
     const ctx = new Context();
     const roots = new Set<unknown>();
+    const rootContributions = new Set<any>();
     const slots = {
       register: (spec: any) => { roots.add(spec); return () => { roots.delete(spec); }; },
       inject: (_name: string, callback: () => unknown) => ctx.effect(callback as any),
+      provideRoot: (contribution: any) => {
+        rootContributions.add(contribution);
+        return () => { rootContributions.delete(contribution); };
+      },
+      entries: () => [],
+      subscribe: () => () => {},
     };
     ctx.reflect.provide('slots', slots);
     ctx.reflect.provide('theme', { getTheme: () => ({ active: { colorScheme: 'light', tokens: {} } }) });
@@ -49,9 +56,15 @@ describe('真实客户端布局模块与Cordis释放', () => {
       await fiber;
       expect(ctx.reflect.get('layout', false)).toBeDefined();
       expect([...roots].filter((spec: any) => spec.name === 'root')).toHaveLength(1);
+      if (mode !== 'compatibility') {
+        const panelInfo = [...rootContributions].find(value => value.hooks?.panelInfo)?.hooks.panelInfo;
+        expect(typeof panelInfo?.getSnapshot).toBe('function');
+        expect(panelInfo.getSnapshot()).toEqual({ activePanelId: null });
+      }
       await fiber.dispose();
       expect(ctx.reflect.get('layout', false)).toBeUndefined();
       expect([...roots].filter((spec: any) => spec.name === 'root')).toHaveLength(0);
+      expect(rootContributions.size).toBe(0);
     }
   });
 });

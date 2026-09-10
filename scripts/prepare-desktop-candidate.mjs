@@ -17,6 +17,8 @@ const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: source, encod
 if (revision !== 'a1ddcda8e701a8490c619ce411ea8a3d6daa1453') throw new Error('上游提交与评审基线不一致');
 await mkdir(destination, { recursive: true });
 await cp(resolve(source, 'dsh-plugin-desktop'), resolve(destination, 'dsh-plugin-desktop'), { recursive: true });
+const desktopPatch = fileURLToPath(new URL('../apps/desktop/patches/cloud-layout-bridge.patch', import.meta.url));
+execFileSync('git', ['apply', '--whitespace=error-all', desktopPatch], { cwd: destination, stdio: 'inherit' });
 await cp(resolve(source, 'LICENSE'), resolve(destination, 'UPSTREAM-LICENSE'));
 await cp(fileURLToPath(new URL('../apps/desktop/plugins/cloud', import.meta.url)), resolve(destination, 'mewclaw-cloud'), { recursive: true });
 await cp(fileURLToPath(new URL('../packages/desktop/host', import.meta.url)), resolve(destination, 'mewclaw-host'), { recursive: true, filter: path => !path.split(/[\\/]/).includes('lib') });
@@ -37,6 +39,7 @@ await writeFile(hostTsconfigPath, JSON.stringify(hostTsconfig, null, 2) + '\n');
 await cp(fileURLToPath(new URL('../apps/desktop/launcher.mjs', import.meta.url)), resolve(destination, 'launcher.mjs'));
 await cp(fileURLToPath(new URL('../apps/desktop/electron-builder.cjs', import.meta.url)), resolve(destination, 'electron-builder.cjs'));
 const sourceChanges = [];
+sourceChanges.push('dsh-plugin-desktop: 为云端 DSH 0.1.5 补齐 main/rightbar、panelInfo 与布局服务兼容契约');
 for (const filename of ['index.ts', 'notifications.ts']) {
   const path = resolve(destination, 'dsh-plugin-desktop/src', filename);
   const original = await readFile(path, 'utf8');
