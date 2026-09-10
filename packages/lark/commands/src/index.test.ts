@@ -172,6 +172,14 @@ describe("飞书 Web 配对登录", () => {
       vi.unstubAllGlobals();
     }
   });
+
+  it("个人机器人 /login 明确说明账号已归属", async () => {
+    const env = makeCtx();
+    apply(env as never, { pairingUnavailableMessage: "该个人机器人已归属当前 MewClaw 账号，无需再次绑定。" });
+    const result = await env.service().handle({ scope, chatId: makeChatId("oc_1"), command: { name: "login", args: "" } });
+    expect(result?.markdown).toContain("已归属当前 MewClaw 账号");
+    expect(result?.markdown).not.toContain("尚未配置");
+  });
 });
 
 describe("命令操作卡", () => {

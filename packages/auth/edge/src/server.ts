@@ -23,6 +23,7 @@ import { LoginGuard, RateLimiter } from "./rate-limit.js";
 import { UPGRADE_ABORTED, UpgradeTaskTracker } from "./upgrade-tasks.js";
 import { promptAuditInput, type PromptAuditor } from "./prompt-audit.js";
 import { RemoteEventResults } from "./remote-event-results.js";
+import { handleBotAccount, handleBotInternal } from "./feishu-bots.js";
 
 const AUTHENTICATED_USER_HEADER = "x-dsh-auth-user-id";
 const INTERNAL_MODEL_RESOLVE_PATH = "/internal/models/resolve";
@@ -122,6 +123,9 @@ export class AuthEdgeServer {
     if (url.pathname === "/healthz" && req.method === "GET") { sendJson(res, 200, { ok: true }); return; }
     if (req.method === "POST" && url.pathname === "/internal/pairing/start") { return this.beginPairing(req, res); }
     if (req.method === "POST" && url.pathname === INTERNAL_MODEL_RESOLVE_PATH) { return this.resolveInternalModelRoute(req, res); }
+    if (url.pathname === "/internal/feishu-bots" || url.pathname === "/internal/feishu-bots/claim") {
+      return handleBotInternal(req, res, url.pathname, this.#service.feishuBots, this.#config);
+    }
     if (isUnsafe(req) && !mutationAllowed(req, url, this.#config.trustedOrigins)) throw httpError(403, "CSRF_INVALID");
     if (url.pathname.startsWith("/auth/")) { await this.handleAuth(req, res, url); return; }
     if (isPublicAssetRequest(req, url)) { await this.proxyPublicAsset(req, res); return; }
@@ -159,6 +163,12 @@ export class AuthEdgeServer {
   }
 
   private async handleAuth(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+    if (["/auth/feishu-bot", "/auth/feishu-bot/test", "/auth/feishu-bot/connection"].includes(url.pathname)) {
+      const current = await this.current(req);
+      if (!current) { sendError(res, 401, "UNAUTHORIZED"); return; }
+      if (req.method !== "GET" && !this.#generalLimiter.allow(`feishu-bot:${current.user.id}`)) throw httpError(429, "RATE_LIMITED");
+      return handleBotAccount(req, res, url.pathname, current.user.id, this.#service.feishuBots, this.#config);
+    }
     if (req.method === "GET" && url.pathname === "/auth/account") return this.redirectLegacyAccount(req, res);
     if (req.method === "GET" && url.pathname === "/auth/me") { const current = await this.current(req); if (!current) { sendError(res, 401, "UNAUTHORIZED"); return; } sendJson(res, 200, { user: publicUser(current.user) }); return; }
     if (url.pathname === "/auth/models" && (req.method === "GET" || req.method === "POST")) return this.models(req, res);

@@ -31,8 +31,7 @@
 # ── identity ────────────────────────────────────────────────────────────────
 
 # Phase 1 shows only this one-line persona: `tool-bootstrap` filters the
-# assembled sections down to the persona section (`deployment:persona`, the
-# name `dsh-persona` registers under, plus the legacy `persona` name) during
+# assembled sections down to the official persona prefix/suffix sections during
 # phase 1 and restores every section after promotion, appending the session's
 # working directory to the persona — so the agent knows its workspace and
 # plan-mode's `plan:policy` takes effect instead of being permanently
@@ -40,7 +39,7 @@
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: You are a helpful software engineer assistant.
+    prefix: You are a helpful software engineer assistant.
 
 # Two-phase input bootstrap with the exact Minimal phase-1 tools. Before the
 # first durable tool/call event the model sees only persistent `bash` plus
@@ -78,7 +77,7 @@
     compactionTools: [read, write, edit, glob, grep, todo_write, ask_user_question]
     deferredSources: [agent-instructions, skill-catalog]
     deferredGraceSteps: 1
-    promotedPresentation: code
+    promotedPresentation: ptc
     # Issue #388: after promotion, inject one non-imperative hint (reference
     # files exist at these paths; read them on demand) instead of the full
     # AGENTS.md dump — the full-text injection measurably flips the anchored

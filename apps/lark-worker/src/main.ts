@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type {} from "@deepseek-ai/dsh-host-webserver";
+import type {} from "@deepseek-ai/dsh-agent-presets";
 import { boot, loadLayeredEnv, loadOverlayPatches, resolveConfigPath } from "@deepseek-ai/dsh-app-boot";
 import { provideCmdline } from "@deepseek-ai/dsh-cmdline";
 import { DSH_LAUNCH_ENVIRONMENT_KEY } from "@deepseek-ai/dsh-launch-environment";
@@ -91,9 +92,14 @@ const ctx = await boot("lark-worker", configPath, patches, (hostCtx) => {
 });
 console.log("[lark-worker] booted");
 
-// 冒烟模式（--boot-check）：组合落定后立即干净关停。
+// 冒烟模式实际挂载每个模式，覆盖首次选择才加载的插件；不创建会话或执行模型。
 if (process.argv.includes("--boot-check")) {
-  await ctx.fiber.dispose();
+  try {
+    for (const preset of await ctx.agentPresets.list()) {
+      await ctx.agentPresets.standingKeyFor(preset.id);
+      console.log(`[lark-worker] preset mounted: ${preset.id}`);
+    }
+  } finally { await ctx.fiber.dispose(); }
   console.log("[lark-worker] disposed");
   process.exit(0);
 }

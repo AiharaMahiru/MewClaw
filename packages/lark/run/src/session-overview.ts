@@ -1,7 +1,7 @@
 import { SessionId, type SessionEvent } from "@deepseek-ai/dsh-session";
 import type { TodoItem } from "@deepseek-ai/dsh-tool-todo";
 import type { SessionPersistence } from "@deepseek-ai/dsh-session-persistence";
-import type { LarkSessionDirectory } from "dsh-lark-session-directory";
+import { inspectStoredSession, type LarkSessionDirectory } from "dsh-lark-session-directory";
 
 import {
   deterministicSessionIdForScope,
@@ -70,8 +70,8 @@ export async function readSessionOverview(
   const sessionId = target.mode === "shared"
     ? target.sessionId
     : sessionIdForScope(input.scope, input.sessionGeneration);
-  const snapshots = await persistence.listSnapshots();
+  const snapshots = await persistence.list();
   if (!snapshots.some((snapshot) => snapshot.header.id === sessionId)) return { exists: false };
-  const inspection = await persistence.inspect(sessionId);
+  const inspection = await inspectStoredSession(persistence, sessionId);
   return { exists: true, ...project(inspection.events) };
 }

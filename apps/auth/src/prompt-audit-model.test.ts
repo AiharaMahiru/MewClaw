@@ -44,7 +44,7 @@ describe("审计模型协议", () => {
       await writeFile(join(dshHome, "settings.yaml"), [
         "llm-deepseek:", `  baseURL: http://127.0.0.1:${port}/v1`,
         "  apiKeyEnv: AUDIT_TEST_CREDENTIAL", "  thinking: disabled",
-        "  modelAliases:", "    deepseek-v4-flash: deepseek-v4.1-flash-expires-on-0910",
+        "  modelAliases:", "    deepseek-v4.1-flash: deepseek/deepseek-v4.1-flash",
       ].join("\n"));
       await writeFile(join(dshHome, ".credentials.yaml"), "AUDIT_TEST_CREDENTIAL: synthetic-managed-key\n", { mode: 0o600 });
       model = await createPromptAuditModel({
@@ -55,8 +55,8 @@ describe("审计模型协议", () => {
         ]),
       });
       await expect(model.generate(input())).resolves.toBe('{"allow":false}');
-      expect(requests).toEqual([{ url: "/v1/chat/completions", authorization: "Bearer synthetic-managed-key", body: expect.any(String) }]);
-      expect(JSON.parse(requests[0]!.body)).toMatchObject({ model: "deepseek-v4.1-flash-expires-on-0910", thinking: { type: "disabled" } });
+      expect(requests).toEqual([{ url: "/v1/chat/completions", authorization: "Bearer synthetic-stale-control-key", body: expect.any(String) }]);
+      expect(JSON.parse(requests[0]!.body)).toMatchObject({ model: "deepseek/deepseek-v4.1-flash", thinking: { type: "disabled" } });
     } finally {
       await model?.close();
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
@@ -64,7 +64,7 @@ describe("审计模型协议", () => {
     }
   });
 
-  it("固定使用官方 Flash 路由，隔离系统规则与用户文本，并传递取消信号", async () => {
+  it("固定使用 V4.1 Flash 路由，隔离系统规则与用户文本，并传递取消信号", async () => {
     const { model, requests, close } = fixture([
       { type: "reasoning-delta", index: 0, text: "内部推理" },
       { type: "text-delta", index: 1, text: '{"allow":' },
@@ -74,7 +74,7 @@ describe("审计模型协议", () => {
     const request = input();
     await expect(model.generate(request)).resolves.toBe('{"allow":false}');
     expect(requests[0]).toMatchObject({
-      provider: "deepseek-official", model: "deepseek-v4-flash", system: request.system,
+      provider: "deepseek-official", model: "deepseek-v4.1-flash", system: request.system,
       signal: request.signal, maxTokens: 512,
       messages: [{ role: "user", content: [{ type: "text", text: request.text }] }],
     });

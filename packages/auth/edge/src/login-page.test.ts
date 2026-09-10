@@ -12,12 +12,19 @@ describe("auth pages", () => {
       expect(page).toContain("class=\"auth-card\"");
       expect(page).toContain("MewClaw Harness");
       expect(page).toContain('rel="icon" type="image/svg+xml" href="/favicon.svg"');
-      expect(page).toContain('viewBox="0 0 240 240"');
-      expect(page).toContain("rotate(45 120 120)");
-      expect(page).toContain('stroke="currentColor"');
+      expect(page).toContain('viewBox="0 0 512 512"');
+      expect(page).toContain('shape-rendering="geometricPrecision"');
+      expect(page).toContain("mewclaw-mark-ink");
+      expect(page).toContain("mewclaw-mark-cutout");
+      expect(page).toContain("--mewclaw-mark-bg: #181717");
       expect(page).toContain("class=\"auth-shell\"");
       expect(page).toContain("class=\"auth-header\"");
       expect(page).toContain("viewport");
+      expect(page).toContain('class="window-bar"');
+      expect(page).toContain('class="auth-boot"');
+      expect(page).toContain('sessionStorage.getItem("mewclaw.boot.v1")');
+      expect(page).toContain("backdrop-filter: blur(28px)");
+      expect(page).toContain("pointer-events: none");
     }
   });
 
@@ -26,9 +33,9 @@ describe("auth pages", () => {
     expect(login).toContain("/auth/register");
     expect(login).toContain("/auth/login");
     expect(login).toContain("x-csrf-token");
-    expect(login).toContain('data-auth-theme="light"');
-    expect(login).toContain(".auth-page { min-height: 100dvh;");
-    expect(login).toContain("width: min(420px, 100%);");
+    expect(login).toContain('<html lang="zh-CN"><head>');
+    expect(login).toContain(".auth-page { position: relative; min-height: 100dvh;");
+    expect(login).toContain("width: min(438px, 100%);");
     expect(login).toContain("@media (max-width: 520px)");
     expect(login).toContain('id="password-toggle"');
     expect(login).toContain('aria-label="显示密码"');

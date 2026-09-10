@@ -15,7 +15,7 @@
  * `we` and no `let me`) or the `maxBootstrapSteps` fallback.
  * `promoteAfterFirstResponse` promotes a tool-less first response once it has
  * responded, and also releases an anchor-gated session when its first turn
- * ends (`turn/end`). With `promotedPresentation: code` the promoted catalog
+ * ends (`turn/end`). With `promotedPresentation: ptc` the promoted catalog
  * is presented as PTC Mode: the wire shows a single `run_code` tool
  * backed by the generated SDK, switched at the step boundary so the current
  * step's native calls are never interrupted. `deferredSources` and
@@ -47,6 +47,8 @@
  * with the phase-1 quarantine and the stabilization controls above.
  */
 
+import { PERSONA_PREFIX_SECTION, PERSONA_SUFFIX_SECTION } from '@deepseek-ai/dsh-system-prompt'
+
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'anchored-tool-bootstrap'
 
@@ -54,13 +56,9 @@ export const name = 'anchored-tool-bootstrap'
 export const inject = ['systemPrompt', 'tools']
 
 /**
- * Prompt section names that carry the preset persona. The `dsh-persona` row
- * registers the preset persona as `deployment:persona` (the PERSONA_SECTION
- * name of `@deepseek-ai/dsh-system-prompt`), shadowing the deployment
- * default for the preset scope; `persona` is the legacy name kept for older
- * harnesses that registered the persona section without the prefix.
+ * 使用安装版本官方导出的 section 名称，保留前缀与后缀，不依赖旧版名称。
  */
-const PERSONA_SECTION_NAMES = new Set(['deployment:persona', 'persona'])
+const PERSONA_SECTION_NAMES = new Set([PERSONA_PREFIX_SECTION, PERSONA_SUFFIX_SECTION])
 
 /**
  * Workspace line a promoted persona gains. Phase 1 keeps the exact one-line
@@ -285,7 +283,7 @@ function resetToControlled(state) {
  * per-agent view of the host registry, so the switch affects this session only.
  */
 function applyPresentation(agent, state, policy) {
-  if (state.presentationApplied || policy.promotedPresentation !== 'code') return
+  if (state.presentationApplied || policy.promotedPresentation !== 'ptc') return
   const tools = agent.ctx.tools
   // Latch only after the switch really happened: without a tools view there
   // is nothing to present, and latching early would skip PTC Mode forever.
@@ -293,7 +291,7 @@ function applyPresentation(agent, state, policy) {
   // The disposer restores the deployment-default (native) presentation; it is
   // kept on the state so a post-compaction reset can release PTC Mode and
   // let the phase-1 catalog filter see the native tool list again.
-  state.presentationDisposer = tools.presentAs('code')
+  state.presentationDisposer = tools.presentAs('ptc')
   state.presentationApplied = true
 }
 
@@ -386,8 +384,8 @@ export function apply(ctx, config) {
   const messageSources = new Set(stringList(config.messageSources, 'messageSources', DEFAULT_MESSAGE_SOURCES))
   const deferredSources = new Set(stringListOrEmpty(config.deferredSources, 'deferredSources'))
   const presentation = config.promotedPresentation ?? 'native'
-  if (presentation !== 'native' && presentation !== 'code') {
-    throw new TypeError(`${name}: promotedPresentation must be "native" or "code"`)
+  if (presentation !== 'native' && presentation !== 'ptc') {
+    throw new TypeError(`${name}: promotedPresentation must be "native" or "ptc"`)
   }
 
   let warned = false

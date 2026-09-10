@@ -210,13 +210,23 @@ function parseEvent(record: Record<string, unknown>, envelope: RunStreamItem["en
     && typeof event.time === "number"
     && asRecord(event.data) !== undefined;
   if (!valid) throw new RunClientError("STREAM_SCHEMA_ERROR", "事件行 event 形状非法");
-  return { event: event as RunStreamItem["event"], envelope };
+  return { event: event as NonNullable<RunStreamItem["event"]>, envelope };
 }
 
 /** 先验 envelope，再区分事件行和终止行。 */
 export function parseLine(line: string, request: RunRequest, maxBytes: number): RunStreamItem | RunStreamDone {
   const record = parseJsonLine(line, maxBytes);
   const envelope = parseEnvelope(record, request);
+  if ("assistant" in record) {
+    const value = asRecord(record.assistant);
+    if ("event" in record || "outcome" in record || !value
+      || !Number.isSafeInteger(value.turn) || Number(value.turn) < 0
+      || !Number.isSafeInteger(value.step) || Number(value.step) < 0
+      || typeof value.text !== "string") {
+      throw new RunClientError("STREAM_SCHEMA_ERROR", "临时正文行非法");
+    }
+    return { envelope, assistant: { turn: Number(value.turn), step: Number(value.step), text: value.text } };
+  }
   return "outcome" in record && !("event" in record)
     ? parseOutcome(record, envelope)
     : parseEvent(record, envelope);

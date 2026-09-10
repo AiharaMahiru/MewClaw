@@ -19,9 +19,9 @@
     "cordis.patch.yml"
   ],
   "dependencies": {
-    "@deepseek-ai/dsh-base": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-sandbox-policy": "0.1.2-rc.1",
-    "@deepseek-ai/dsh-session-persistence-jsonl": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-base": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-sandbox-policy": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "0.1.5-rc.1",
     "dsh-cdg-bridge": "workspace:*",
     "dsh-knowledge-postgres": "workspace:*",
     "dsh-lark-deepseek-routing": "workspace:*",

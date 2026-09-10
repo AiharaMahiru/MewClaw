@@ -28,6 +28,8 @@ const AUTH_STYLES = `
   --dsw-accent: #20b8c7;
   --dsw-accent-strong: #009dde;
   --dsw-shadow-lv3: 0 34px 90px rgb(13 45 53 / 17%);
+  --mewclaw-mark-bg: #fff;
+  --mewclaw-mark-ink: #181717;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -56,6 +58,8 @@ const AUTH_STYLES = `
     --dsw-alias-state-error-primary: #f25a5a;
     --dsw-alias-state-success-primary: #4ed17e;
     --dsw-shadow-lv3: 0 20px 50px rgb(0 0 0 / 38%);
+    --mewclaw-mark-bg: #181717;
+    --mewclaw-mark-ink: #fff;
   }
 }
 
@@ -84,9 +88,11 @@ const AUTH_STYLES = `
   --dsw-alias-state-error-primary: #f25a5a;
   --dsw-alias-state-success-primary: #4ed17e;
   --dsw-shadow-lv3: 0 20px 50px rgb(0 0 0 / 38%);
+  --mewclaw-mark-bg: #181717;
+  --mewclaw-mark-ink: #fff;
 }
 
-:root[data-auth-theme="light"] { color-scheme: light; }
+:root[data-auth-theme="light"] { color-scheme: light; --mewclaw-mark-bg: #fff; --mewclaw-mark-ink: #181717; }
 * { box-sizing: border-box; }
 html { min-width: 320px; min-height: 100%; background: var(--dsw-alias-bg-base); }
 body { min-width: 320px; min-height: 100dvh; margin: 0; overflow-x: hidden; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); }
@@ -94,13 +100,21 @@ button, input { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .4; }
 
-.auth-page { min-height: 100dvh; display: grid; place-items: center; padding: 32px 20px; }
-.auth-shell { width: min(420px, 100%); }
-.auth-card { min-width: 0; padding: 32px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 20px; background: var(--dsw-alias-bg-layer-2); box-shadow: 0 18px 50px rgb(13 45 53 / 12%); }
+.auth-page { position: relative; min-height: 100dvh; display: grid; place-items: center; overflow: hidden; padding: 32px 20px; background: radial-gradient(circle at 18% 18%, rgb(32 184 199 / 16%), transparent 34%), radial-gradient(circle at 82% 78%, rgb(0 157 222 / 13%), transparent 38%), linear-gradient(145deg, #f7fafb, var(--dsw-alias-bg-base)); }
+.auth-page::before { position: absolute; inset: 0; content: ""; opacity: .42; background-image: radial-gradient(rgb(16 38 44 / 12%) .65px, transparent .65px); background-size: 18px 18px; pointer-events: none; mask-image: linear-gradient(to bottom, #000, transparent 72%); }
+.auth-shell { position: relative; z-index: 1; width: min(438px, 100%); }
+.auth-card { min-width: 0; overflow: hidden; padding: 0 34px 34px; border: 1px solid rgb(255 255 255 / 72%); border-radius: 22px; background: rgb(255 255 255 / 76%); box-shadow: 0 30px 80px rgb(13 45 53 / 18%), inset 0 1px 0 rgb(255 255 255 / 80%); backdrop-filter: blur(28px) saturate(145%); -webkit-backdrop-filter: blur(28px) saturate(145%); animation: auth-window-in .42s cubic-bezier(.22,1,.36,1) both; }
+.window-bar { height: 46px; margin: 0 -34px 24px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--dsw-alias-border-l1); background: rgb(255 255 255 / 30%); }
+.window-dot { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 .5px rgb(0 0 0 / 15%); }
+.window-dot:nth-child(1) { background: #ff5f57; }.window-dot:nth-child(2) { background: #febc2e; }.window-dot:nth-child(3) { background: #28c840; }
 .auth-header { display: flex; align-items: center; margin-bottom: 28px; }
 .brand { display: inline-flex; align-items: center; gap: 11px; color: var(--dsw-alias-label-primary); text-decoration: none; }
 .brand-mark { display: inline-flex; width: 48px; flex: 0 0 auto; align-items: center; justify-content: center; }
 .brand-mark svg { display: block; width: 48px; height: auto; }
+.mewclaw-mark-bg { fill: var(--mewclaw-mark-bg); }
+.mewclaw-mark-ink { fill: var(--mewclaw-mark-ink); stroke: var(--mewclaw-mark-ink); }
+.mewclaw-mark-cutout { fill: var(--mewclaw-mark-bg); stroke: var(--mewclaw-mark-bg); }
+.mewclaw-mark-ink[fill="none"], .mewclaw-mark-cutout[fill="none"], g.mewclaw-mark-ink, g.mewclaw-mark-cutout { fill: none; }
 .brand-name { font-size: 14px; line-height: 20px; font-weight: 650; letter-spacing: .01em; }
 .auth-title { margin: 0; font-size: 24px; line-height: 32px; font-weight: 650; letter-spacing: -.02em; }
 .auth-subtitle { margin: 8px 0 0; color: var(--dsw-alias-label-secondary); font-size: 14px; line-height: 22px; }
@@ -146,21 +160,44 @@ button:disabled { cursor: not-allowed; opacity: .4; }
 .status-card .auth-subtitle { margin-left: auto; margin-right: auto; max-width: 36ch; }
 .status-card .button { margin-top: 24px; }
 .hidden { display: none !important; }
+@keyframes auth-window-in { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+.auth-boot { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; pointer-events: none; background: #f5f5f7; color: #181717; animation: auth-boot-away .28s cubic-bezier(.4,0,1,1) .9s forwards; }
+.auth-boot-inner { display: grid; justify-items: center; gap: 22px; animation: auth-boot-arrive .48s cubic-bezier(.22,1,.36,1) both; }
+.auth-boot .brand-mark { width: 84px; filter: drop-shadow(0 12px 24px rgb(0 0 0 / 12%)); }.auth-boot .brand-mark svg { width: 84px; }
+.auth-boot-track { width: 108px; height: 3px; overflow: hidden; border-radius: 999px; background: rgb(24 23 23 / 12%); }.auth-boot-progress { display: block; width: 42%; height: 100%; border-radius: inherit; background: currentColor; animation: auth-boot-progress .72s cubic-bezier(.2,.8,.2,1) .12s both; }
+html.auth-boot-seen .auth-boot { display: none; }
+@keyframes auth-boot-arrive { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: scale(1); } }
+@keyframes auth-boot-progress { from { transform: translateX(-110%); } to { transform: translateX(250%); } }
+@keyframes auth-boot-away { to { opacity: 0; visibility: hidden; } }
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-auth-theme="light"]) .auth-page { background: radial-gradient(circle at 18% 18%, rgb(32 184 199 / 13%), transparent 34%), radial-gradient(circle at 82% 78%, rgb(65 118 230 / 14%), transparent 38%), linear-gradient(145deg, #111113, var(--dsw-alias-bg-base)); }
+  :root:not([data-auth-theme="light"]) .auth-page::before { background-image: radial-gradient(rgb(255 255 255 / 10%) .65px, transparent .65px); }
+  :root:not([data-auth-theme="light"]) .auth-card { border-color: rgb(255 255 255 / 12%); background: rgb(40 40 43 / 76%); box-shadow: 0 30px 80px rgb(0 0 0 / 40%), inset 0 1px 0 rgb(255 255 255 / 8%); }
+  :root:not([data-auth-theme="light"]) .window-bar { background: rgb(255 255 255 / 4%); }
+  :root:not([data-auth-theme="light"]) .field label { color: var(--dsw-alias-label-secondary); }
+  :root:not([data-auth-theme="light"]) .field input { background: rgb(255 255 255 / 7%); }
+  :root:not([data-auth-theme="light"]) .field input:focus { background: rgb(255 255 255 / 10%); }
+  :root:not([data-auth-theme="light"]) .auth-boot { background: #18181a; color: #fff; }
+}
 
 @media (max-width: 520px) {
   html, body { background: #fff; }
   .auth-page { display: block; padding: 0; }
   .auth-shell { width: 100%; }
   .auth-card { min-height: 100dvh; padding: 28px 24px 40px; border: 0; border-radius: 0; box-shadow: none; }
+  .window-bar { margin: -28px -24px 28px; }
   .auth-header { margin-bottom: 38px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  .auth-boot { opacity: 0; visibility: hidden; }
 }
 `;
 
-const BRAND = `<a class="brand" href="/" aria-label="返回 MewClaw Harness 登录"><span class="brand-mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240"><defs><mask id="mewclaw-login-v-under"><rect width="240" height="240" fill="#fff"/><path d="M76 90h28" stroke="#000" stroke-width="18"/><path d="M136 150h28" stroke="#000" stroke-width="18"/></mask></defs><g transform="rotate(45 120 120)" fill="none" stroke="currentColor" stroke-width="16"><rect x="35" y="90" width="170" height="60" rx="30"/><rect x="90" y="35" width="60" height="170" rx="30" mask="url(#mewclaw-login-v-under)"/></g></svg></span><span class="brand-name">MewClaw Harness</span></a>`;
+const BRAND = `<a class="brand" href="/" aria-label="返回 MewClaw Harness 登录"><span class="brand-mark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" shape-rendering="geometricPrecision"><circle class="mewclaw-mark-bg" cx="256" cy="256" r="256"/><path class="mewclaw-mark-ink" d="M256 132 C244 132 233 137 222 146 C208 136 196 120 184 96 C179 88 169 90 166 98 C154 130 142 172 134 200 C128 214 125 230 126 246 C123.8 281.9 38.5 324.3 51.2 351.5 A226 226 0 0 0 460.8 351.5 C473.5 324.3 388.2 281.9 386 246 C387 230 384 214 378 200 C358 130 370 172 346 98 C343 90 333 88 328 96 C316 120 304 136 290 146 C279 137 268 132 256 132 Z"/><path class="mewclaw-mark-cutout" fill="none" stroke-width="62" stroke-linecap="round" d="M116.9 410.6 A208 208 0 0 0 234.2 462.8"/><path class="mewclaw-mark-ink" fill="none" stroke-width="34" stroke-linecap="round" d="M116.9 410.6 A208 208 0 0 0 234.2 462.8"/><path class="mewclaw-mark-cutout" fill="none" stroke-width="62" stroke-linecap="round" d="M366.2 432.4 A208 208 0 0 0 462.9 234.3"/><path class="mewclaw-mark-ink" fill="none" stroke-width="34" stroke-linecap="round" d="M366.2 432.4 A208 208 0 0 0 462.9 234.3"/><g class="mewclaw-mark-ink" fill="none" stroke-width="10" stroke-linecap="round"><path d="M128 276 L44 252"/><path d="M126 300 L50 296"/></g><g class="mewclaw-mark-cutout" fill="none" stroke-width="15" stroke-linecap="round"><path d="M174 266 Q204 300 234 266"/><path d="M278 266 Q308 300 338 266"/></g><path class="mewclaw-mark-cutout" d="M247 312 L265 312 L256 325 Z" stroke-width="7" stroke-linejoin="round"/></svg></span><span class="brand-name">MewClaw Harness</span></a>`;
 
 export type AuthTheme = "light" | "dark" | "system";
 
@@ -285,12 +322,12 @@ function documentPage(title: string, content: string, script = "", theme: AuthTh
   const themeAttribute = theme === "system" ? "" : ` data-auth-theme="${theme}"`;
   const pageClassAttribute = pageClass ? ` ${pageClass}` : "";
   const cardClassAttribute = cardClass ? ` ${cardClass}` : "";
-  return `<!doctype html><html lang="zh-CN"${themeAttribute}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#eef4f5"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><title>${safeTitle} - MewClaw Harness</title><style>${AUTH_STYLES}</style></head><body><main class="auth-page${pageClassAttribute}"><div class="auth-shell"><section class="auth-card${cardClassAttribute}"><header class="auth-header">${BRAND}</header>${content}</section></div></main>${scriptTag}</body></html>`;
+  return `<!doctype html><html lang="zh-CN"${themeAttribute}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#eef4f5"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><title>${safeTitle} - MewClaw Harness</title><script>try{if(sessionStorage.getItem("mewclaw.boot.v1"))document.documentElement.classList.add("auth-boot-seen")}catch{}</script><style>${AUTH_STYLES}</style></head><body><div class="auth-boot" aria-hidden="true"><div class="auth-boot-inner"><span class="brand-mark">${BRAND.match(/<svg[\s\S]*<\/svg>/u)?.[0] ?? ""}</span><span class="auth-boot-track"><span class="auth-boot-progress"></span></span></div></div><main class="auth-page${pageClassAttribute}"><div class="auth-shell"><section class="auth-card${cardClassAttribute}"><div class="window-bar" aria-hidden="true"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div><header class="auth-header">${BRAND}</header>${content}</section></div></main>${scriptTag}<script>(()=>{const boot=document.querySelector(".auth-boot");if(!boot)return;try{sessionStorage.setItem("mewclaw.boot.v1","1")}catch{}const remove=()=>boot.remove();boot.addEventListener("animationend",event=>{if(event.animationName==="auth-boot-away")remove()},{once:true});setTimeout(remove,1400)})()</script></body></html>`;
 }
 
 export function loginPage(): string {
   const content = `<h1 id="title" class="auth-title">登录</h1><form id="form" class="form-stack"><div id="name-wrap" class="field hidden"><label for="name">显示名称</label><input id="name" autocomplete="name" maxlength="120"></div><div class="field"><label for="email">邮箱</label><input id="email" type="email" autocomplete="email" required maxlength="320" placeholder="name@example.com"></div><div class="field"><label for="password">密码</label><div class="input-wrap"><input id="password" type="password" autocomplete="current-password" required minlength="12" maxlength="256" placeholder="至少 12 个字符"><button id="password-toggle" class="password-toggle" type="button" aria-label="显示密码" aria-pressed="false">显示</button></div></div><button id="submit" class="button primary" type="submit">登录</button></form><form id="verify-form" class="form-stack hidden"><p class="auth-subtitle">验证码已发送到 <strong id="verification-email"></strong></p><div class="field"><label for="verification-code">邮箱验证码</label><input id="verification-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required placeholder="6 位数字"></div><button id="verify-submit" class="button primary" type="submit">验证并进入工作台</button><button id="resend" class="button secondary" type="button">重新发送验证码</button><button id="verify-back" class="text-button" type="button">更换邮箱</button></form><p id="message" class="auth-message" role="status" aria-live="polite"></p><div class="auth-links"><button id="toggle" class="text-button" type="button">创建新账户</button><button id="forgot" class="text-button" type="button">忘记密码</button></div>`;
-  return documentPage("登录", content, LOGIN_SCRIPT, "light");
+  return documentPage("登录", content, LOGIN_SCRIPT, "system");
 }
 
 export function pairPage(token: string, currentUser?: { email: string; displayName: string }, switchAccount = false): string {

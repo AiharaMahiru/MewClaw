@@ -100,13 +100,15 @@ export interface RunRequest {
  * 网关对每一行先验 envelope（runId + 完整 Scope 与提交一致）再消费。
  * 心跳是空行，不是本类型的实例。
  */
-export interface RunStreamItem {
-  event: SessionEvent;
+export type RunStreamItem = {
   envelope: {
     runId: RunId;
     scope: Scope;
   };
-}
+} & (
+  | { event: SessionEvent; assistant?: never }
+  | { assistant: { turn: number; step: number; text: string }; event?: never }
+);
 
 /**
  * NDJSON 桥接的终止行：每流恰好一行且是最后一行。

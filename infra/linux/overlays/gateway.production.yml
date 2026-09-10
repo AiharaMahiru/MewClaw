@@ -1,15 +1,12 @@
 # Linux production: Gateway remains a tool-free loopback consumer of Worker.
+- id: account-bot-fleet
+  config:
+    authEndpoint: http://127.0.0.1:13080/internal/feishu-bots
+    tokenEnv: AUTH_PAIRING_TOKEN
+    stateDir: /var/lib/dsh/account-bots
+    uploadsRoot: /var/lib/dsh/uploads/account-bots
+
 - id: lark-run-client
   config:
     baseURL: http://127.0.0.1:18788
     tokenEnv: WORKER_TOKEN
-
-- id: lark-gateway
-  config:
-    authorizedOpenIds: !!js (process.env.AUTHORIZED_OPEN_IDS ?? '').split(',').filter(Boolean)
-    allowedChatIds: !!js (process.env.LARK_ALLOWED_CHAT_IDS ?? '').split(',').filter(Boolean)
-    processingCardText: '正在思考…'
-    failureCardTemplate: '运行失败（{{code}}）：{{hint}}'
-    unauthorizedCardText: '未授权使用（请联系管理员）。'
-    stateDir: /var/lib/dsh/gateway
-    uploadsRoot: /var/lib/dsh/uploads

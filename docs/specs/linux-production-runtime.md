@@ -181,8 +181,9 @@ interface LinuxProductionConfig {
 `loadLayeredEnv()` 建立官方冻结快照，不直接解析 `.env`；因此
 `/var/lib/dsh/.env` 是 `project-env` 默认层，`$DSH_HOME/.credentials.yaml` 的受管值
 可以覆盖它。Worker、Gateway、Admin 不得把整份 `runtime.secrets.env` 作为继承环境
-注入，否则继承环境会反向压过 Models 页面写入的受管凭证。Auth Edge 不装载凭证
-Provider，为校验内部控制面 token 保留该环境文件。
+注入，否则继承环境会反向压过 Models 页面写入的受管凭证。Auth Edge 为校验内部控制面
+token 保留该环境文件；其独立提示词审计上下文通过官方凭证 Provider 解析引用，并额外装载
+最小范围的 `deepseek.env`，不复制密钥到另一份存储。
 
 生产 manifest 必须显式配置全部字段，不使用开发默认值。校验规则：
 

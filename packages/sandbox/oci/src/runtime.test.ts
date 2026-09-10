@@ -113,7 +113,7 @@ describe("OciSubprocessRuntime.spawn", () => {
     child.stdout.write("hi\n");
     child.once.mock.calls.find(([event]) => event === "close")![1](0, null);
     await expect(handle.done).resolves.toEqual({ exitCode: 0, signal: null });
-    expect(handle.pid).toBe(4242);
+    expect(handle).not.toHaveProperty("pid");
   });
 
   it("收集模式：有界尾部读（readFrom 偏移非消耗）", async () => {

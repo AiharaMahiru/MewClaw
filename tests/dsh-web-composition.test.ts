@@ -186,9 +186,9 @@ describe("官方 dsh Web 组合", () => {
     };
 
     expect(manifest.dependencies).toMatchObject({
-      "dsh-context": "0.42.0",
-      "@linxin666/dsh-web-all": "0.3.16",
-      "dsh-better-sidebar": "0.18.0",
+      "dsh-context": "0.48.0",
+      "@linxin666/dsh-web-all": "0.3.19",
+      "dsh-better-sidebar": "0.18.1",
     });
     expect(manifest.dsh?.profile?.bundles).not.toContain("dsh-better-sidebar");
 
@@ -206,7 +206,7 @@ describe("官方 dsh Web 组合", () => {
     const client = await readFile(repositoryPath("packages/lark/web-auth/client.js"), "utf8");
     expect(manifest.exports?.["./client"]).toEqual(expect.objectContaining({ default: "./client.js" }));
     expect(manifest.dsh?.client).toEqual(expect.objectContaining({ platform: "web", inject: [] }));
-    expect(client).toContain('inject: ["slots", "connection"]');
+    expect(client).toContain('inject: ["slots", "connection", "remote", "remote.settings"]');
     expect(client).toContain('id: "dsh-lark-web-auth"');
     expect(client).toContain('"settings.trigger"');
     expect(client).toContain('"settings.section"');
@@ -333,6 +333,8 @@ describe("官方 dsh Web 组合", () => {
         "@linxin666/dsh-web-all/doctor",
         "@linxin666/dsh-web-all/usage",
         "@linxin666/dsh-web-all/session-archive",
+        "@linxin666/dsh-web-all/model-capabilities",
+        "@linxin666/dsh-web-all/preset-center",
         "@linxin666/dsh-web-all/skin-center",
         "@linxin666/dsh-i18n",
         "dsh-better-sidebar",
@@ -388,7 +390,7 @@ describe("官方 dsh Web 组合", () => {
 
     const lightweightRows = overlayRows("apps/lark-worker/lightweight.overlay.yml");
     expect(lightweightRows).not.toContainEqual(expect.objectContaining({ id: "subagent", disabled: true }));
-    for (const id of ["web-ui-git-graph", "web-ui-better-sidebar", "web-ui-pet"]) {
+    for (const id of ["web-ui-pet"]) {
       expect(lightweightRows).toContainEqual(expect.objectContaining({ id, disabled: true }));
     }
   });
@@ -396,7 +398,7 @@ describe("官方 dsh Web 组合", () => {
   it("部署覆盖只修改 MewClaw persona、模型与 provider 边界", () => {
     const rows = overlayRows("packages/bundle/web/cordis.patch.yml");
     const prompt = rows.find((row) => row.id === "system-prompt");
-    expect(prompt?.config?.persona).toEqual(expect.stringContaining("MewClaw"));
+    expect(prompt?.config?.personaPrefix).toEqual(expect.stringContaining("MewClaw"));
     expect(rows).toContainEqual(expect.objectContaining({
       id: "agent-default-model",
       config: { provider: "openai", model: "gpt-5.6-luna" },
@@ -449,7 +451,7 @@ describe("官方 dsh Web 组合", () => {
     expect(metadata).not.toContain("旧会话兼容");
   });
 
-  it("lightweight 使用无本机执行依赖的专用 agent preset", () => {
+  it("lightweight 复用完整宿主能力和官方 standard，保留默认 ID 与账号策略", () => {
     const bundleManifest = JSON.parse(
       readFileSync(repositoryPath("packages/bundle/web/package.json"), "utf8"),
     ) as { files?: string[] };
@@ -459,12 +461,7 @@ describe("官方 dsh Web 组合", () => {
     const roster = lightweightRows.find((row) => row.id === "agent-presets");
     expect(roster?.config).toEqual({
       default: "lark-lightweight",
-      roots: [
-        {
-          path: { __jsExpr: "process.cwd() + '/node_modules/dsh-lark-web-bundle/agent-presets-lightweight'" },
-          trust: "system",
-        },
-      ],
+      roots: (overlayRows("apps/lark-worker/full.overlay.yml").find((row) => row.id === "agent-presets")?.config as { roots: unknown }).roots,
       includeUserRoot: false,
     });
 
@@ -481,27 +478,9 @@ describe("官方 dsh Web 组合", () => {
     const presetRows = overlayRows(
       "packages/bundle/web/agent-presets-lightweight/lark-lightweight/agent.cordis.yml",
     );
-    expect(presetRows.map((row) => row.id)).toEqual([
-      "persona",
-      "agent-instructions",
-      "tool-fs",
-      "skill-filesystem",
-      "tool-skill",
-      "tool-goal",
-      "planning",
-      "compaction",
-      "tool-ask-user",
-      "tool-todo",
-      "tool-web",
-    ]);
-    for (const id of [
-      "tool-bash",
-      "tool-pwsh",
-      "tool-fs-search",
-      "tool-jobs",
-      "delegation",
-    ]) {
-      expect(presetRows).not.toContainEqual(expect.objectContaining({ id }));
+    expect(presetRows).toEqual(overlayRows("packages/bundle/web/agent-presets/lark-standard/agent.cordis.yml"));
+    for (const id of ["subprocess", "sandbox", "bash-sandbox", "shell-env", "permission", "web-ui-git-graph", "web-ui-better-sidebar"]) {
+      expect(lightweightRows).toContainEqual(expect.objectContaining({ id, disabled: false }));
     }
 
     const webRows = overlayRows("packages/bundle/web/cordis.patch.yml");
@@ -620,7 +599,7 @@ describe("官方 dsh Web 组合", () => {
     const composition = await readFile(resolve(presetRoot, "agent.cordis.yml"), "utf8");
     expect(composition).toContain("name: ./tool-bootstrap.mjs");
     expect(composition).toContain("bootstrapMaxTokens: 1024");
-    expect(composition).toContain("promotedPresentation: code");
+    expect(composition).toContain("promotedPresentation: ptc");
   });
 
   it("full/OCI 七项 roster 只来自 system roots，不扫描用户 preset 根", () => {

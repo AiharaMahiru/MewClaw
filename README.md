@@ -10,6 +10,7 @@
 
 - 已验证：独立桌面底座构建、Linux Electron 启动、云端登录，以及同账号桌面/Web 两轮真实续聊同步。
 - 已实现并测试：本地文件 Consumer 的列目录、读文件、条件写入、路径边界和授权撤销；桌面云端插件共 15 项测试通过。
+- 已同步 Web `master@56c4244`：DSH 核心及官方插件升级至 `0.1.5-rc.1`，并带入四模式整合、按账号隔离的飞书自建应用机器人、MewClaw 品牌与启动体验、DeepSeek V4.1 Flash wire 路由修复及安全审计凭证链路。
 - **尚未完成**：原生目录授权与云端工具桥接、完整跨账号和断线验收、Windows x64 打包及实机测试。文件 Consumer 测试通过不代表模型已经能使用电脑工作区。
 - 首版不提供任意本地 Shell、目录双向同步、离线任务重放或多设备接管。目录授权不等于操作系统沙箱。
 
@@ -62,7 +63,7 @@ docs/       # 架构、SPEC、发布说明与验收证据
 
 ## 共享服务开发与验证
 
-需要 Node.js 24+、pnpm 10.30.3；生产构建使用部署指定的固定 Node 版本。DSH 核心依赖当前锁定为 `0.1.2-rc.1`，以锁文件为准。
+需要 Node.js 24+、pnpm 10.30.3；生产构建使用部署指定的固定 Node 版本。DSH 核心依赖当前锁定为 `0.1.5-rc.1`，以锁文件为准。
 
 ```sh
 pnpm install --frozen-lockfile
@@ -98,7 +99,7 @@ pnpm verify:dsh-brand
 
 ## 关键决策速览
 
-- **仓库形态**：独立插件仓库，通过 npm 依赖 `@deepseek-ai/dsh-*`（当前核心基线 `0.1.2-rc.1`），共享服务使用 pnpm workspace + 自有 app bins 从源码启动 Cordis 组合；桌面使用独立候选 workspace。
+- **仓库形态**：独立插件仓库，通过 npm 依赖 `@deepseek-ai/dsh-*`（当前核心基线 `0.1.5-rc.1`），共享服务使用 pnpm workspace + 自有 app bins 从源码启动 Cordis 组合；桌面使用独立候选 workspace。
 - **数据面**：会话 / 运行生命周期 / 事件流全部由 DSH session log（JSONL + SQLite 查询）接管；PostgreSQL 仅保留知识库（pgvector）、cron 任务、审批待办与管理面。
 - **进程拓扑**：飞书 Gateway 与 Worker 执行面分离，Auth、Admin、浏览器和预览服务按部署组合独立运行；各入口通过 Cordis 配置装载插件。
 - **机器人模板**：映射为 DSH agent presets（每会话 isolate realm 提供隔离）；平台强制策略留在常驻 bundle 层。

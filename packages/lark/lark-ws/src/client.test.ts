@@ -10,6 +10,7 @@ const sdk = vi.hoisted(() => ({
   handlers: {} as Record<string, (event: unknown) => unknown>,
   clientConfig: undefined as unknown,
   start: vi.fn(),
+  close: vi.fn(),
 }));
 
 vi.mock("@larksuiteoapi/node-sdk", () => ({
@@ -20,6 +21,7 @@ vi.mock("@larksuiteoapi/node-sdk", () => ({
     start() {
       return sdk.start();
     }
+    close(options: unknown) { sdk.close(options); }
   },
   EventDispatcher: class {
     register(handlers: Record<string, (event: unknown) => unknown>) {
@@ -72,6 +74,10 @@ beforeEach(() => {
 });
 
 describe("start", () => {
+  it("停止时实际关闭SDK并禁用重连", async () => {
+    const ws = createLarkWs(options()); await ws.start(); ws.stop();
+    expect(sdk.close).toHaveBeenCalledWith({ force: true });
+  });
   it("构造 WSClient（含域名与握手超时）并启动", async () => {
     const ws = createLarkWs(options());
     await ws.start();

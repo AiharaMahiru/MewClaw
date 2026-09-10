@@ -43,15 +43,15 @@ function makeOptions(input: {
   mount: ReturnType<typeof vi.fn>;
 }): RunExecutionOptions {
   const handle = { agent: {} as never, dispose: vi.fn(async () => undefined) };
-  const runSetup = async (request: { setup?: (ctx: Context) => Promise<void> }) => {
-    await request.setup?.(input.context);
+  const runSetup = async (request: { setup?: (ctx: Context, agent: never) => Promise<void> }) => {
+    await request.setup?.(input.context, (input.context as unknown as { agent: never }).agent);
     return handle;
   };
   return {
     agents: { get: vi.fn(), create: vi.fn(runSetup), resume: vi.fn(runSetup) },
     agentPresets: { mount: input.mount },
     sessionPersistence: {
-      listSnapshots: vi.fn(async () => input.persisted ? [{ header: { id: "session-setup" } }] : []),
+      list: vi.fn(async () => input.persisted ? [{ header: { id: "session-setup" } }] : []),
     },
     selection: { provider: "deepseek-official", model: "deepseek-chat" },
     agentPresetId: "standard",

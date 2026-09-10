@@ -47,7 +47,7 @@ interface FlowState {
   openTools: Array<{ name: string; at: number }>;
   toolLines: string[];
   assistantParts: string[];
-  assistantChunkSteps: Set<string>;
+  assistantChunkSteps: Map<string, number>;
   toolCount: number;
   toolTotalMs: number;
   done: boolean;
@@ -86,7 +86,7 @@ export class RunFlow {
       openTools: [],
       toolLines: [],
       assistantParts: [],
-      assistantChunkSteps: new Set(),
+      assistantChunkSteps: new Map(),
       toolCount: 0,
       toolTotalMs: 0,
       done: false,
@@ -129,6 +129,7 @@ export class RunFlow {
   ): Promise<void> {
     if (state.done) return;
     if ("outcome" in item) return this.#finish(item, state);
+    if (item.assistant) return this.#assistantChunk(item.assistant, state);
     await this.#handleEvent(item.event as SessionEvent, state, input);
   }
 
@@ -154,7 +155,6 @@ export class RunFlow {
   }
 
   async #handleEvent(event: SessionEvent, state: FlowState, input: RunFlowInput): Promise<void> {
-    if (event.type === "assistant/chunk") return this.#assistantChunk(event, state);
     if (event.type === "assistant/message") return this.#assistant(event, state);
     if (event.type === "tool/call") {
       state.openTools.push({ name: event.data.name, at: Date.now() });
@@ -207,17 +207,25 @@ export class RunFlow {
     if (event.type !== "assistant/message") return;
     const text = assistantText(event);
     if (text.length === 0) return;
-    if (state.assistantChunkSteps.has(`${event.data.turn}:${event.data.step}`)) return;
+    const index = state.assistantChunkSteps.get(`${event.data.turn}:${event.data.step}`);
+    if (index !== undefined) {
+      state.assistantParts[index] = text;
+      return;
+    }
     state.assistantParts.push(text);
     this.options.card.append(state.cardId, text);
   }
 
-  #assistantChunk(event: SessionEvent, state: FlowState): void {
-    if (event.type !== "assistant/chunk" || event.data.chunk.type !== "text-delta") return;
-    if (event.data.chunk.text.trim().length === 0) return;
-    state.assistantChunkSteps.add(`${event.data.turn}:${event.data.step}`);
-    state.assistantParts.push(event.data.chunk.text);
-    this.options.card.append(state.cardId, event.data.chunk.text);
+  #assistantChunk(delta: NonNullable<RunStreamItem["assistant"]>, state: FlowState): void {
+    const key = `${delta.turn}:${delta.step}`;
+    let index = state.assistantChunkSteps.get(key);
+    if (index === undefined) {
+      index = state.assistantParts.length;
+      state.assistantChunkSteps.set(key, index);
+      state.assistantParts.push("");
+    }
+    state.assistantParts[index] += delta.text;
+    this.options.card.append(state.cardId, delta.text);
   }
 
   #toolResult(state: FlowState): void {

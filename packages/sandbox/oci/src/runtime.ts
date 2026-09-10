@@ -230,9 +230,6 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
     }
 
     return {
-      get pid() {
-        return child?.pid ?? -1;
-      },
       stdin: spec.stdio.stdin === "pipe" ? (stdinStream as Writable) : undefined,
       stdout: spec.stdio.stdout === "pipe" ? (stdoutStream as Readable) : undefined,
       stderr: spec.stdio.stderr === "pipe" ? (stderrStream as Readable) : undefined,
