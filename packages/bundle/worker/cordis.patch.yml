@@ -17,7 +17,12 @@
 # 用自有 Adapter 装饰官方 DeepSeek 传输层：对外保留稳定逻辑 ID，wire
 # 模型映射和禁用目录均不再修改官方包。
 - id: llm-deepseek
-  name: 'dsh-lark-deepseek-routing'
+  disabled: true
+
+# name 是匹配条件，不能用于替换原行；独立插入路由适配器。
+- insert:
+    - id: lark-deepseek-routing
+      name: 'dsh-lark-deepseek-routing'
 
 # web 缝指向 Firecrawl（search + fetch 双注册；dsh-base 缺省只挂 DeepSeek 搜索）。
 - id: web

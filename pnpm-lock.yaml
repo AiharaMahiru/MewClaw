@@ -773,6 +773,9 @@ importers:
       dsh-lark-base:
         specifier: workspace:*
         version: link:../../packages/bundle/base
+      dsh-lark-deepseek-routing:
+        specifier: workspace:*
+        version: link:../../packages/llm/deepseek-routing
       dsh-lark-run:
         specifier: workspace:*
         version: link:../../packages/lark/run
