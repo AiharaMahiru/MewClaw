@@ -131,4 +131,11 @@ export const AUTH_MIGRATIONS: readonly Migration[] = [
   { version: "auth/002_feishu_pairing", sql: AUTH_MIGRATION_002 },
   { version: "auth/003_pairing_session", sql: AUTH_MIGRATION_003 },
   { version: "auth/004_user_model_profiles", sql: AUTH_MIGRATION_004 },
+  { version: "auth/005_feishu_bots", sql: `
+CREATE TABLE IF NOT EXISTS auth_feishu_bots (
+ user_id uuid PRIMARY KEY REFERENCES auth_users(id) ON DELETE CASCADE,
+ app_id text NOT NULL UNIQUE,
+ revision integer NOT NULL CHECK(revision > 0),
+ record jsonb NOT NULL CHECK(record->>'userId'=user_id::text AND record->>'appId'=app_id AND (record->>'revision')::integer=revision)
+);` },
 ];

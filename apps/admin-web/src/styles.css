@@ -123,7 +123,13 @@ input::placeholder { color: var(--dsw-alias-label-tertiary); }
 .hHd-Xa_logoRow { display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end; gap: 8px; height: 60px; margin-bottom: 8px; padding: 8px 0 8px 4px; overflow: hidden; }
 .hHd-Xa_brand { display: inline-flex; flex: 1 1 0; align-items: center; min-width: 0; padding: 0; color: inherit; background: transparent; cursor: pointer; overflow: hidden; }
 .hHd-Xa_brandIdentity { display: inline-flex; align-items: center; gap: 10px; min-width: 0; height: 30px; }
-.hHd-Xa_brandMark { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; color: #f3f8fa; }
+.hHd-Xa_brandMark { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; }
+.mewclaw-brand-mark { --mewclaw-mark-bg: #fff; --mewclaw-mark-ink: #181717; }
+.mewclaw-mark-bg { fill: var(--mewclaw-mark-bg); }
+.mewclaw-mark-ink { fill: var(--mewclaw-mark-ink); stroke: var(--mewclaw-mark-ink); }
+.mewclaw-mark-cutout { fill: var(--mewclaw-mark-bg); stroke: var(--mewclaw-mark-bg); }
+.mewclaw-mark-ink[fill="none"], .mewclaw-mark-cutout[fill="none"], g.mewclaw-mark-ink, g.mewclaw-mark-cutout { fill: none; }
+body[data-ds-dark-theme] .mewclaw-brand-mark { --mewclaw-mark-bg: #181717; --mewclaw-mark-ink: #fff; }
 .hHd-Xa_brandName { display: inline-flex; align-items: center; min-width: 0; height: 24px; font-size: 16px; font-weight: 650; line-height: 24px; letter-spacing: .01em; white-space: nowrap; }
 .hHd-Xa_iconButton, .qDHVXG_iconButton { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; color: var(--dsw-alias-label-secondary); background: transparent; border-radius: 50%; }
 .hHd-Xa_iconButton:hover, .qDHVXG_iconButton:hover { background: var(--dsw-alias-interactive-bg-hover); }

@@ -51,6 +51,15 @@ await runNode([
   "--no-open",
   "--boot-check",
 ], { unsetEnv: ["DSH_SANDBOX_IMAGE"] });
+// 生产 OCI 的 minimal 和管道 shell 与 full 不同，必须实际挂载同一预设根。
+await runNode([
+  "apps/lark-worker/dist/main.js",
+  "--patch", "apps/lark-worker/full.overlay.yml",
+  "--patch", "apps/lark-worker/oci.overlay.yml",
+  "--patch", "apps/lark-worker/full-port0.overlay.yml",
+  "--patch", "apps/lark-worker/boot-check.overlay.yml",
+  "--port", "0", "--no-open", "--boot-check",
+], { env: { DSH_SANDBOX_IMAGE: "localhost/dsh-lark-sandbox:release-check" } });
 await runNode(["apps/admin/dist/main.js", "--patch", "apps/admin/boot-check.overlay.yml", "--boot-check"]);
 await runNode(["apps/browser/dist/main.js", "--boot-check"]);
 await runNode(["apps/preview/dist/main.js", "--boot-check"]);
@@ -64,7 +73,7 @@ async function runNode(args, options) {
 }
 
 async function runCommand(command, args, options = {}) {
-  const env = { ...process.env, ...BOOT_CHECK_ENV };
+  const env = { ...process.env, ...BOOT_CHECK_ENV, ...options.env };
   for (const name of options.unsetEnv ?? []) delete env[name];
   await new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(command, args, { cwd: root, env, stdio: "inherit" });

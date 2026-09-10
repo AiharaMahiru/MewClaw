@@ -42,11 +42,13 @@ interface AppConfig {  // 两个 app 各自的最小进程配置
 
 **worker 层**（`dsh-lark-worker`）：`dsh-lark-run` + `dsh-lark-cron` +（M3：`dsh-knowledge-postgres`、`dsh-memory-mem0`）+ profile 对应的 agent preset。执行隔离由 app overlay 显式选择：
 
-- `lightweight.overlay.yml`（默认）：禁用 `subprocess`、本机 shell、jobs、`tool-fs-search`、`permission` 命令面、全部子代理执行 provider/tool、workflow/Ralph 行，以及依赖本机 Git subprocess/PTY 的第三方 Web 行；用户关闭 pet 时同时禁用 `web-ui-pet`，不通过重开设置覆盖偏好。保留 rc.7 Web API 所需的空 `subagents` registry 和 `fs-sandbox` 的 Scope 工作区文件能力。Web 默认 preset 与 `dsh-lark-run.agentPresetId` 均设为 `lark-lightweight`，roster 只扫描专用根并设置 `includeUserRoot: false`；该 preset 不声明上述已禁用能力的 consumer。registry 只提供空查询面，不提供执行后端。它不允许任意代码执行，也不称为 sandbox；显式 lightweight 启动仅用于隔离回归，生产 Auth Edge 仍只接入 full/OCI Worker。
-- `full.overlay.yml`（可选）：保留宿主本机 subprocess、Shell、文件搜索、jobs、委派等官方执行组合，默认选择“飞书全功能模式”，并把 `lark-lightweight`、`lark-standard`、`liangshen`（全能优化模式）与官方 `standard`、`code`、`minimal`、`cordis` 加入 system-only roster；该 profile 不提供 OS 级 sandbox。
-- `oci.overlay.yml`（可选）：以 `dsh-sandbox-oci` 替换本机 subprocess/sandbox；允许容器内 shell/编译，默认断网，并继续暴露同一七项 system-only roster；轻量 preset 仍不声明本机执行 consumer。
+lightweight 与 full 使用相同宿主 Provider 和 system-only preset roots，仅默认 preset 不同。Scope、认证、目录策略、审批和既有外部控制插件禁用配置保持不变；OCI 仍由容器 Provider 决定执行位置。
 
-**网关层**（`dsh-lark-gateway-bundle`）：`dsh-lark`、`dsh-lark-ws`、`dsh-lark-gateway`、`dsh-lark-card`、`dsh-lark-approval`、`dsh-lark-commands`、`dsh-lark-run-client`。**不含**任何工具行与 agent 栈行（硬边界）。
+- `lightweight.overlay.yml`：保留历史 profile 入口，取消执行能力裁剪。默认 preset 为 lark-lightweight，公开 include 官方 standard，能力与 full 一致，且 includeUserRoot 为 false；不提供 OS 级沙箱。
+- `full.overlay.yml`（可选）：保留宿主本机 subprocess、Shell、文件搜索、jobs、委派等官方执行组合，默认选择“飞书全功能模式”，并把 `lark-lightweight`、`lark-standard`、`liangshen`（全能优化模式）与官方 `standard`、`code`、`minimal`、`cordis` 加入 system-only roster；该 profile 不提供 OS 级 sandbox。
+- `oci.overlay.yml`（可选）：以 `dsh-sandbox-oci` 替换本机 subprocess/sandbox；允许容器内 shell/编译，默认断网，并继续暴露同一七项 system-only roster；lightweight preset 的执行同样由容器 Provider 承载。
+
+**网关层**（`dsh-lark-gateway-bundle`）：仅 `credentials`、`dsh-cdg-bridge`、`dsh-lark-run-client` 和 `dsh-lark-gateway/bot-fleet`。机器人由Auth账号配置驱动，在独立根装载lark/card/commands/gateway/ws；部署根不再启动默认机器人。**不含**任何工具行与 agent 栈行（硬边界）。
 
 **apps**：
 
@@ -56,7 +58,7 @@ interface AppConfig {  // 两个 app 各自的最小进程配置
 
 M1 实施记录（与草案的差异）：
 
-1. **网关组合不挂 dsh-base**：dsh-base 行集含完整 agent/工具栈，网关若挂载即违反"网关无工具行"硬边界。网关 bundle 自含 `credentials` + lark 行；平台强制层（hmr 禁用、平台 persona）只作用于 worker 部署。
+1. **网关组合不挂 dsh-base**：dsh-base 行集含完整 agent/工具栈，网关若挂载即违反"网关无工具行"硬边界。网关 bundle 自含 `credentials` 和账号宿主行；平台强制层（hmr 禁用、平台 persona）只作用于 worker 部署。
 2. **worker 开发端口 8788**：lark-claw 的 pi-worker 仍占用 8787（迁移期并存，原系统保持不动）；M5 交接时回归 8787 决策。
 3. app bin 的组合装载 = 读自身 package.json 的 `dsh.profile.bundles` → 逐层 `loadOverlayPatches` → `boot()`（与 dsh CLI profile 语义一致，分发时可直接被 `dsh --profile` 装载）。
 
@@ -80,7 +82,7 @@ M1 实施记录（与草案的差异）：
 | 配置 schema 非法 | 加载失败并指名字段 | 修正配置 |
 | 隔离 profile 非法 | supervisor 启动失败 | 设为 `lightweight`、`full` 或 `oci` |
 | 健康端口显式为空、非规范或超出范围 | supervisor 在创建子进程前失败 | 设为 `1..65535` 的规范十进制值，或取消设置以使用默认值 |
-| lightweight 请求任意代码执行 | 工具不存在，模型无法调用 | 切换 OCI profile 并重启 |
+| 执行工具被目录或审批策略拒绝 | 明确拒绝，不更换执行 Provider 绕过 | 按对应授权流程处理 |
 | agent preset 声明的宿主依赖未激活 | 会话创建失败并列出 waiting 行 | 选择与 profile 匹配的 preset，不做静默降级 |
 
 ## 7 安全与信任
@@ -96,8 +98,8 @@ M1 实施记录（与草案的差异）：
 
 - `unit`（组合校验）：网关组合无工具行 / worker 组合无 lark 行断言；
 - `unit`：每 bundle 层独立加载冒烟；
-- `security`：默认轻量 overlay 禁用所有本机子进程与子代理执行入口，保留 Web API 的空 registry；OCI overlay 替换本机 subprocess/sandbox；
-- `integration`：lightweight preset 可挂载并创建会话；工作区选择与 `commands/list` 可用，工具目录不含被禁用的执行能力；
+- `security`：lightweight 保留完整执行能力与 permission 服务；OCI overlay 替换本机 subprocess/sandbox；账号与工作区拒绝测试不削弱；
+- `integration`：lightweight preset 可挂载并创建会话；工作区选择与 `commands/list` 可用，工具目录与官方 standard 一致且受实际 Provider 约束；
 - `unit`：supervisor profile → worker 参数与 Podman 生命周期选择；
 - `unit`：Linux unit 只让 Auth 继承控制面密钥文件，四个 App 均固定生产项目环境目录；
 - `e2e`：双进程本机部署端到端（M1 验收烟雾）。
@@ -114,5 +116,5 @@ M1 实施记录（与草案的差异）：
 
 ## 10 开放问题
 
-1. 每次 DSH 升级都要对照官方 `standard` 复核 `lark-lightweight` 的安全能力 roster 与宿主依赖；
+1. 每次 DSH 升级都要对照官方 `standard` 复核 `lark-lightweight` 引用的官方 standard 及宿主依赖；
 2. apps bin 的 source-launch 约定（tsx ESM 钩子）与 dsh CLI 启动器的差异验证（M0 spike）。

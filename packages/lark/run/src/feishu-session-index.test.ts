@@ -23,7 +23,7 @@ async function makeRoot(): Promise<string> {
 }
 
 function header(id: SessionId, cwd: string): SessionHeader {
-  return { version: 0, id, cwd, createdAt: 1, isSeeded: false };
+  return { version: 3, id, cwd, createdAt: 1, isSeeded: false };
 }
 
 function inspection(meta: SessionHeader, prompt?: string): SessionInspection {
@@ -32,6 +32,7 @@ function inspection(meta: SessionHeader, prompt?: string): SessionInspection {
     inheritedEventCount: SessionLogOffset(0),
     events: prompt ? [{
       seq: SessionSeq(0), time: 1, type: "user/message",
+      surfaceOp: "append",
       data: {
         role: "user", id: MessageId("message-index-test"),
         source: { kind: "user" }, content: [{ type: "text", text: prompt }],

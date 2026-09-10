@@ -27,7 +27,7 @@ async function makeRoot(): Promise<string> {
 }
 
 function header(id: ReturnType<typeof SessionId>, cwd: string): SessionHeader {
-  return { version: 0, id, cwd, createdAt: 1, agentPreset: "code", isSeeded: false };
+  return { version: 3, id, cwd, createdAt: 1, agentPreset: "code", isSeeded: false };
 }
 
 function request(targetScope: Scope = scope) {
@@ -36,10 +36,10 @@ function request(targetScope: Scope = scope) {
 
 function makePersistence(records: Map<string, { meta: SessionHeader; events: SessionEvent[] }>) {
   return {
-    inspect: vi.fn(async (id: ReturnType<typeof SessionId>) => {
+    open: vi.fn(async (id: ReturnType<typeof SessionId>) => {
       const record = records.get(String(id));
       if (!record) throw new Error("session missing");
-      return record;
+      return { header: record.meta, inheritedEventCount: 0, read: async () => ({ events: record.events }), close: vi.fn(async () => undefined) };
     }),
   };
 }
@@ -100,7 +100,7 @@ describe("FileSessionDirectory", () => {
 
     const missingId = SessionId("web-session-no-cwd");
     const persistence = makePersistence(new Map([
-      [String(missingId), { meta: { version: 0, id: missingId, createdAt: 1, isSeeded: false }, events: [] }],
+      [String(missingId), { meta: { version: 3, id: missingId, createdAt: 1, isSeeded: false }, events: [] }],
     ]));
     const missing = await FileSessionDirectory.open({
       filePath: join(root, "missing.json"), persistence: persistence as never,

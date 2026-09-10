@@ -60,7 +60,7 @@ claim 记录只存在内存，包含随机高熵摘要、sessionId、签发时�
 
 1. 严格解析完整 Scope 与非负 generation；
 2. 只查找当前 Scope + generation 的绑定；
-3. 通过 `SessionPersistence.inspect()` 或 `listSnapshots()` 确认 session 仍存在；
+3. 通过 `SessionPersistence.list()` 的 snapshot header 确认 session 仍存在；读取日志使用 `open(id, "read")` → `handle.read()`，在 finally 中 `close()`，不占写所有权；共享 Consumer `inspectStoredSession()` 返回原 meta、inheritedEventCount 与 events，错误原样传播，目录授权层仍统一脱敏拒绝；
 4. 读取 header 并验证 `cwd` 为存在、可用的工作目录；
 5. `use` 只能选择当前列表中已 claim 的 session，不能接收任意 sessionId 作为授权。
 

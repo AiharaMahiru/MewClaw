@@ -28,7 +28,7 @@ WebSocket remote.mux 只允许 stream descriptor，官方网关拒绝通过该�
 ## 4 审计契约
 
 Auth 使用独立 Cordis Context 挂载官方设置、凭证和 DeepSeek Provider，复用同一 DSH_HOME。
-默认使用官方 deepseek-official 路由和 deepseek-v4-flash 模型，连接来自 llm-deepseek 设置段，
+默认使用 deepseek-official 路由和 deepseek-v4.1-flash 逻辑模型，连接来自 llm-deepseek 设置段，
 不跟随 agent-default-model，不向 Worker 发送审计输入，不导出或复制凭证。
 审计上下文只保留启动快照的 project-env/user-env 回退层，避免 Auth 控制面继承的旧密钥
 遮蔽 Models 中保存的受管凭证；不修改主进程环境。部署应与 Worker 共用 DSH_HOME。
@@ -64,8 +64,8 @@ boot-check 不初始化模型，不解析审计凭证，不产生外部调用。
 
 ## 7 模型路由与故障回归
 
-DeepSeek 依赖补丁新增 modelAliases 与 disabledModels 配置，Flash 对外保持 deepseek-v4-flash，
-实际请求由配置映射到 deepseek-v4.1-flash-expires-on-0910。Vision Exp 在目录及直接调用路径均禁用。
+自有DeepSeek路由插件复用官方Adapter，通过配置把唯一可见逻辑模型 deepseek-v4.1-flash
+映射为CommandCode端点要求的 deepseek/deepseek-v4.1-flash。Gemini Web2API不再注册为模型Provider；Gemini搜索MCP是独立工具能力，继续保留。
 审计与普通请求共用此映射；仅审计调用显式 reasoningEffort=off，对应 thinking.type=disabled。
 不通过全局 thinking=disabled 限制普通会话。必须用本地 HTTP 捕获实际 model/thinking 字段，不能只检查字符串或进程状态。
 响应只能为完整 decision JSON（兼容完整代码围栏）。多个判定、嵌套对象、异常结束、截断都不能放行。

@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   apply,
   FAVICON_SVG,
-  MEWCLAW_MARK_MASK_ID,
   MEWCLAW_MARK_VIEWBOX,
   renderMewClawBrandMark,
 } from "./index.js";
@@ -29,13 +28,16 @@ describe("dsh-lark-atw-brand", () => {
       width: 104,
       height: 104,
       viewBox: MEWCLAW_MARK_VIEWBOX,
-      className: "hero-mark",
+      className: "hero-mark mewclaw-brand-mark",
+      shapeRendering: "geometricPrecision",
       "aria-hidden": "true",
     });
-    expect(mark.children.map((child) => (child as ElementNode).type)).toEqual(["defs", "g"]);
-    expect(JSON.stringify(mark)).toContain(`url(#${MEWCLAW_MARK_MASK_ID})`);
-    expect(JSON.stringify(mark)).toContain("rotate(45 120 120)");
-    expect(JSON.stringify(mark)).toContain('"stroke":"currentColor"');
+    expect(mark.children.map((child) => (child as ElementNode).type)).toEqual(["circle", "path", "path", "path", "path", "path", "g", "g", "path"]);
+    expect(JSON.stringify(mark)).toContain("M256 132 C244 132");
+    expect(JSON.stringify(mark)).toContain("mewclaw-mark-ink");
+    expect(JSON.stringify(mark)).toContain("mewclaw-mark-cutout");
+    expect(JSON.stringify(mark)).not.toContain("rotate(45 120 120)");
+    expect(JSON.stringify(mark)).not.toContain("mask");
   });
 
   it("不引用 DeepSeek 鱼形组件或外部资源", () => {
@@ -62,6 +64,18 @@ describe("dsh-lark-atw-brand", () => {
     expect(html).not.toContain("mewclaw-hero-mark{width");
     expect(html).toContain("data-mewclaw-brand");
     expect(routes.map(({ path }) => path)).toEqual(["/mewclaw-brand/favicon.svg", "/mewclaw-brand/manifest.webmanifest"]);
-    expect(FAVICON_SVG).toContain('transform="rotate(45 120 120)"');
+    expect(FAVICON_SVG).toContain('viewBox="0 0 512 512"');
+    expect(FAVICON_SVG).toContain("@media(prefers-color-scheme:dark)");
+    expect(FAVICON_SVG).toContain("--bg:#181717;--ink:#fff");
+    expect(html).toContain("body[data-ds-dark-theme] .mewclaw-brand-mark");
+    expect(html).toContain("mewclaw-hero-copy");
+    expect(html).not.toContain("@keyframes mewclaw-hero-copy");
+    expect(html).toContain("span:has(.mewclaw-hero-brand)+span{display:none}");
+    expect(html).toContain("prefers-reduced-motion:reduce");
+    expect(html).toContain('class="mewclaw-boot"');
+    expect(html).toContain('sessionStorage.getItem("mewclaw.boot.v1")');
+    expect(html).toContain('sessionStorage.setItem("mewclaw.boot.v1","1")');
+    expect(html).toContain("setTimeout(remove,1600)");
+    expect(html).toContain("pointer-events:none");
   });
 });

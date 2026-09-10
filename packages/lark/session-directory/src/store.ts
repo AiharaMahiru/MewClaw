@@ -4,6 +4,7 @@ import { isAbsolute } from "node:path";
 
 import { foldRequestHeader, type SessionId } from "@deepseek-ai/dsh-session";
 import type { SessionPersistence } from "@deepseek-ai/dsh-session-persistence";
+import { inspectStoredSession } from "./persistence.js";
 import {
   isSessionClaimCode,
   LarkError,
@@ -36,7 +37,7 @@ interface ClaimRecord {
 
 export interface FileSessionDirectoryOptions {
   filePath: string;
-  persistence: Pick<SessionPersistence, "inspect">;
+  persistence: Pick<SessionPersistence, "open">;
   claimTtlMs: number;
   maxEntries: number;
   now?: () => number;
@@ -118,7 +119,7 @@ export class FileSessionDirectory implements LarkSessionDirectory {
 
   async #inspect(sessionId: SessionId): Promise<Extract<SessionResolution, { mode: "shared" }>> {
     try {
-      const inspection = await this.options.persistence.inspect(sessionId);
+      const inspection = await inspectStoredSession(this.options.persistence, sessionId);
       const cwd = inspection.meta.cwd;
       if (!cwd || !isAbsolute(cwd) || !(await stat(cwd)).isDirectory()) throw unavailable();
       const selection = modelSelection(inspection.events);

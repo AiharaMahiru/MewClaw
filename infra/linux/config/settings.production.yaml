@@ -6,24 +6,17 @@ agent-default-model:
   reasoningEffort: max
 
 llm-deepseek:
-  baseURL: https://api.deepseek.com
+  baseURL: https://api.commandcode.ai/provider/v1
+  apiKeyEnv: DEEPSEEK_API_KEY
+  models:
+    - id: deepseek-v4.1-flash
+      name: DeepSeek V4.1 Flash
   modelAliases:
-    deepseek-v4-flash: deepseek-v4.1-flash-expires-on-0910
-  disabledModels:
-    - deepseek-v4-flash-vision-exp
+    deepseek-v4.1-flash: deepseek/deepseek-v4.1-flash
+  disabledModels: []
 
 llm-pi-ai:
   providers:
-    gemini-web2api:
-      displayName: Gemini Web2API
-      api: openai-completions
-      baseURL: http://localhost:8083/v1
-      apiKeyEnv: GEMINI_WEB2API_API_KEY
-      models:
-        - id: gemini-3.8-flash
-          name: Gemini 3.8 Flash
-        - id: gemini-3.1-pro
-          name: Gemini 3.1 Pro
     openai:
       baseURL: https://cpa.rwr.ink/v1
       api: openai-responses

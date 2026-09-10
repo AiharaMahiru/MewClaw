@@ -9,10 +9,11 @@ interface AgentSetupInput {
   ctx: Context;
   options: RunExecutionOptions;
   sessionId: SessionId;
+  agent: Agent;
 }
 
-function agentPresetForSetup(ctx: Context, fallback: string): string {
-  const session = ctx.agent?.session;
+function agentPresetForSetup(ctx: Context, agent: Agent, fallback: string): string {
+  const session = agent.session;
   if (!session) return fallback;
   // Alpha 版本从 SessionProjectionRegistry 读取；保留无 registry 的轻量测试/启动路径。
   if (ctx.sessionProjections) {
@@ -46,9 +47,9 @@ export interface RunAgentHandle {
 }
 
 async function setupAgent(input: AgentSetupInput): Promise<(() => void) | undefined> {
-  const { ctx, options, sessionId } = input;
+  const { ctx, options, sessionId, agent } = input;
   installModelSelection(ctx, { current: options.selection, assembled: undefined });
-  await options.agentPresets.mount(ctx, agentPresetForSetup(ctx, options.agentPresetId));
+  await options.agentPresets.mount(ctx, agentPresetForSetup(ctx, agent, options.agentPresetId));
   const preset = options.preset;
   if (preset) {
     await ctx.inject(["skills"], (skillCtx) => {
@@ -84,8 +85,8 @@ export async function createRunAgent(
   let unregister: (() => void) | undefined;
   const common = {
     agentOptions: { provider: options.selection.provider, model: options.selection.model },
-    setup: async (ctx: Context) => {
-      unregister = await setupAgent({ ctx, options, sessionId });
+    setup: async (ctx: Context, agent: Agent) => {
+      unregister = await setupAgent({ ctx, agent, options, sessionId });
     },
   };
   const handle = !hasPersistedSession
@@ -101,7 +102,7 @@ export async function createRunAgent(
 async function hasPersisted(options: RunExecutionOptions, sessionId: SessionId): Promise<boolean> {
   const snapshots = await atRunStage(
     "agent-list-snapshots",
-    () => options.sessionPersistence.listSnapshots(),
+    () => options.sessionPersistence.list(),
     options.reportStage,
   );
   return snapshots.some((snapshot) => snapshot.header.id === sessionId);

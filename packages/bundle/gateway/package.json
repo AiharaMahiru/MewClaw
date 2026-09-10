@@ -16,7 +16,7 @@
   "main": "./lib/index.js",
   "files": ["lib", "cordis.patch.yml"],
   "dependencies": {
-    "@deepseek-ai/dsh-credentials-local": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-credentials-local": "0.1.5-rc.1",
     "dsh-cdg-bridge": "workspace:*",
     "dsh-lark": "workspace:*",
     "dsh-lark-card": "workspace:*",

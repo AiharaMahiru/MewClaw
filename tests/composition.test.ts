@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadOverlayPatches } from "@deepseek-ai/dsh-app-boot";
+import { composeEntries, loadOverlayPatches } from "@deepseek-ai/dsh-app-boot";
 import { describe, expect, it } from "vitest";
 
 const require = createRequire(import.meta.url);
@@ -73,17 +73,13 @@ describe("网关组合（硬边界）", () => {
     }
   });
 
-  it("行集 = 凭证 + lark 域（白名单）", () => {
+  it("行集仅账号宿主，不再装载部署级客户端和长连接", () => {
     const names = [...rowNames("dsh-lark-gateway-bundle")].sort();
     expect(names).toEqual([
       "@deepseek-ai/dsh-credentials-local",
       "dsh-cdg-bridge",
-      "dsh-lark",
-      "dsh-lark-card",
-      "dsh-lark-commands",
-      "dsh-lark-gateway",
+      "dsh-lark-gateway/bot-fleet",
       "dsh-lark-run-client",
-      "dsh-lark-ws",
     ]);
   });
 
@@ -97,6 +93,20 @@ describe("网关组合（硬边界）", () => {
 });
 
 describe("worker 组合（技能与 overlay）", () => {
+  it("真实补丁算法禁用官方适配器并装载可解析的路由插件", () => {
+    const warnings: string[] = [];
+    const rows = composeEntries([
+      loadOverlayPatches("test", require.resolve("@deepseek-ai/dsh-base/cordis.patch.yml")),
+      loadOverlayPatches("test", repositoryPath("packages/bundle/worker/cordis.patch.yml")),
+    ], (message) => warnings.push(message));
+    const flatten = (entries: typeof rows): typeof rows => entries.flatMap((row) => [row, ...(row.group && Array.isArray(row.config) ? flatten(row.config) : [])]);
+    const effective = flatten(rows);
+    expect(effective.find((row) => row.id === "llm-deepseek")?.disabled).toBe(true);
+    expect(effective.find((row) => row.id === "lark-deepseek-routing")?.name).toContain("dsh-lark-deepseek-routing");
+    expect(warnings.filter((message) => message.includes("llm-deepseek"))).toEqual([]);
+    const workerRequire = createRequire(repositoryPath("apps/lark-worker/package.json"));
+    expect(workerRequire.resolve("dsh-lark-deepseek-routing")).toContain("deepseek-routing");
+  });
   it("技能发现只扫描受审 skills 根，不包含项目或用户默认根", () => {
     const row = bundlePatches("dsh-lark-worker").find((patch) => patch.id === "lark-reviewed-skill-filesystem");
     expect(row).toMatchObject({
@@ -120,19 +130,21 @@ describe("worker 组合（技能与 overlay）", () => {
     });
   });
 
-  it("默认轻量 overlay 关闭全部本机子进程与委派入口", () => {
+  it("轻量 overlay 不再裁剪本机执行与委派入口，仍保留权限服务", () => {
     const patches = overlayPatches("apps/lark-worker/lightweight.overlay.yml");
     const disabled = patches
       .filter((patch) => patch.disabled === true)
       .map((patch) => patch.id)
       .filter((id): id is string => Boolean(id));
-    expect(disabled).toEqual(expect.arrayContaining([
+    const execution = [
       "subprocess", "bash-sandbox", "pwsh-sandbox", "tool-bash", "tool-pwsh",
       "jobs", "tool-jobs", "tool-fs-search", "permission", "subagent-spawn-in-process",
       "subagent-fork-in-process", "tool-subagent-control", "tool-subagent-list-agents",
       "tool-subagent", "tool-subagent-fork", "tool-subagent-report", "workflow-worker-thread",
       "tool-workflow", "tool-ralph",
-    ]));
+    ];
+    for (const id of execution) expect(disabled).not.toContain(id);
+    expect(patches).toContainEqual(expect.objectContaining({ id: "permission", disabled: false }));
     expect(disabled).not.toContain("subagent");
   });
 
@@ -258,6 +270,6 @@ describe("平台强制层", () => {
     const patches = bundlePatches("dsh-lark-base");
     expect(patches).toContainEqual({ id: "hmr", disabled: true });
     const prompt = patches.find((patch) => patch.id === "system-prompt");
-    expect(prompt?.config).toMatchObject({ persona: expect.stringContaining("MewClaw") });
+    expect(prompt?.config).toMatchObject({ personaPrefix: expect.stringContaining("MewClaw") });
   });
 });

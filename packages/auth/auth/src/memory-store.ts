@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { MemoryFeishuBotStore } from "./feishu-bot-store.js";
 
 import type {
   AuditEntry,
@@ -38,6 +39,7 @@ interface MemoryPairingContext {
 }
 
 export class MemoryAuthStore implements AuthStore {
+  readonly feishuBots = new MemoryFeishuBotStore();
   readonly users = new Map<string, AuthUser>();
   readonly passwords = new Map<string, PasswordCredential>();
   readonly sessions = new Map<string, AuthSession>();

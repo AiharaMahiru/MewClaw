@@ -221,6 +221,7 @@ function privateProfile(baseURL: string, modelId: string): ResolvedPiAiProviderP
     requestImageMaxBytes: 1_048_576,
     retryPolicy: DEFAULT_RETRY_POLICY,
     configuredMaxTokens: new Map(),
+    modelErrors: new Map(),
     piProvider: createProvider({
       id: PROVIDER,
       name: "我的模型",

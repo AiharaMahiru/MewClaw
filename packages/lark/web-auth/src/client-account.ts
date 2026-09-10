@@ -1,5 +1,4 @@
 import type {
-  AccountIdentity,
   AccountModelProfile,
   AccountUser,
   ReactApi,
@@ -11,20 +10,19 @@ import {
   readCsrfToken,
   setAccountModelDefault,
   signOut,
-  unlinkIdentity,
   useAccountUsage,
   useAccountUser,
   useAdminUsers,
   useAccountModelProfiles,
-  useIdentities,
   updateAccountModelProfile,
 } from "./client-data.js";
 
-type AccountArea = "usage" | "models" | "feishu" | "security" | "admin";
+export { maskIdentity } from "./client-feishu.js";
+
+type AccountArea = "usage" | "models" | "security" | "admin";
 const AREAS: ReadonlyArray<{ id: AccountArea; label: string }> = [
   { id: "usage", label: "用量与额度" },
   { id: "models", label: "我的模型" },
-  { id: "feishu", label: "飞书连接" },
   { id: "security", label: "安全与登录" },
   { id: "admin", label: "用户与权限" },
 ];
@@ -63,7 +61,7 @@ function AccountActions({ React }: { React: ReactApi }): unknown {
 
 function AccountOverview({ React, user }: { React: ReactApi; user: AccountUser }): unknown {
   const initial = Array.from(user.displayName.trim())[0] || "M";
-  const mode = user.defaultMode === "full" ? "Full / OCI roster" : "轻量模式";
+  const mode = user.defaultMode === "full" ? "通用工作" : "日常助手";
   return React.createElement("div", { className: "mewclaw-account-section" },
     React.createElement("div", { className: "mewclaw-account-profile" },
       React.createElement("span", { className: "mewclaw-account-avatar mewclaw-account-avatar-large", "aria-hidden": "true" }, initial),
@@ -121,27 +119,6 @@ function PasswordSection({ React }: { React: ReactApi }): unknown {
 function passwordField(React: ReactApi, label: string, name: string, autoComplete: string): unknown {
   return React.createElement("label", null, label,
     React.createElement("input", { name, type: "password", autoComplete, minLength: 12, maxLength: 256, required: true }));
-}
-
-function IdentitySection({ React }: { React: ReactApi }): unknown {
-  const [revision, setRevision] = React.useState(0);
-  const state = useIdentities(React, revision);
-  if (state.status !== "ready") return loading(React, state.status === "error");
-  if (!state.data.length) return emptyState(React, "暂无飞书绑定");
-  const remove = async (identity: AccountIdentity): Promise<void> => {
-    if (!window.confirm("确定解绑当前飞书账号吗？")) return;
-    try { await unlinkIdentity(identity); setRevision(revision + 1); }
-    catch (cause) {
-      const code = cause instanceof Error ? cause.message : "";
-      window.alert(code === "IDENTITY_LAST_LOGIN_METHOD" ? "这是当前账号最后的登录方式，不能解绑。" : "解绑失败，请稍后重试。");
-    }
-  };
-  return React.createElement("ul", { className: "mewclaw-identity-list" }, state.data.map((identity) =>
-    React.createElement("li", { className: "mewclaw-identity-row", key: identity.subject },
-      React.createElement("div", { className: "mewclaw-account-row-copy" },
-        React.createElement("strong", null, "飞书"),
-        React.createElement("span", null, maskIdentity(identity.subject))),
-      React.createElement("button", { type: "button", className: "mewclaw-account-button danger", onClick: () => { void remove(identity); } }, "解绑"))));
 }
 
 type ModelProfileFormProps = {
@@ -325,16 +302,18 @@ function UsageSection({ React }: { React: ReactApi }): unknown {
       usageStat(React, "模型调用", formatCount(totals.calls)), usageStat(React, "总 Token", formatCount(totals.totalTokens))),
     React.createElement("div", { className: "mewclaw-account-usage-progress" },
       React.createElement("div", { className: "mewclaw-account-usage-progress-head" }, React.createElement("span", null, state.data.periodStart), React.createElement("span", null, `${formatUsd(quota.usedUsd)} / ${formatUsd(quota.monthlyLimitUsd)}`)),
-      React.createElement("div", { className: "mewclaw-account-usage-progress-track", role: "progressbar", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(percent) },
+      React.createElement("div", { className: "mewclaw-account-usage-progress-track", role: "progressbar", "aria-label": "本月额度使用比例", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(percent) },
         React.createElement("div", { className: "mewclaw-account-usage-progress-fill", style: { width: `${percent}%` } }))),
     React.createElement("dl", { className: "mewclaw-account-token-grid" },
       fact(React, "输入 Token", formatCount(totals.inputTokens)), fact(React, "输出 Token", formatCount(totals.outputTokens)),
       fact(React, "缓存 Token", formatCount(totals.cacheReadTokens + totals.cacheWriteTokens)), fact(React, "推理 Token", formatCount(totals.reasoningTokens))),
-    models.length ? React.createElement("ul", { className: "mewclaw-account-models" }, models.map((model) =>
+    models.length ? React.createElement("details", { className: "mewclaw-account-model-detail" },
+      React.createElement("summary", null, "按模型查看明细", React.createElement("span", null, `${models.length} 个模型`)),
+      React.createElement("ul", { className: "mewclaw-account-models" }, models.map((model) =>
       React.createElement("li", { className: "mewclaw-account-model-row", key: `${model.provider}:${model.model}` },
         React.createElement("div", { className: "mewclaw-account-row-copy" }, React.createElement("strong", null, model.model), React.createElement("span", null, model.provider)),
         React.createElement("span", { className: "mewclaw-account-row-meta" }, `${formatCount(model.calls)} 次`),
-        React.createElement("span", null, formatUsd(model.totalUsd))))) : emptyState(React, "本周期暂无模型调用"));
+        React.createElement("span", null, formatUsd(model.totalUsd)))))) : emptyState(React, "本周期暂无模型调用"));
 }
 
 function usageStat(React: ReactApi, label: string, value: string): unknown {
@@ -360,7 +339,6 @@ function emptyState(React: ReactApi, text: string): unknown {
 function areaContent(React: ReactApi, area: AccountArea): unknown {
   if (area === "usage") return React.createElement(UsageSection, { React });
   if (area === "models") return React.createElement(ModelProfilesSection, { React });
-  if (area === "feishu") return React.createElement(IdentitySection, { React });
   if (area === "security") return React.createElement(PasswordSection, { React });
   return React.createElement(AdminSection, { React });
 }
@@ -368,13 +346,12 @@ function areaContent(React: ReactApi, area: AccountArea): unknown {
 function areaMeta(area: AccountArea): string {
   if (area === "usage") return "本月";
   if (area === "models") return "个人配置";
-  if (area === "feishu") return "个人连接";
   if (area === "security") return "密码";
   return "管理员";
 }
 
 function AccountFold(React: ReactApi, entry: { id: AccountArea; label: string }): unknown {
-  return React.createElement("details", { className: "mewclaw-account-fold", open: entry.id === "usage" },
+  return React.createElement("details", { key: entry.id, className: "mewclaw-account-fold", open: entry.id === "usage" },
     React.createElement("summary", null,
       React.createElement("span", { className: "mewclaw-account-fold-title" }, entry.label, React.createElement("span", { className: "mewclaw-account-fold-meta" }, areaMeta(entry.id)))),
     React.createElement("div", { className: "mewclaw-account-fold-content" }, areaContent(React, entry.id)));
@@ -384,15 +361,13 @@ function renderAccount(React: ReactApi, state: ResourceState<AccountUser>): unkn
   if (state.status !== "ready") return loading(React, state.status === "error");
   const areas = AREAS.filter((entry) => entry.id !== "admin" || state.data.role === "admin");
   return React.createElement("div", { className: "mewclaw-account-center" },
-    React.createElement("header", { className: "mewclaw-account-center-header" }, React.createElement("h2", null, "账户中心")),
+    React.createElement("header", { className: "mewclaw-account-center-header" },
+      React.createElement("h2", null, "账户中心"),
+      React.createElement("p", { className: "mewclaw-account-message" }, "查看账户用量，管理个人模型与登录安全。")),
     React.createElement(AccountOverview, { React, user: state.data }),
     React.createElement("div", { className: "mewclaw-account-folds" }, areas.map((entry) => AccountFold(React, entry))));
 }
 
 export function AccountCenterSection(React: ReactApi): unknown {
   return renderAccount(React, useAccountUser(React));
-}
-
-export function maskIdentity(subject: string): string {
-  return subject.length > 12 ? `${subject.slice(0, 6)}...${subject.slice(-4)}` : subject;
 }

@@ -260,6 +260,7 @@ export type CommitFeishuPairingResult =
   | { status: "session-conflict" };
 
 export interface AuthStore {
+  readonly feishuBots: import("./feishu-bot-store.js").FeishuBotStore;
   createUser(input: CreateUserInput): Promise<AuthUser>;
   findUserByEmail(email: string): Promise<AuthUser | undefined>;
   findUserById(userId: string): Promise<AuthUser | undefined>;

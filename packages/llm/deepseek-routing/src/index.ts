@@ -11,7 +11,7 @@ import z from "@deepseek-ai/schemastery";
 
 const PROVIDER = "deepseek-official";
 const SETTINGS_NS = "llm-deepseek";
-const DEFAULT_ALIASES = { "deepseek-v4-flash": "deepseek-v4.1-flash-expires-on-0910" } as const;
+const DEFAULT_ALIASES = { "deepseek-v4.1-flash": "deepseek/deepseek-v4.1-flash" } as const;
 const DEFAULT_DISABLED_MODELS = ["deepseek-v4-flash-vision-exp"] as const;
 
 export interface Config extends OfficialDeepSeekConfig {
@@ -125,9 +125,11 @@ export function apply(ctx: Context, config: Config): void {
 }
 
 function resolveRoutingSnapshot(config: Config, ctx: Context): RoutingSnapshot {
-  const { modelAliases = { ...DEFAULT_ALIASES }, disabledModels = [...DEFAULT_DISABLED_MODELS], ...officialConfig } = config;
+  const { modelAliases, disabledModels = [...DEFAULT_DISABLED_MODELS], ...officialConfig } = config;
   const disabled = new Set(disabledModels);
-  const aliases = Object.freeze({ ...modelAliases });
+  // Settings 在初始化或旧配置迁移时可能给出空字典；必需的 wire 映射不能因此丢失。
+  // 显式配置仍可覆盖默认值，但未配置项始终继承插件基线。
+  const aliases: Readonly<Record<string, string>> = Object.freeze({ ...DEFAULT_ALIASES, ...modelAliases });
   for (const [logical, wire] of Object.entries(aliases)) {
     if (disabled.has(logical) || disabled.has(wire)) throw new Error(`lark-deepseek-routing: disabled alias ${logical} -> ${wire}`);
   }

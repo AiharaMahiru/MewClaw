@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { PostgresFeishuBotStore } from "./feishu-bot-store.js";
 
 import { createPostgresMigrationDatabase, runMigrations } from "dsh-lark-postgres-runtime";
 import { Pool, type PoolClient } from "pg";
@@ -110,9 +111,11 @@ function textArray(value: unknown): string[] {
 
 export class PostgresAuthStore implements AuthStore {
   readonly pool: Pool;
+  readonly feishuBots: PostgresFeishuBotStore;
 
   constructor(connectionString: string) {
     this.pool = new Pool({ connectionString, max: 10 });
+    this.feishuBots = new PostgresFeishuBotStore(this.pool);
   }
 
   async migrate(): Promise<void> {

@@ -38,6 +38,7 @@ interface CommandServiceOptions {
   defaultProfile: RunProfile;
   cardActions: CardActionRegistry;
   pairingClient?: FeishuPairingClient | undefined;
+  pairingUnavailableMessage?: string | undefined;
 }
 
 type ScopedCommandInput = Pick<GatewayCommandInput, "scope" | "chatId" | "sessionGeneration">;
@@ -109,7 +110,7 @@ export class GatewayCommands implements LarkCommandsService {
   }
 
   async #login(input: ScopedCommandInput): Promise<GatewayCommandResult> {
-    if (!this.options.pairingClient) return this.#reply(input, "Web 配对登录尚未配置，请联系管理员。");
+    if (!this.options.pairingClient) return this.#reply(input, this.options.pairingUnavailableMessage ?? "Web 配对登录尚未配置，请联系管理员。");
     try {
       const sessionId = deterministicSessionIdForScope(input.scope, input.sessionGeneration ?? 0);
       const pairing = await this.options.pairingClient.issue(input.scope.userId, sessionId);
