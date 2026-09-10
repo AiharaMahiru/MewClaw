@@ -1,0 +1,25 @@
+{
+  "name": "dsh-lark-auth-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MewClaw 多用户认证边界进程",
+  "exports": {
+    "./runtime": { "types": "./dist/types/app.d.ts", "default": "./dist/app.js" }
+  },
+  "scripts": {
+    "dev": "node --import tsx/esm src/main.ts"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-credentials-local": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-launch-environment": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-llm": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-settings-file": "0.1.2-rc.1",
+    "@deepseek-ai/schemastery": "3.18.2",
+    "@deepseek-ai/dsh-app-boot": "0.1.2-rc.1",
+    "dsh-lark-auth": "workspace:*",
+    "dsh-lark-auth-edge": "workspace:*",
+    "dsh-lark-deepseek-routing": "workspace:*"
+  }
+}

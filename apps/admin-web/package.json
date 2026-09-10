@@ -1,0 +1,23 @@
+{
+  "name": "dsh-lark-admin-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "管理面前端：知识库管理单页（列表/上传/摄入任务/生命周期），构建产物由 dsh-lark-admin 静态面托管",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.10",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.2",
+    "typescript": "5.9.3",
+    "vite": "8.2.1"
+  }
+}

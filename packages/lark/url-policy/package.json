@@ -1,0 +1,17 @@
+{
+  "name": "dsh-lark-url-policy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "复用的公网 URL SSRF 防护：保存与真实出站前均解析并拒绝受保护地址",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib"]
+}

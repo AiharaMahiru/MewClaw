@@ -1,0 +1,246 @@
+# dsh-lark-worker：worker 组合层（dsh-base + dsh-lark-base 之后）。
+# 执行面行集：运行服务器、交互 provider、会话持久化与沙箱工作区覆盖。
+# worker 面不得出现 lark 客户端行/卡片行（硬边界，由组合校验测试锁死）。
+
+# 会话落盘到 Harness home。生产 overlay 会把它提升到 /var/lib/dsh，
+# 本地与候选发布则不会向只读的发布目录写入。
+- id: session-persistence-jsonl
+  config:
+    root: !!js dshHomePath('sessions')
+
+# dsh-settings-file 的默认路径也必须落在 Harness home；否则设置页或首轮
+# 会话触发 materialize 时会尝试在只读发布目录下创建 `var`。
+- id: settings
+  config:
+    dshHome: !!js dshHomePath()
+
+# 用自有 Adapter 装饰官方 DeepSeek 传输层：对外保留稳定逻辑 ID，wire
+# 模型映射和禁用目录均不再修改官方包。
+- id: llm-deepseek
+  name: 'dsh-lark-deepseek-routing'
+
+# web 缝指向 Firecrawl（search + fetch 双注册；dsh-base 缺省只挂 DeepSeek 搜索）。
+- id: web
+  config:
+    searchProvider: firecrawl
+    fetchProvider: firecrawl
+
+# 沙箱策略工作区根（各 scope 子目录由 lark-run 创建并注入 meta.cwd；绝对路径）。
+- id: sandbox-policy
+  config:
+    workspaceRoot: !!js dshHomePath('workspaces')
+
+- insert:
+    # 受审仓库技能使用独立 provider 实例，与 dsh-base/preset 的项目技能 provider
+    # 分层合并。bundled 根由宿主读取，内容仍须通过下方 trust-manifest 预检。
+    - id: lark-reviewed-skill-filesystem
+      name: '@deepseek-ai/dsh-skill-filesystem'
+      config:
+        providerName: dsh-lark-reviewed
+        includeDefaultRoots: false
+        bundledSkillDir: skills
+
+    # Web 与飞书显式会话授权目录；必须先于 lark-run 注册。
+    - id: lark-session-directory
+      name: 'dsh-lark-session-directory'
+      config:
+        filePath: !!js dshHomePath('session-directory.json')
+        claimTtlMs: 600000
+        maxEntries: 20
+
+    # 运行服务器：POST /v1/runs + 控制端点（交互解答等）。
+    # 端口 8788：lark-claw 的 pi-worker 仍占用 8787（迁移期并存，M5 交接）。
+    - id: lark-run
+      name: 'dsh-lark-run'
+      config:
+        host: 127.0.0.1
+        port: 8788
+        presetId: lark-standard
+        agentPresetId: standard
+        workspaceRoot: !!js dshHomePath('workspaces')
+        tokenEnv: WORKER_TOKEN
+
+    # 普通用户私有模型仅在本次 Web prompt 内经 Auth Edge capability 解析；
+    # URL/Key 不会写入 settings.yaml 或 Worker 的共享 Provider 配置。
+    - id: web-private-model
+      name: 'dsh-lark-web-private-model'
+      config:
+        authBaseUrl: 'http://127.0.0.1:13080'
+        tokenEnv: WORKER_TOKEN
+
+    # 模型计费 Provider（与 admin 共用 PG 账本；运行前额度检查 + usage 结算）。
+    - id: lark-billing
+      name: 'dsh-lark-billing'
+      config:
+        databaseUrlEnv: DATABASE_URL
+        namespace:
+          tenantId: !!js process.env.LARK_TENANT_ID ?? 'lark'
+          botId: !!js process.env.BOT_ID ?? 'default'
+          deploymentId: !!js process.env.DEPLOYMENT_ID ?? 'default'
+        defaultMonthlyLimitUsd: 10
+        defaultPrice:
+          inputMicroCreditsPerMillion: 220000
+          outputMicroCreditsPerMillion: 660000
+          cacheReadMicroCreditsPerMillion: 7000
+          cacheWriteMicroCreditsPerMillion: 0
+          reasoningMicroCreditsPerMillion: 0
+
+    # userQuestions 的飞书 provider（worker 侧待办与结算；网关侧呈现）。
+    - id: lark-approval
+      name: 'dsh-lark-approval'
+      config:
+        ttlMs: 1800000
+        maxOptions: 4
+        maxPendingPerScope: 5
+
+    # 技能供应链预检（会话创建前，fail closed；M4 起 skills/* 落地后逐技能核对）。
+    - id: skill-trust
+      name: 'dsh-skill-trust'
+      config:
+        manifestPath: 'skills/trust-manifest.json'
+        skillsRoot: 'skills'
+
+    # 知识 Provider（与 admin 进程共用同一 PG 数据面；凭证引用）。
+    - id: knowledge-postgres
+      name: 'dsh-knowledge-postgres'
+      config:
+        databaseUrlEnv: DATABASE_URL
+        siliconflowApiKeyEnv: SILICONFLOW_API_KEY
+        uploadsRoot: !!js dshHomePath('uploads')
+
+    # 知识检索工具（模型面 Consumer；Scope 取自运行信封）。
+    - id: tool-knowledge
+      name: 'dsh-tool-knowledge'
+
+    # CDG 加密附件桥接（inspect/decrypt；未配置可执行文件 = 明文语义）。
+    - id: cdg-bridge
+      name: 'dsh-cdg-bridge'
+      config:
+        command: !!js process.env.CDG_BRIDGE_PATH
+
+    # 普通用户模型面 CDG 工具：全部文件操作均再次限制在当前会话工作区，
+    # 不允许模型指定 key-file、可执行文件或跨用户路径。
+    - id: tool-cdg
+      name: 'dsh-tool-cdg'
+      config:
+        command: !!js process.env.CDG_BRIDGE_PATH
+
+    # 附件摄入管线（运行前预检：物化/提取/视觉/显式意图摄入/知识候选）。
+    - id: lark-uploads
+      name: 'dsh-lark-uploads'
+      config:
+        uploadsRoot: !!js dshHomePath('uploads')
+
+    # 视觉分析（图片/扫描件 → 结构化文本回注；凭证缺失 = 降级不可用）。
+    - id: lark-vision
+      name: 'dsh-lark-vision'
+      config:
+        apiKeyEnv: VISION_OPENAI_API_KEY
+        baseUrlEnv: VISION_BASE_URL
+        modelEnv: VISION_MODEL
+        reasoningEffortEnv: VISION_MODEL_REASONING_EFFORT
+
+    # Firecrawl web Provider（web_search/web_fetch 的提供方 + web_crawl/web_map/web_screenshot 工具；
+    # 多 key 轮换分摊额度：FIRECRAWL_API_KEY_FALLBACKS = 逗号分隔备用 key）。
+    - id: web-firecrawl
+      name: 'dsh-web-firecrawl'
+      config:
+        apiKeyEnv: FIRECRAWL_API_KEY
+        apiKeyFallbacksEnv: FIRECRAWL_API_KEY_FALLBACKS
+
+    # 跨会话 cron（任务/租约/执行历史/投递 outbox；与 knowledge 同库）。
+    - id: lark-cron
+      name: 'dsh-lark-cron'
+      config:
+        databaseUrlEnv: DATABASE_URL
+
+    # 模型面 cron_schedule 工具。
+    - id: tool-cron
+      name: 'dsh-tool-cron'
+
+    # 生图/改图能力：与 GPT 文本模型共用兼容入口和 OPENAI_API_KEY。
+    - id: lark-image
+      name: 'dsh-lark-image'
+      config:
+        baseUrl: 'https://cpa.rwr.ink/v1'
+        apiKeyEnv: OPENAI_API_KEY
+        model: gpt-image-2
+        workspaceRoot: !!js dshHomePath('workspaces')
+        maxReferences: 8
+
+    # generate_image 模型工具（Scope 信封取工作区；产物走 R-06 收集）。
+    - id: tool-image
+      name: 'dsh-tool-image'
+
+    # 邮件能力（可选挂载：MAIL_HOST 未配置则整组不激活——mail 服务与工具都不出现）。
+    - id: mail-imap
+      name: 'dsh-mail-imap'
+      config:
+        enabled: !!js Boolean(process.env.MAIL_HOST)
+        host: !!js process.env.MAIL_HOST ?? ''
+        smtpPort: !!js Number(process.env.SMTP_SSL_PORT ?? 465)
+        imapPort: !!js Number(process.env.IMAPS_PORT ?? 993)
+        userEnv: EMAIL
+        passwordEnv: PASSWORD
+
+    # mail_send / mail_recent / mail_read 模型工具（mail 服务就位后激活）。
+    - id: tool-mail
+      name: 'dsh-tool-mail'
+
+    # bot 模板目录（装载校验 + 运行期应用；revision 与技能声明核对）。
+    - id: lark-presets
+      name: 'dsh-lark-presets'
+      config:
+        presetsRoot: presets
+        trustManifestPath: 'skills/trust-manifest.json'
+
+    # 跨会话记忆（mem0 Provider；默认启用，显式关闭才降级为 no-op）。
+    - id: memory-mem0
+      name: 'dsh-memory-mem0'
+      config:
+        enabled: true
+        embeddingApiKeyEnv: SILICONFLOW_API_KEY
+        embeddingBaseUrl: 'https://api.siliconflow.cn/v1'
+        embeddingModel: 'Qwen/Qwen3-VL-Embedding-8B'
+        embeddingDimensions: 1024
+        llmApiKeyEnv: DEEPSEEK_API_KEY
+        llmModel: 'deepseek-chat'
+        llmBaseUrl: 'https://api.deepseek.com'
+        databaseUrlEnv: DATABASE_URL
+        collectionName: dsh_lark_memory
+        scheduler:
+          concurrency: 4
+          pollIntervalMs: 250
+          maxAttempts: 5
+          leaseMs: 30000
+
+    # 统一记忆 API 模型工具（Scope 只取运行信封）。
+    - id: tool-memory
+      name: 'dsh-tool-memory'
+      config:
+        enabled: true
+        timeoutMs: 5000
+
+    # 所有用户可用的受控 Chromium：Worker 只持有 typed client，浏览器进程、临时
+    # profile、SSRF 防护和回收由独立 loopback Browser App 承载。
+    - id: browser
+      name: 'dsh-browser'
+      config:
+        browserBaseUrl: 'http://127.0.0.1:13083'
+        tokenEnv: WORKER_TOKEN
+
+    # browser_open/snapshot/click/type/wait/evaluate/console/network/screenshot/close。
+    - id: tool-browser
+      name: 'dsh-tool-browser'
+
+    # 用户工作区 Web/API 公共分享：Worker 只持有 typed client，运行时和公网
+    # 转发由独立 loopback Preview App 承载；内部认证复用 WORKER_TOKEN。
+    - id: preview
+      name: 'dsh-preview'
+      config:
+        previewBaseUrl: 'http://127.0.0.1:13082'
+        tokenEnv: WORKER_TOKEN
+
+    # share_web / share_list / share_revoke 模型工具（Scope 仅取运行信封）。
+    - id: tool-preview
+      name: 'dsh-tool-preview'

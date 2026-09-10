@@ -1,0 +1,49 @@
+[Unit]
+Description=MewClaw DSH Worker
+# The production bootstrap pins the dsh service account to UID 995. A system
+# unit UID placeholder resolves to the manager (root), so it must not be used
+# for rootless paths.
+After=network-online.target postgresql@17-dsh.service user@995.service dsh-browser.service
+Requires=postgresql@17-dsh.service dsh-podman-ready.service
+After=dsh-podman-ready.service
+Wants=network-online.target user@995.service dsh-browser.service
+
+[Service]
+Type=simple
+User=dsh
+Group=dsh
+WorkingDirectory=/opt/dsh/current
+EnvironmentFile=/etc/dsh/postgres.env
+EnvironmentFile=/etc/dsh/production.env
+Environment=HOME=/var/lib/dsh
+Environment=DSH_PROJECT_ENV_DIR=/var/lib/dsh
+Environment=MEM0_TELEMETRY=false
+Environment=DSH_PROFILE=web
+Environment=GIT_CONFIG_SYSTEM=/etc/dsh/gitconfig
+# Podman 必须连接真实 user manager；别名路径会回退到 cgroupfs，导致
+# rootless 容器无法在 system.slice 下施加 CPU、内存和 PID 限制。
+Environment=XDG_RUNTIME_DIR=/run/user/995
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/995/bus
+Delegate=yes
+ExecStart=/opt/dsh/runtime/node/bin/node /opt/dsh/current/apps/lark-worker/dist/main.js --patch apps/lark-worker/full.overlay.yml --patch apps/lark-worker/oci.overlay.yml --patch infra/linux/overlays/worker.production.yml --port 13081 --no-open
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+ReadWritePaths=/var/lib/dsh /run/user/995
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

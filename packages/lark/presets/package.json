@@ -1,0 +1,26 @@
+{
+  "name": "dsh-lark-presets",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "bot 模板目录化插件（worker）：presets/*/preset.json 装载校验（schema/修订号/技能声明）与运行面应用（SPEC presets.md）",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib"],
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.2"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  }
+}

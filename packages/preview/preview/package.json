@@ -1,0 +1,31 @@
+{
+  "name": "dsh-preview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Preview 能力缝 Definition 与 Worker typed HTTP client Provider",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib"],
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.2",
+    "dsh-lark-contracts": "workspace:*"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-credentials": "0.1.2-rc.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-credentials": "0.1.2-rc.1",
+    "@types/node": "24.10.1",
+    "vitest": "4.1.10"
+  }
+}

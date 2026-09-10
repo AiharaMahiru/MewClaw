@@ -1,0 +1,43 @@
+# Linux 发布启动门禁专用：禁用会迁移数据库或访问外部网络的 Provider。
+# 生产 overlay 不引用本文件，发布后的运行态仍会加载完整的数据面。
+
+- id: lark-billing
+  disabled: true
+- id: knowledge-postgres
+  disabled: true
+- id: tool-knowledge
+  disabled: true
+- id: web-firecrawl
+  disabled: true
+- id: lark-cron
+  disabled: true
+- id: tool-cron
+  disabled: true
+- id: tool-cdg
+  disabled: true
+- id: memory-mem0
+  disabled: true
+- id: tool-memory
+  disabled: true
+
+# 以下宿主插件依赖上方的数据面或会话 Scope；运行时完整 profile 不受影响。
+- id: lark-run
+  disabled: true
+- id: lark-approval
+  disabled: true
+- id: web-private-model
+  disabled: true
+- id: lark-uploads
+  disabled: true
+- id: tool-image
+  disabled: true
+- id: mail-imap
+  disabled: true
+- id: tool-mail
+  disabled: true
+- id: tool-browser
+  disabled: true
+- id: tool-preview
+  disabled: true
+- id: lark-web-auth
+  disabled: true

@@ -1,0 +1,39 @@
+[Unit]
+Description=MewClaw Controlled Browser Runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dsh
+Group=dsh
+WorkingDirectory=/opt/dsh/current
+EnvironmentFile=/etc/dsh/production.env
+Environment=HOME=/var/lib/dsh
+Environment=DSH_PROJECT_ENV_DIR=/var/lib/dsh
+Environment=DSH_BROWSER_PORT=13083
+Environment=DSH_BROWSER_CHROMIUM_PATH=/usr/bin/chromium
+Environment=DSH_BROWSER_STATE_ROOT=/var/lib/dsh/browser
+Environment=DSH_BROWSER_WORKSPACE_ROOT=/var/lib/dsh/workspaces
+ExecStart=/opt/dsh/runtime/node/bin/node /opt/dsh/current/apps/browser/dist/main.js
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/var/lib/dsh/browser /var/lib/dsh/workspaces
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

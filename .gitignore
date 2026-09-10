@@ -1,0 +1,46 @@
+# 密钥与本地配置（.env 已获用户授权、自 lark-claw 复制而来，永不入库）
+.env
+.env.*
+!.env.example
+
+# JavaScript 与 TypeScript 构建产物
+node_modules/
+dist/
+lib/
+!infra/linux/deploy/lib/
+!infra/linux/deploy/lib/*.sh
+coverage/
+*.tsbuildinfo
+
+# 其他语言构建状态
+__pycache__/
+.venv/
+.mvn/
+target/
+bin/
+obj/
+
+# 运行态目录
+.data/
+var/
+artifacts/
+.upload/
+.workspaces/
+.uploads/
+.artifacts/
+*.log
+
+# 本地验证与浏览器产物（可能含 Cookie、历史记录或截图，严禁入库）
+build/
+.workspaces-test/
+D:/
+docs/evidence/
+* TO DO list.csv
+
+# 智能体任务状态
+.codex-tasks/
+
+# 编辑器与操作系统
+.idea/
+.DS_Store
+Thumbs.db

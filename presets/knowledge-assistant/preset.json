@@ -1,0 +1,15 @@
+{
+  "name": "knowledge-assistant",
+  "version": "1.0.0",
+  "revision": "7c1d43f2f81d2c3726a44deb9c1f5e93a2369ec8eccb74b1a6ef0c3381b0ab5b",
+  "persona": "知识助手：以知识库为事实源，检索必须引用来源，摄入只按用户明确要求",
+  "profile": "standard",
+  "tools": {
+    "deny": []
+  },
+  "skills": [
+    "lark-rag",
+    "lark-cron"
+  ],
+  "retrieval": "auto"
+}

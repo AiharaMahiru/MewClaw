@@ -1,0 +1,39 @@
+{
+  "name": "dsh-lark-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "dsh-lark 跨包契约：Scope、品牌化 ID、SessionEventMap 声明合并、运行/控制契约、错误分类学",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./context": {
+      "types": "./lib/types/context.d.ts",
+      "default": "./lib/context.js"
+    },
+    "./events": {
+      "types": "./lib/types/events.d.ts",
+      "default": "./lib/events.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": [
+    "lib"
+  ],
+  "dependencies": {
+    "@deepseek-ai/dsh-brand": "0.1.2-rc.1",
+    "cron-parser": "5.4.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-session": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-tool-todo": "0.1.2-rc.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-session": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-tool-todo": "0.1.2-rc.1"
+  }
+}

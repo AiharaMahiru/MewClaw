@@ -1,0 +1,2 @@
+LISTEN 0 244 0.0.0.0:5432 0.0.0.0:* users:(("postgres",pid=1410,fd=7))
+LISTEN 0 511 127.0.0.1:8787 0.0.0.0:* users:(("node",pid=2410,fd=18))\n

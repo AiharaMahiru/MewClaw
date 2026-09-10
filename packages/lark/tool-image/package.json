@@ -1,0 +1,31 @@
+{
+  "name": "dsh-tool-image",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "生图能力缝 Consumer：模型面 generate_image 工具（prompt + 工作区参考图 → PNG 产物，SPEC image.md §5）",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib"],
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.2",
+    "dsh-lark-contracts": "workspace:*"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-tools": "0.1.2-rc.1",
+    "dsh-lark-image": "workspace:*"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-tools": "0.1.2-rc.1",
+    "dsh-lark-image": "workspace:*"
+  }
+}

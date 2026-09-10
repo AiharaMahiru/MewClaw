@@ -1,0 +1,51 @@
+# 生产 Worker 的非敏感模型设置。
+# 凭证只通过 apiKeyEnv 引用，不在此文件或仓库中保存密钥值。
+agent-default-model:
+  provider: openai
+  model: gpt-5.6-luna
+  reasoningEffort: max
+
+llm-deepseek:
+  baseURL: https://api.deepseek.com
+  modelAliases:
+    deepseek-v4-flash: deepseek-v4.1-flash-expires-on-0910
+  disabledModels:
+    - deepseek-v4-flash-vision-exp
+
+llm-pi-ai:
+  providers:
+    gemini-web2api:
+      displayName: Gemini Web2API
+      api: openai-completions
+      baseURL: http://localhost:8083/v1
+      apiKeyEnv: GEMINI_WEB2API_API_KEY
+      models:
+        - id: gemini-3.8-flash
+          name: Gemini 3.8 Flash
+        - id: gemini-3.1-pro
+          name: Gemini 3.1 Pro
+    openai:
+      baseURL: https://cpa.rwr.ink/v1
+      api: openai-responses
+      models:
+        - id: gpt-5.6-luna
+          name: GPT-5.6 Luna
+          contextWindow: 272000
+          maxTokens: 128000
+        - id: gpt-5.6-sol
+          name: GPT-5.6 Sol
+          contextWindow: 272000
+          maxTokens: 128000
+        - id: gpt-5.6-terra
+          name: GPT-5.6 Terra
+          contextWindow: 272000
+          maxTokens: 128000
+        - id: gpt-6-astra
+          name: GPT-6 Astra
+          reasoningEfforts:
+            off: none
+            low: low
+            medium: medium
+            high: high
+            max: max
+      apiKeyEnv: OPENAI_API_KEY

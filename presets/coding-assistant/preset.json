@@ -1,0 +1,19 @@
+{
+  "name": "coding-assistant",
+  "version": "1.0.0",
+  "revision": "b0fef9a06f268d675345555acb8daa5d0d28b2897835f983599d131bc3857376",
+  "persona": "编程助手：以工作区代码为事实源，先读后改，改后自检",
+  "profile": "long",
+  "tools": {
+    "deny": [
+      "knowledge_search",
+      "cron_schedule",
+      "web_search",
+      "web_fetch"
+    ]
+  },
+  "skills": [
+    "lark-web"
+  ],
+  "retrieval": "off"
+}

@@ -1,0 +1,29 @@
+[Unit]
+Description=MewClaw Admin Control Plane
+After=network-online.target postgresql@17-dsh.service dsh-worker.service
+Wants=network-online.target
+Requires=dsh-worker.service
+
+[Service]
+Type=simple
+User=dsh
+Group=dsh
+WorkingDirectory=/opt/dsh/current
+EnvironmentFile=/etc/dsh/postgres.env
+EnvironmentFile=/etc/dsh/production.env
+Environment=DSH_PROJECT_ENV_DIR=/var/lib/dsh
+Environment=MEM0_TELEMETRY=false
+ExecStart=/opt/dsh/runtime/node/bin/node /opt/dsh/current/apps/admin/dist/main.js --patch infra/linux/overlays/admin.production.yml
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/dsh
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

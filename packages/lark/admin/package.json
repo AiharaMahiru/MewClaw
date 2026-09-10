@@ -1,0 +1,35 @@
+{
+  "name": "dsh-lark-admin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "管理面宿主插件：webServer 路由（知识快照/摄入/生命周期）+ admin-web 静态面（SPEC admin.md）",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib"],
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.2",
+    "dsh-lark-billing": "workspace:*",
+    "dsh-knowledge": "workspace:*",
+    "dsh-lark-contracts": "workspace:*",
+    "dsh-memory": "workspace:*"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-credentials": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-host-webserver": "0.1.2-rc.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-credentials": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-host-webserver": "0.1.2-rc.1",
+    "@types/node": "24.10.1"
+  }
+}

@@ -1,0 +1,40 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`lark/* 事件落盘与重放 > JSON 落盘→重放一致（快照） 1`] = `
+[
+  {
+    "data": {
+      "messageId": "om_msg1",
+      "scope": {
+        "botId": "b-1",
+        "conversationId": "oc_chat1",
+        "deploymentId": "d-1",
+        "tenantId": "t-1",
+        "userId": "ou_user1",
+      },
+      "text": "帮我查一下知识库",
+    },
+    "seq": 0,
+    "time": 0,
+    "type": "lark/message/in",
+  },
+  {
+    "data": {
+      "artifactId": "art-1",
+      "bytes": 42,
+      "digest": "sha256:ab12",
+      "name": "report.md",
+      "scope": {
+        "botId": "b-1",
+        "conversationId": "oc_chat1",
+        "deploymentId": "d-1",
+        "tenantId": "t-1",
+        "userId": "ou_user1",
+      },
+    },
+    "seq": 1,
+    "time": 0,
+    "type": "lark/artifact/created",
+  },
+]
+`;

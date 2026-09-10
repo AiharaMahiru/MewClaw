@@ -1,0 +1,35 @@
+# 一次性管理组合：只包含 credentials、Auth、DoorAgent Migration Provider 与 App Consumer。
+# CLI 在 mount 前覆盖 actor 配置；这里的环境表达式只为直接 boot 维持 fail-loud 配置语义。
+- id: credentials
+  name: '@deepseek-ai/dsh-credentials-local'
+  config:
+    watch: false
+
+- id: auth
+  name: 'dsh-lark-auth'
+  config:
+    databaseUrlEnv: DATABASE_URL
+    credentialRollbackKeyEnv: CREDENTIAL_ROLLBACK_KEY
+    credentialRollbackPath: !!js >-
+      process.env.CREDENTIAL_ROLLBACK_PATH || (process.platform === "win32"
+      ? process.cwd() + "/var/credential-rollbacks"
+      : "/var/lib/dsh/credential-rollbacks")
+
+- id: dooragent-migration
+  name: 'dsh-dooragent-migration'
+  config:
+    statePath: !!js process.env.MIGRATION_STATE_PATH
+    actor:
+      scope:
+        tenantId: !!js process.env.MIGRATION_TENANT_ID
+        botId: !!js process.env.MIGRATION_BOT_ID
+        deploymentId: !!js process.env.MIGRATION_DEPLOYMENT_ID
+        userId: !!js process.env.MIGRATION_USER_ID
+        conversationId: !!js process.env.MIGRATION_CONVERSATION_ID
+      operator:
+        userId: !!js process.env.MIGRATION_USER_ID
+        sessionId: !!js process.env.MIGRATION_OPERATOR_SESSION_ID
+        requestId: !!js process.env.MIGRATION_REQUEST_ID
+
+- id: migration-consumer
+  name: 'dsh-dooragent-migration-app/consumer'

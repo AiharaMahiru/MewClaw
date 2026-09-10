@@ -1,0 +1,8 @@
+- id: lark-run
+  config:
+    host: 127.0.0.1
+    port: 28788
+    presetId: lark-standard
+    agentPresetId: lark-standard
+    workspaceRoot: /var/lib/dsh/workspaces
+    tokenEnv: WORKER_TOKEN

@@ -1,0 +1,26 @@
+{
+  "name": "dsh-lark-auth-edge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "浏览器认证边界与官方 dsh Worker/Admin 反向代理",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib"],
+  "dependencies": {
+    "dsh-lark-auth": "workspace:*",
+    "dsh-lark-atw-brand": "workspace:*",
+    "dsh-lark-url-policy": "workspace:*",
+    "nodemailer": "^7.0.5"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^7.0.4"
+  }
+}

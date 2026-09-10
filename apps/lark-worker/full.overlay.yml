@@ -1,0 +1,71 @@
+# 显式全功能 profile：启用宿主默认本机执行组合，并恢复七项 system preset roster。
+# 正式服务默认加载本层；DSH_LARK_ISOLATION_PROFILE=lightweight 仅用于显式隔离回归。
+# 浏览器工作区选择固定走官方 browse picker，避免 Windows native picker 只弹在宿主桌面。
+- id: directory-picker
+  disabled: true
+
+# full 是独立可启动的宿主执行 profile，不能依赖前一层恰好未禁用这些行。
+# OCI 覆盖层随后仍会禁用本机 subprocess/sandbox，并替换为容器 Provider。
+- id: subprocess
+  disabled: false
+- id: sandbox
+  disabled: false
+- id: bash-sandbox
+  disabled: false
+- id: shell-env
+  disabled: false
+- id: permission
+  disabled: false
+
+- insert:
+    - id: directory-picker-browse-host
+      name: '@deepseek-ai/dsh-host-directory-picker-browse'
+    - id: directory-picker-browse-client
+      name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
+
+- id: agent-presets
+  config:
+    default: lark-standard
+    roots:
+      - path: !!js process.cwd() + '/node_modules/dsh-lark-web-bundle/agent-presets-lightweight'
+        trust: system
+      - path: !!js process.cwd() + '/node_modules/dsh-lark-web-bundle/agent-presets'
+        trust: system
+      - path: !!js process.cwd() + '/node_modules/@deepseek-ai/dsh-agent-presets/presets'
+        trust: system
+    # 只认仓库 system preset（含全能优化模式）及官方 preset；
+    # 用户目录中的历史/实验 preset 不得污染 full/OCI roster 或阻断新会话创建。
+    includeUserRoot: false
+
+- id: lark-run
+  config:
+    host: 127.0.0.1
+    port: 8788
+    presetId: lark-standard
+    agentPresetId: lark-standard
+    workspaceRoot: .workspaces
+    tokenEnv: WORKER_TOKEN
+
+# full/OCI 的 Web UI 能力面：恢复可审计的本机文件、Git、任务和设置卡。
+- id: web-ui-dsh-aionui-panel
+  disabled: true
+- id: web-ui-task-board
+  disabled: false
+- id: web-ui-git-graph
+  disabled: false
+- id: web-ui-better-sidebar
+  disabled: false
+- id: web-ui-describe-image
+  disabled: false
+- id: web-ui-skill-explorer
+  disabled: false
+
+# 外部控制、SSH、实验 preset 和 pet 不属于默认 full/OCI roster。
+- id: web-ui-remote-web-ui
+  disabled: true
+- id: web-ui-ssh
+  disabled: true
+- id: web-ui-liangshen
+  disabled: true
+- id: web-ui-pet
+  disabled: true

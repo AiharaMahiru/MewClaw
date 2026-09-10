@@ -1,0 +1,42 @@
+[Unit]
+Description=MewClaw Public Preview Runtime
+After=network-online.target user@995.service
+Wants=network-online.target user@995.service
+Requires=dsh-podman-ready.service
+After=dsh-podman-ready.service
+
+[Service]
+Type=simple
+User=dsh
+Group=dsh
+WorkingDirectory=/opt/dsh/current
+EnvironmentFile=/etc/dsh/production.env
+Environment=HOME=/var/lib/dsh
+Environment=DSH_PROJECT_ENV_DIR=/var/lib/dsh
+Environment=DSH_PREVIEW_PORT=13082
+Environment=DSH_PREVIEW_WORKSPACE_ROOT=/var/lib/dsh/workspaces
+Environment=XDG_RUNTIME_DIR=/run/user/995
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/995/bus
+Delegate=yes
+ExecStart=/opt/dsh/runtime/node/bin/node /opt/dsh/current/apps/preview/dist/main.js
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+ReadWritePaths=/var/lib/dsh /run/user/995
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

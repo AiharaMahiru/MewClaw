@@ -1,0 +1,26 @@
+{
+  "name": "dsh-cdg-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CDG 加密附件桥接插件：ctx.cdgBridge（inspect/decrypt，外部 cdgbridge 可执行文件；未配置即关闭）",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib"],
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.2"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  }
+}

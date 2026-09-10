@@ -1,0 +1,24 @@
+{
+  "name": "dsh-lark-admin-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "管理面部署 bin：webServer + knowledge + graph memory + admin 面（无 dsh-base，物理无工具执行面）",
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "dsh-lark-admin-bundle"
+      ]
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-app-boot": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-launch-environment": "0.1.2-rc.1",
+    "dsh-lark-admin": "workspace:*",
+    "dsh-lark-admin-bundle": "workspace:*",
+    "dsh-lark-contracts": "workspace:*",
+    "dsh-knowledge-postgres": "workspace:*",
+    "dsh-memory-mem0": "workspace:*"
+  }
+}

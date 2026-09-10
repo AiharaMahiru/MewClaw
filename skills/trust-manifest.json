@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "skills": {
+    "cdg-bridge": {
+      "version": "2",
+      "digest": "d11ab2fc5cb83db7811b268b8c9e8315ff21da1e0bb0c38ae0bf51a6aa63bb3e",
+      "capabilities": {
+        "filesystem": [
+          "scope-workspace"
+        ]
+      }
+    },
+    "lark-automation": {
+      "version": "1",
+      "digest": "0d7a768cee7f6ddbc5c806d5ee52ea7284a4d8e1d263a05d192d0b88b013e67f",
+      "capabilities": {}
+    },
+    "lark-browser": {
+      "version": "2",
+      "digest": "79e15a67ab730cd5fa6ea9605333a0b64aea032ff2983621f8efca654c9a19d0",
+      "capabilities": {
+        "filesystem": [
+          "scope-workspace"
+        ],
+        "network": [
+          "public-internet"
+        ]
+      }
+    },
+    "lark-coding": {
+      "version": "1",
+      "digest": "d905a505a52d7f4cdbd635f7f63b1cbc419c9d2730050cf90693449914ec8f8b",
+      "capabilities": {
+        "filesystem": [
+          "scope-workspace"
+        ]
+      }
+    },
+    "lark-cron": {
+      "version": "1",
+      "digest": "be6d450a89ea097341822cd9468f8f28887ce179ea5fdb6e57b4c40416739bdd",
+      "capabilities": {}
+    },
+    "lark-office": {
+      "version": "1",
+      "digest": "71d3fa26c9722c4f93488fea720355df6117ff95ddc739fcf05f74fd685cb762",
+      "capabilities": {
+        "credentialRefs": [
+          "EMAIL",
+          "PASSWORD"
+        ]
+      }
+    },
+    "lark-rag": {
+      "version": "1",
+      "digest": "eec61d7c64129756e441defe129de5bbd22f0f7d4394e376766ac7b8a45c7c21",
+      "capabilities": {}
+    },
+    "lark-research": {
+      "version": "1",
+      "digest": "75342f4fa939a0c148014fdd0cd26f7342537d62c5b9f8dc70c664526076d65f",
+      "capabilities": {
+        "network": [
+          "api.firecrawl.dev"
+        ]
+      }
+    },
+    "lark-share": {
+      "version": "1",
+      "digest": "eb1825748ba7000e31a3f3f40ee266d52c93e829867ada3e031766e78a5f37a5",
+      "capabilities": {
+        "filesystem": [
+          "scope-workspace"
+        ],
+        "network": [
+          "chat.rwr.ink"
+        ]
+      }
+    },
+    "lark-web": {
+      "version": "2",
+      "digest": "8133219d0452c3996ef7e0fa2b6dd57ca589310af89b2ea35f49250a1c73e001",
+      "capabilities": {
+        "network": [
+          "api.firecrawl.dev"
+        ]
+      }
+    }
+  }
+}

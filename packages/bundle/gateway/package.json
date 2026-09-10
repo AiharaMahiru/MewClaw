@@ -1,0 +1,35 @@
+{
+  "name": "dsh-lark-gateway-bundle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "网关组合层 bundle：入口 + 渲染 + 审批呈现 + 命令 + 控制面（无任何工具/agent 行）",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib", "cordis.patch.yml"],
+  "dependencies": {
+    "@deepseek-ai/dsh-credentials-local": "0.1.2-rc.1",
+    "dsh-cdg-bridge": "workspace:*",
+    "dsh-lark": "workspace:*",
+    "dsh-lark-card": "workspace:*",
+    "dsh-lark-commands": "workspace:*",
+    "dsh-lark-contracts": "workspace:*",
+    "dsh-lark-gateway": "workspace:*",
+    "dsh-lark-run-client": "workspace:*",
+    "dsh-lark-ws": "workspace:*"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  }
+}

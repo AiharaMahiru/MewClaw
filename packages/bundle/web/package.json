@@ -1,0 +1,36 @@
+{
+  "name": "dsh-lark-web-bundle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "当前 dsh-lark Worker 的官方 dsh Web 组合覆盖层",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./agent-presets-oci/workspace-guidance.mjs": "./agent-presets-oci/workspace-guidance.mjs",
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib", "cordis.patch.yml", "agent-presets", "agent-presets-lightweight", "agent-presets-oci"],
+  "dependencies": {
+    "@deepseek-ai/cordis-plugin-include": "1.0.7",
+    "@deepseek-ai/dsh": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-permission-presets": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-web-app": "0.1.2-rc.1",
+    "dsh-lark-atw-brand": "workspace:*",
+    "dsh-lark-web-auth": "workspace:*",
+    "clsx": "2.1.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  }
+}

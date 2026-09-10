@@ -1,0 +1,62 @@
+{
+  "name": "dsh-lark-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "worker 组合层 bundle：执行面行集（lark-run/approval + 会话与工作区覆盖）",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": [
+    "lib",
+    "cordis.patch.yml"
+  ],
+  "dependencies": {
+    "@deepseek-ai/dsh-base": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-sandbox-policy": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-session-persistence-jsonl": "0.1.2-rc.1",
+    "dsh-cdg-bridge": "workspace:*",
+    "dsh-knowledge-postgres": "workspace:*",
+    "dsh-lark-deepseek-routing": "workspace:*",
+    "dsh-lark-billing": "workspace:*",
+    "dsh-lark-approval": "workspace:*",
+    "dsh-lark-contracts": "workspace:*",
+    "dsh-lark-web-private-model": "workspace:*",
+    "dsh-lark-cron": "workspace:*",
+    "dsh-lark-image": "workspace:*",
+    "dsh-lark-presets": "workspace:*",
+    "dsh-lark-run": "workspace:*",
+    "dsh-lark-session-directory": "workspace:*",
+    "dsh-lark-uploads": "workspace:*",
+    "dsh-lark-vision": "workspace:*",
+    "dsh-mail": "workspace:*",
+    "dsh-mail-imap": "workspace:*",
+    "dsh-memory": "workspace:*",
+    "dsh-memory-mem0": "workspace:*",
+    "dsh-preview": "workspace:*",
+    "dsh-browser": "workspace:*",
+    "dsh-tool-memory": "workspace:*",
+    "dsh-tool-preview": "workspace:*",
+    "dsh-tool-browser": "workspace:*",
+    "dsh-skill-trust": "workspace:*",
+    "dsh-tool-cron": "workspace:*",
+    "dsh-tool-cdg": "workspace:*",
+    "dsh-tool-image": "workspace:*",
+    "dsh-tool-knowledge": "workspace:*",
+    "dsh-tool-mail": "workspace:*",
+    "dsh-web-firecrawl": "workspace:*"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  }
+}

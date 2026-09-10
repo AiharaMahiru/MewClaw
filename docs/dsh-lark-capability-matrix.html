@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="dsh-lark capability matrix and delivery plan snapshot">
+  <title>dsh-lark 能力矩阵 | MewClaw</title>
+  <style>
+    :root {
+      --ink: #17251e;
+      --muted: #647069;
+      --paper: #f4f7f4;
+      --surface: #ffffff;
+      --line: #d9e1da;
+      --teal: #0d6d70;
+      --green: #1a7a4d;
+      --amber: #b67316;
+      --rust: #b9532c;
+      --baseline: #5f6f69;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: var(--paper); font: 14px/1.5 "Segoe UI", "Microsoft YaHei", sans-serif; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; }
+    .topbar { border-bottom: 1px solid var(--line); background: var(--surface); }
+    .bar, .controls, .section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .bar { min-height: 86px; }
+    .identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .mark { display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px; color: #fff; background: var(--ink); border-radius: 6px; font-weight: 800; font-size: 12px; }
+    .eyebrow, .section-kicker, .snapshot { margin: 0; color: var(--muted); font-size: 12px; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 0; font-size: 26px; line-height: 1.15; }
+    h2 { margin-bottom: 4px; font-size: 20px; line-height: 1.2; }
+    h3 { margin-bottom: 8px; font-size: 15px; }
+    .snapshot { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .signal { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); }
+    .overview { padding: 34px 0 28px; border-bottom: 1px solid var(--line); }
+    .intro { max-width: 760px; margin-bottom: 24px; color: var(--muted); font-size: 15px; }
+    .intro strong { color: var(--ink); }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .metric { min-height: 112px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+    .metric strong { display: block; margin-bottom: 6px; font-size: 30px; line-height: 1; }
+    .metric p { margin: 0; color: var(--muted); }
+    .metric.baseline { border-top: 3px solid var(--baseline); }
+    .metric.done { border-top: 3px solid var(--green); }
+    .metric.active { border-top: 3px solid var(--teal); }
+    .metric.planned { border-top: 3px solid var(--rust); }
+    .matrix, .plans { padding: 32px 0; }
+    .matrix { background: var(--surface); border-bottom: 1px solid var(--line); }
+    .section-kicker { margin-bottom: 5px; color: var(--teal); }
+    .section-copy { margin: 0; color: var(--muted); }
+    .controls { margin: 22px 0 12px; align-items: stretch; }
+    .filters { display: flex; flex-wrap: wrap; gap: 6px; }
+    .filter { min-height: 34px; padding: 0 10px; color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 4px; }
+    .filter:hover, .filter[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); background: #edf3ef; }
+    .filter-count { margin-left: 5px; color: inherit; }
+    .search { width: min(280px, 100%); }
+    .search input { width: 100%; min-height: 36px; padding: 0 10px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; outline: none; }
+    .search input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px #d9eeee; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+    table { width: 100%; min-width: 820px; border-collapse: collapse; }
+    th, td { padding: 13px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); background: #f7faf7; font-weight: 600; white-space: nowrap; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: #f8fbf9; }
+    .capability { font-weight: 700; }
+    .subtle { color: var(--muted); font-size: 12px; }
+    .status { display: inline-flex; align-items: center; min-width: 62px; min-height: 25px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+    .status.baseline { color: #43514c; background: #e8eeea; }
+    .status.done { color: #0f5f39; background: #dcf1e4; }
+    .status.active { color: #075b61; background: #d9f0ef; }
+    .status.planned { color: #913c1e; background: #fae6dc; }
+    .result-line { min-height: 24px; margin: 10px 0 0; color: var(--muted); }
+    .empty { margin: 12px 0 0; padding: 16px; color: var(--muted); border: 1px dashed var(--line); border-radius: 6px; }
+    .lanes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
+    .lane { min-width: 0; padding: 16px 16px 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+    .lane.active { border-top: 3px solid var(--teal); }
+    .lane.planned { border-top: 3px solid var(--rust); }
+    .lane.done { border-top: 3px solid var(--green); }
+    .lane ol { margin: 0; padding: 0; list-style: none; }
+    .lane li { padding: 12px 0; border-top: 1px solid var(--line); }
+    .lane li:first-child { border-top: 0; }
+    .lane li strong, .lane li span { display: block; }
+    .lane li span { margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .note { margin: 18px 0 0; padding: 12px 14px; color: #405049; background: #e8f2ed; border-left: 3px solid var(--teal); }
+    footer { padding: 20px 0 28px; color: var(--muted); font-size: 12px; }
+    .footer-line { display: flex; justify-content: space-between; gap: 16px; border-top: 1px solid var(--line); padding-top: 16px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    @media (max-width: 760px) {
+      .bar, .section-head, .controls, .footer-line { align-items: flex-start; flex-direction: column; }
+      .bar { padding: 15px 0; }
+      .snapshot { white-space: normal; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .search { width: 100%; }
+      .lanes { grid-template-columns: 1fr; }
+      h1 { font-size: 23px; }
+    }
+    @media (max-width: 420px) {
+      .shell { width: min(100% - 24px, 1180px); }
+      .metrics { gap: 8px; }
+      .metric { min-height: 98px; padding: 13px; }
+      .metric strong { font-size: 26px; }
+      .filter { padding: 0 8px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell bar">
+      <div class="identity">
+        <div class="mark" aria-hidden="true">DSH</div>
+        <div>
+          <p class="eyebrow">MEWCLAW · DELIVERY SNAPSHOT</p>
+          <h1>dsh-lark 能力矩阵</h1>
+        </div>
+      </div>
+      <p class="snapshot"><span class="signal" aria-hidden="true"></span>静态快照 · 2026.08.16</p>
+    </div>
+  </header>
+
+  <main>
+    <section class="overview">
+      <div class="shell">
+        <p class="section-kicker">PROJECT VIEW</p>
+        <h2>从能力边界到交付门槛</h2>
+        <p class="intro">以当前 Epic 台账作为交付状态真值，并用组件映射与 SPEC 索引定义能力范围。<strong>本地验证、浏览器验收和外部真实服务验收被刻意分开。</strong></p>
+        <div class="metrics" aria-label="能力状态汇总">
+          <div class="metric baseline"><strong data-count="baseline">6</strong><p>架构基线</p></div>
+          <div class="metric done"><strong data-count="done">6</strong><p>本地已完成</p></div>
+          <div class="metric active"><strong data-count="active">2</strong><p>进行中</p></div>
+          <div class="metric planned"><strong data-count="planned">2</strong><p>待开发</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="matrix" aria-labelledby="matrix-title">
+      <div class="shell">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">CAPABILITY MATRIX</p>
+            <h2 id="matrix-title">能力矩阵</h2>
+            <p class="section-copy">按状态或关键词筛选；表格中的门槛描述下一步可验证的条件。</p>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="filters" role="group" aria-label="按状态筛选">
+            <button class="filter" type="button" data-filter="all" aria-pressed="true" title="显示全部能力">全部 <span class="filter-count" data-filter-count="all"></span></button>
+            <button class="filter" type="button" data-filter="baseline" aria-pressed="false" title="仅显示架构基线">基线 <span class="filter-count" data-filter-count="baseline"></span></button>
+            <button class="filter" type="button" data-filter="done" aria-pressed="false" title="仅显示本地已完成能力">已完成 <span class="filter-count" data-filter-count="done"></span></button>
+            <button class="filter" type="button" data-filter="active" aria-pressed="false" title="仅显示进行中能力">进行中 <span class="filter-count" data-filter-count="active"></span></button>
+            <button class="filter" type="button" data-filter="planned" aria-pressed="false" title="仅显示待开发能力">待开发 <span class="filter-count" data-filter-count="planned"></span></button>
+          </div>
+          <label class="search"><span class="sr-only">搜索能力</span><input id="search" type="search" placeholder="搜索能力、领域或门槛"></label>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>能力</th><th>领域</th><th>状态</th><th>当前交付</th><th>下一门槛</th></tr>
+            </thead>
+            <tbody id="matrixRows"></tbody>
+          </table>
+        </div>
+        <p id="resultLine" class="result-line" aria-live="polite"></p>
+        <p id="emptyState" class="empty" hidden>没有匹配的能力项。请清除关键词或切换状态。</p>
+      </div>
+    </section>
+
+    <section class="plans" aria-labelledby="plan-title">
+      <div class="shell">
+        <p class="section-kicker">DELIVERY PLAN</p>
+        <h2 id="plan-title">研发计划清单</h2>
+        <p class="section-copy">计划列出的是当前可执行路线，不把未获授权的外部动作包装为本地完成。</p>
+        <div class="lanes">
+          <article class="lane active">
+            <h3>进行中</h3>
+            <ol>
+              <li><strong>Admin WebUI 跨视口验收</strong><span>本地构建与 mock 已通过，等待可用 Browser surface 完成截图与交互矩阵。</span></li>
+              <li><strong>全局集成、独立 review 与证据归档</strong><span>已启动，当前等待 WebUI 子任务完成后执行最终收口。</span></li>
+            </ol>
+          </article>
+          <article class="lane planned">
+            <h3>待开发</h3>
+            <ol>
+              <li><strong>真实外部服务验收</strong><span>仅在明确授权后执行飞书、模型、Firecrawl 或受管服务验证。</span></li>
+              <li><strong>成员与生图能力重新立项</strong><span>dsh-lark-members 和 dsh-lark-image 需要独立 SPEC 与最小权限设计。</span></li>
+            </ol>
+          </article>
+          <article class="lane done">
+            <h3>已完成</h3>
+            <ol>
+              <li><strong>全仓架构、安全与质量审计基线</strong><span>直接证实问题已修复并有本地回归证据。</span></li>
+              <li><strong>image + Firecrawl P1</strong><span>角色映射、成本纪律与无密钥定向测试已完成。</span></li>
+              <li><strong>命令、卡片、工作流与 Skills</strong><span>权限、幂等、供应链预检及无密钥发现回归已完成。</span></li>
+              <li><strong>dsh web 兼容契约</strong><span>浏览器与 Worker 的边界已由 SPEC 和组合测试锁定。</span></li>
+              <li><strong>控制面响应边界强化</strong><span>Worker JSON、TODO 数量和文本长度防护及回归验证已收口。</span></li>
+            </ol>
+          </article>
+        </div>
+        <p class="note">状态说明：基线表示已有架构与规格边界；已完成表示本次 Epic 的本地交付已通过定向门禁；进行中与待开发仍不能视为生产服务验收。</p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell footer-line">
+      <span>数据来源：20260816-dsh-platform-audit 任务台账、组件映射、SPEC 索引</span>
+      <span>静态快照，不是运行时健康页</span>
+    </div>
+  </footer>
+
+  <script>
+    const rows = [
+      { name: '会话与类型化事件', domain: 'DSH 核心', state: 'baseline', delivery: 'Session log、事件承载与声明合并', gate: '保持规格与组合测试一致' },
+      { name: '网关与 Worker 分离', domain: '进程拓扑', state: 'baseline', delivery: 'Gateway 无工作区工具；Worker 负责执行', gate: '组合边界与服务生命周期持续验证' },
+      { name: 'Scope 与 ACL', domain: '安全边界', state: 'baseline', delivery: '完整 Scope、查询内 ACL、回调非授权', gate: '跨 Scope 拒绝测试和审计证据' },
+      { name: '运行队列与 NDJSON 桥接', domain: '执行面', state: 'baseline', delivery: 'per-scope 串行、超时、session 事件流', gate: '协议与恢复场景继续回归' },
+      { name: '知识与附件管线', domain: '能力域', state: 'baseline', delivery: '知识检索、附件落盘、CDG 固定桥接', gate: '数据隔离与解析错误路径验证' },
+      { name: 'Cron、记忆与 OCI Profile', domain: '可选能力', state: 'baseline', delivery: '显式 profile 和可选 Provider 边界', gate: '按 SPEC 独立验收，不默认启用' },
+      { name: '架构、安全与质量审计', domain: '工程治理', state: 'done', delivery: '七类直接证实问题修复与回归矩阵', gate: '纳入最终全局 review' },
+      { name: 'Image + Firecrawl P1', domain: '多模态与 Web', state: 'done', delivery: '配置上限、参数纪律、截图与 cron 范式', gate: '真实上游 smoke 需授权' },
+      { name: '飞书命令与卡片交互', domain: '用户交互', state: 'done', delivery: '权限、TTL、幂等、Scope 绑定 actionId', gate: '跟随最终集成门禁复核' },
+      { name: '办公、研究、自动化、编码 Skills', domain: '工作流', state: 'done', delivery: '受信 Skill、manifest 和无密钥发现验证', gate: '外部 Provider 使用另行授权' },
+      { name: 'dsh web 兼容契约', domain: '管理面', state: 'done', delivery: '浏览器仅访问 admin API，Worker 凭证不下发', gate: '由 WebUI 实现验收闭环' },
+      { name: '控制面响应边界强化', domain: '管理面安全', state: 'done', delivery: 'Worker JSON 上限与 TODO payload 防护及回归已收口', gate: '纳入最终全局 review 复核' },
+      { name: 'Admin WebUI 跨视口验收', domain: '浏览器界面', state: 'active', delivery: '构建、mock API 与静态深链回退已通过', gate: '桌面、平板、手机截图与交互验证' },
+      { name: '全局集成与独立 review', domain: '交付门禁', state: 'active', delivery: '正在汇总各子任务的分层验证与证据', gate: 'WebUI 验收完成后执行 pnpm verify 和完整 review' },
+      { name: '真实外部服务验收', domain: '生产边界', state: 'planned', delivery: '飞书、模型、Firecrawl、受管服务不在本地快照范围', gate: '获得明确授权后执行' },
+      { name: '成员与生图能力', domain: '扩展能力', state: 'planned', delivery: '当前未迁移，不在默认 Worker 组合', gate: '独立 SPEC、最小 API 权限与测试' }
+    ];
+    const labels = { baseline: '架构基线', done: '已完成', active: '进行中', planned: '待开发' };
+    const search = document.getElementById('search');
+    const body = document.getElementById('matrixRows');
+    const empty = document.getElementById('emptyState');
+    const resultLine = document.getElementById('resultLine');
+    const filters = Array.from(document.querySelectorAll('[data-filter]'));
+    let selectedState = 'all';
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, function (character) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character];
+      });
+    }
+
+    function filteredRows() {
+      const term = search.value.trim().toLowerCase();
+      return rows.filter(function (row) {
+        const text = [row.name, row.domain, row.delivery, row.gate].join(' ').toLowerCase();
+        return (selectedState === 'all' || row.state === selectedState) && (!term || text.includes(term));
+      });
+    }
+
+    function renderMatrix() {
+      const visible = filteredRows();
+      body.innerHTML = visible.map(function (row) {
+        return '<tr><td><span class="capability">' + escapeHtml(row.name) + '</span></td><td>' + escapeHtml(row.domain) +
+          '</td><td><span class="status ' + row.state + '">' + labels[row.state] + '</span></td><td>' +
+          escapeHtml(row.delivery) + '</td><td><span class="subtle">' + escapeHtml(row.gate) + '</span></td></tr>';
+      }).join('');
+      empty.hidden = visible.length !== 0;
+      resultLine.textContent = '显示 ' + visible.length + ' / ' + rows.length + ' 项能力';
+    }
+
+    function updateCounts() {
+      const counts = rows.reduce(function (result, row) {
+        result[row.state] = (result[row.state] || 0) + 1;
+        return result;
+      }, {});
+      document.querySelectorAll('[data-count]').forEach(function (element) {
+        element.textContent = counts[element.dataset.count] || 0;
+      });
+      document.querySelectorAll('[data-filter-count]').forEach(function (element) {
+        const state = element.dataset.filterCount;
+        element.textContent = state === 'all' ? rows.length : counts[state] || 0;
+      });
+    }
+
+    filters.forEach(function (button) {
+      button.addEventListener('click', function () {
+        selectedState = button.dataset.filter;
+        filters.forEach(function (item) { item.setAttribute('aria-pressed', String(item === button)); });
+        renderMatrix();
+      });
+    });
+    search.addEventListener('input', renderMatrix);
+    updateCounts();
+    renderMatrix();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+1410 /www/server/pgsql/bin/postgres -D /www/server/pgsql/data\n

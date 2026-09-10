@@ -1,0 +1,22 @@
+* text=auto
+
+# 源码与数据文件统一 LF，脚本按平台惯例
+*.ts text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+
+*.gif binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.pdf binary
+
+# Generated patch files use a leading context marker before tab-indented code.
+*.patch whitespace=-space-before-tab

@@ -1,0 +1,11 @@
+# 本地 Web 组合验证专用：把同一 Worker 内的 lark-run 改到 OS 随机端口。
+# Web Host 仍由 --port 0 选择随机端口；不触碰正在运行的 8788 Worker。
+
+- id: lark-run
+  config:
+    host: 127.0.0.1
+    port: 0
+    presetId: lark-standard
+    agentPresetId: lark-lightweight
+    workspaceRoot: .workspaces
+    tokenEnv: WORKER_TOKEN

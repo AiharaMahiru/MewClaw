@@ -1,0 +1,31 @@
+{
+  "name": "dsh-browser-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "仅监听 loopback 的受控 Chromium CDP Browser daemon",
+  "exports": {
+    ".": {
+      "types": "./dist/types/main.d.ts",
+      "default": "./dist/main.js"
+    },
+    "./runtime": { "types": "./dist/types/runtime.d.ts", "default": "./dist/runtime.js" }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/main.js",
+    "test": "vitest run --root ../.. apps/browser/src",
+    "typecheck": "tsc -p tsconfig.test.json --noEmit",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-app-boot": "0.1.2-rc.1",
+    "@deepseek-ai/schemastery": "3.18.2",
+    "dsh-lark-contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "vitest": "4.1.10"
+  }
+}

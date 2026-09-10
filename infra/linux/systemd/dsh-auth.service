@@ -1,0 +1,30 @@
+[Unit]
+Description=MewClaw Auth Edge
+After=network-online.target postgresql@17-dsh.service dsh-worker.service dsh-admin.service dsh-preview.service
+Wants=network-online.target dsh-preview.service
+Requires=dsh-worker.service dsh-admin.service
+
+[Service]
+Type=simple
+User=dsh
+Group=dsh
+WorkingDirectory=/opt/dsh/current
+EnvironmentFile=/etc/dsh/runtime.secrets.env
+EnvironmentFile=/etc/dsh/user-model.secrets.env
+EnvironmentFile=/etc/dsh/postgres.env
+EnvironmentFile=/etc/dsh/production.env
+Environment=DSH_PROJECT_ENV_DIR=/var/lib/dsh
+ExecStart=/opt/dsh/runtime/node/bin/node /opt/dsh/current/apps/auth/dist/main.js
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/dsh
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

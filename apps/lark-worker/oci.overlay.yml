@@ -1,0 +1,48 @@
+# lark-worker 的 OCI 覆盖层（M2 生产路径；开发默认仍走 sandbox-local）。
+# 启动方式：node --import tsx/esm apps/lark-worker/src/main.ts --patch apps/lark-worker/oci.overlay.yml
+# 要求：Podman rootless 就绪 + `pnpm sandbox:build` 构建镜像。
+
+# OCI 与 full 共用七项 system-only preset roster；用户目录中的实验 preset
+# 不得改变容器执行边界。默认使用官方 standard，lark-standard 仍可恢复。
+- id: agent-presets
+  config:
+    default: standard
+    roots:
+      - path: !!js process.cwd() + '/node_modules/dsh-lark-web-bundle/agent-presets-oci'
+        trust: system
+      - path: !!js process.cwd() + '/node_modules/dsh-lark-web-bundle/agent-presets-lightweight'
+        trust: system
+      - path: !!js process.cwd() + '/node_modules/dsh-lark-web-bundle/agent-presets'
+        trust: system
+      - path: !!js process.cwd() + '/node_modules/@deepseek-ai/dsh-agent-presets/presets'
+        trust: system
+    includeUserRoot: false
+    # 默认内置根会抢在 roots 之前覆盖同名 minimal；官方根已在列表末尾显式保留。
+    includeShippedRoot: false
+
+# 禁用 dsh-base 的同世界实现（与 sandbox-oci 同服务键冲突）。
+- id: subprocess
+  disabled: true
+- id: sandbox
+  disabled: true
+
+# 容器执行 + confine 透传（podman 未就绪 → 会话失败 fail closed）。
+- insert:
+    - id: sandbox-oci
+      name: 'dsh-sandbox-oci'
+      config:
+        image: 'localhost/dsh-lark-sandbox:1.0.0'
+        network: none
+        # sandbox-oci 接受的工作区根必须是绝对路径；lark-run 自身仍使用
+        # 相对 workspaceRoot，并由其 Scope 逻辑解析到同一目录。
+        workspaceRoot: !!js process.cwd() + '/.workspaces'
+        resources:
+          cpus: 2
+          memoryMiB: 4096
+          pids: 256
+          tmpfsMiB: 512
+
+    # 容器内 Bash 使用 /workspace，宿主文件工具仍以会话 cwd 解析路径。
+    # 该提示对所有非 complete preset 生效，避免模型请求无意义的权限升级。
+    - id: oci-workspace-guidance
+      name: 'dsh-lark-web-bundle/agent-presets-oci/workspace-guidance.mjs'

@@ -1,0 +1,89 @@
+# dsh-lark-admin-bundle：admin 组合层（独立于 dsh-base——admin 进程绝不含工具/agent 行）。
+# 行集：凭证 + host-webserver + knowledge/memory Provider + 管理面插件。
+
+- insert:
+    # 凭证提供方（项目 .env 层回退，经 app bin 的 loadLayeredEnv 冻结环境快照）。
+    - id: credentials
+      name: '@deepseek-ai/dsh-credentials-local'
+
+    # 管理面 HTTP 载体（loopback 默认；0.0.0.0 需 lark-admin 配 adminTokenEnv）。
+    - id: host-webserver
+      name: '@deepseek-ai/dsh-host-webserver'
+      config:
+        host: 127.0.0.1
+        # 8791：lark-claw 的 admin-api 仍占用 8790（迁移期并存，M5 交接）。
+        port: 8791
+
+    # 知识 Provider（与 worker 共用同一 PG 数据面；凭证引用，值绝不写入组合）。
+    - id: knowledge-postgres
+      name: 'dsh-knowledge-postgres'
+      config:
+        databaseUrlEnv: DATABASE_URL
+        siliconflowApiKeyEnv: SILICONFLOW_API_KEY
+        uploadsRoot: !!js process.cwd() + '/.uploads'
+
+    # 图记忆 Provider（admin 只使用 graph API；仍共享同一 Scope/PG ACL）。
+    - id: memory-mem0
+      name: 'dsh-memory-mem0'
+      config:
+        enabled: true
+        embeddingApiKeyEnv: SILICONFLOW_API_KEY
+        embeddingBaseUrl: 'https://api.siliconflow.cn/v1'
+        embeddingModel: 'Qwen/Qwen3-VL-Embedding-8B'
+        embeddingDimensions: 1024
+        llmApiKeyEnv: DEEPSEEK_API_KEY
+        llmModel: 'deepseek-chat'
+        llmBaseUrl: 'https://api.deepseek.com'
+        databaseUrlEnv: DATABASE_URL
+        collectionName: dsh_lark_memory
+        scheduler:
+          concurrency: 2
+          pollIntervalMs: 500
+          maxAttempts: 3
+          leaseMs: 30000
+
+    # 模型计费 Provider（与 worker 共用同一 PG 账本）。
+    - id: lark-billing
+      name: 'dsh-lark-billing'
+      config:
+        databaseUrlEnv: DATABASE_URL
+        namespace:
+          tenantId: !!js process.env.LARK_TENANT_ID ?? 'lark'
+          botId: !!js process.env.BOT_ID ?? 'default'
+          deploymentId: !!js process.env.DEPLOYMENT_ID ?? 'default'
+        defaultMonthlyLimitUsd: 10
+        defaultPrice:
+          inputMicroCreditsPerMillion: 220000
+          outputMicroCreditsPerMillion: 660000
+          cacheReadMicroCreditsPerMillion: 7000
+          cacheWriteMicroCreditsPerMillion: 0
+          reasoningMicroCreditsPerMillion: 0
+
+    # 管理面插件（身份与网关 Scope 引导默认一致：tenant=lark, bot=default, deployment=default）。
+    - id: lark-admin
+      name: 'dsh-lark-admin'
+      config:
+        identity:
+          tenantId: !!js process.env.LARK_TENANT_ID ?? 'lark'
+          botId: !!js process.env.BOT_ID ?? 'default'
+          deploymentId: !!js process.env.DEPLOYMENT_ID ?? 'default'
+          adminUserId: !!js process.env.ADMIN_USER_ID ?? (process.env.AUTHORIZED_OPEN_IDS ?? '').split(',')[0]
+        uploadsRoot: !!js process.cwd() + '/.uploads'
+        webRoot: !!js process.cwd() + '/apps/admin-web/dist'
+        adminTokenEnv: ADMIN_TOKEN
+        # Admin 运行观察只通过 loopback Worker 控制面读取健康和会话投影。
+        # Worker token 仍由 credentials Provider 解析，浏览器永远看不到该凭证。
+        controlPlane:
+          workerBaseUrl: 'http://127.0.0.1:8788'
+          workerTokenEnv: WORKER_TOKEN
+          requestTimeoutMs: 2500
+          targets:
+            - id: primary-agent
+              label: 主 Agent
+              scope:
+                tenantId: !!js process.env.LARK_TENANT_ID ?? 'lark'
+                botId: !!js process.env.BOT_ID ?? 'default'
+                deploymentId: !!js process.env.DEPLOYMENT_ID ?? 'default'
+                userId: !!js process.env.ADMIN_USER_ID ?? (process.env.AUTHORIZED_OPEN_IDS ?? '').split(',')[0]
+                conversationId: admin-console
+              defaultGeneration: 0

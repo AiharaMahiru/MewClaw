@@ -1,0 +1,54 @@
+# Linux production: apply after full.overlay.yml and oci.overlay.yml.
+# Every Worker-owned write path is absolute and lives under the systemd
+# ReadWritePaths boundary. Relative defaults resolve under /opt/dsh/current,
+# which is intentionally read-only in production.
+- id: session-persistence-jsonl
+  config:
+    root: /var/lib/dsh/sessions
+
+- id: settings
+  config:
+    dshHome: /var/lib/dsh/.dsh
+
+- id: sandbox-policy
+  config:
+    workspaceRoot: /var/lib/dsh/workspaces
+
+- id: lark-session-directory
+  config:
+    filePath: /var/lib/dsh/session-directory.json
+    claimTtlMs: 600000
+    maxEntries: 20
+
+- id: knowledge-postgres
+  config:
+    databaseUrlEnv: DATABASE_URL
+    siliconflowApiKeyEnv: SILICONFLOW_API_KEY
+    uploadsRoot: /var/lib/dsh/uploads
+
+- id: lark-uploads
+  config:
+    uploadsRoot: /var/lib/dsh/uploads
+
+- id: lark-image
+  config:
+    baseUrl: https://cpa.rwr.ink/v1
+    apiKeyEnv: OPENAI_API_KEY
+    model: gpt-image-2
+    workspaceRoot: /var/lib/dsh/workspaces
+    maxReferences: 8
+
+- id: lark-run
+  config:
+    host: 127.0.0.1
+    port: 18788
+    presetId: lark-standard
+    agentPresetId: lark-standard
+    workspaceRoot: /var/lib/dsh/workspaces
+    tokenEnv: WORKER_TOKEN
+
+- id: sandbox-oci
+  config:
+    image: !!js process.env.DSH_SANDBOX_IMAGE
+    network: none
+    workspaceRoot: /var/lib/dsh/workspaces

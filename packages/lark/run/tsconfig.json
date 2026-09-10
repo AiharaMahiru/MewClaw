@@ -1,0 +1,22 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declarationDir": "lib/types",
+    "outDir": "lib",
+    "rootDir": "src",
+    "tsBuildInfoFile": "lib/.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    { "path": "../contracts" },
+    { "path": "../billing" },
+    { "path": "../session-directory" },
+    { "path": "../uploads" },
+    { "path": "../cron" },
+    { "path": "../presets" },
+    { "path": "../../memory/memory" },
+    { "path": "../../skill/skill-trust" }
+  ]
+}

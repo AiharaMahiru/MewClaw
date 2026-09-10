@@ -1,0 +1,5 @@
+# lark-gateway 组合根：空行集——行集由 dsh.profile.bundles 的 patch 层插入
+# （dsh-lark-gateway-bundle：credentials + lark + lark-ws + lark-card +
+# lark-commands + lark-run-client + lark-gateway）。
+# 网关面不得出现任何工具行与 agent 栈行（硬边界，组合校验测试锁死）。
+[]

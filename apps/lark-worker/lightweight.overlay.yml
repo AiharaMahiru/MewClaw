@@ -1,0 +1,93 @@
+# 默认轻量生产 profile：只保留 Scope 工作区内的 fs-sandbox 文件能力。
+# 这是 capability-restricted host profile，不是 OS 级 sandbox。
+# 任意代码、子进程和委派执行须显式切换 full.overlay.yml 或 oci.overlay.yml。
+
+# Web 浏览器必须使用官方 browse picker；auto 在 Windows 本机默认选择 native，
+# 远程浏览器无法接收原生选择器。认证边界会把 browse 的目录请求锁到用户根目录。
+- id: directory-picker
+  disabled: true
+
+- insert:
+    - id: directory-picker-browse-host
+      name: '@deepseek-ai/dsh-host-directory-picker-browse'
+    - id: directory-picker-browse-client
+      name: '@deepseek-ai/dsh-client-ui-directory-picker-browse'
+
+# 只暴露与本 profile 宿主能力匹配的 preset；不扫描用户目录，避免持久化的
+# 执行型 preset（例如 Liangshen）绕过 lightweight 的能力边界。
+- id: agent-presets
+  config:
+    default: lark-lightweight
+    roots:
+      - path: !!js process.cwd() + '/node_modules/dsh-lark-web-bundle/agent-presets-lightweight'
+        trust: system
+    includeUserRoot: false
+
+# Cordis patch 会整体替换行 config，这里重述 lark-run 的完整部署配置。
+- id: lark-run
+  config:
+    host: 127.0.0.1
+    port: 8788
+    presetId: lark-standard
+    agentPresetId: lark-lightweight
+    workspaceRoot: .workspaces
+    tokenEnv: WORKER_TOKEN
+
+- id: subprocess
+  disabled: true
+- id: sandbox
+  disabled: true
+- id: bash-sandbox
+  disabled: true
+- id: pwsh-sandbox
+  disabled: true
+- id: shell-env
+  disabled: true
+- id: tool-bash
+  disabled: true
+- id: tool-pwsh
+  disabled: true
+- id: jobs
+  disabled: true
+- id: tool-jobs
+  disabled: true
+- id: tool-fs-search
+  disabled: true
+
+# permission-presets 强制注入 ctx.shell；lightweight 没有 shell provider，故禁用其命令面。
+- id: permission
+  disabled: true
+
+# rc.7 host api-proxy 读取全局 subagents registry；保留空 registry，但禁用
+# 所有执行 provider、控制工具和 workflow，因此不会产生委派执行能力。
+- id: subagent-spawn-in-process
+  disabled: true
+- id: subagent-fork-in-process
+  disabled: true
+- id: tool-subagent-control
+  disabled: true
+- id: tool-subagent-list-agents
+  disabled: true
+- id: tool-subagent
+  disabled: true
+- id: tool-subagent-fork
+  disabled: true
+- id: tool-subagent-report
+  disabled: true
+- id: workflow-worker-thread
+  disabled: true
+- id: tool-workflow
+  disabled: true
+- id: tool-ralph
+  disabled: true
+
+# 第三方 Web 执行面：lightweight 不允许本机 Git subprocess 或 PTY。
+- id: web-ui-git-graph
+  disabled: true
+- id: web-ui-better-sidebar
+  disabled: true
+
+# 用户已关闭 pet；上游 client 在 host 注销 /api/pet/* 后仍会轮询，故停用整行，
+# 不反向覆盖用户偏好，也不留下持续 404。
+- id: web-ui-pet
+  disabled: true

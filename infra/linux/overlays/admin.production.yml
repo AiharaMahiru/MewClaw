@@ -1,0 +1,36 @@
+# Linux production: Admin remains loopback-only and has no agent/tool rows.
+- id: host-webserver
+  config:
+    host: 127.0.0.1
+    port: 18791
+
+- id: knowledge-postgres
+  config:
+    databaseUrlEnv: DATABASE_URL
+    siliconflowApiKeyEnv: SILICONFLOW_API_KEY
+    uploadsRoot: /var/lib/dsh/uploads
+
+- id: lark-admin
+  config:
+    identity:
+      tenantId: !!js process.env.LARK_TENANT_ID ?? 'lark'
+      botId: !!js process.env.BOT_ID ?? 'default'
+      deploymentId: !!js process.env.DEPLOYMENT_ID ?? 'default'
+      adminUserId: !!js process.env.ADMIN_USER_ID ?? (process.env.AUTHORIZED_OPEN_IDS ?? '').split(',')[0]
+    uploadsRoot: /var/lib/dsh/uploads
+    webRoot: /opt/dsh/current/apps/admin-web/dist
+    adminTokenEnv: ADMIN_TOKEN
+    controlPlane:
+      workerBaseUrl: http://127.0.0.1:18788
+      workerTokenEnv: WORKER_TOKEN
+      requestTimeoutMs: 2500
+      targets:
+        - id: primary-agent
+          label: 主 Agent
+          scope:
+            tenantId: !!js process.env.LARK_TENANT_ID ?? 'lark'
+            botId: !!js process.env.BOT_ID ?? 'default'
+            deploymentId: !!js process.env.DEPLOYMENT_ID ?? 'default'
+            userId: !!js process.env.ADMIN_USER_ID ?? (process.env.AUTHORIZED_OPEN_IDS ?? '').split(',')[0]
+            conversationId: admin-console
+          defaultGeneration: 0

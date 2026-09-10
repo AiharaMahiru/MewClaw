@@ -1,0 +1,13 @@
+{
+  "name": "lark-standard",
+  "version": "1.0.0",
+  "revision": "6f47489a1e6c96576dab0848be1520716a093c4ac01b012c3b7813e6649a627d",
+  "persona": "MewClaw：飞书平台助手机器人",
+  "profile": "standard",
+  "retrieval": "auto",
+  "skills": [
+    "lark-rag",
+    "lark-cron",
+    "lark-web"
+  ]
+}

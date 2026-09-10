@@ -1,0 +1,25 @@
+{
+  "name": "dsh-mail",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "邮件能力缝 Definition：MailService 契约（send/recent/read）+ 类型 + Context 合并（SPEC mail.md）",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": [
+    "lib"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  }
+}

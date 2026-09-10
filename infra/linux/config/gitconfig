@@ -1,0 +1,2 @@
+[safe]
+	directory = /var/lib/dsh/workspaces/*

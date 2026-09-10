@@ -1,0 +1,26 @@
+{
+  "name": "dsh-knowledge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "知识能力缝 Definition：ctx.knowledge 服务契约（检索/摄入/生命周期/审计）与全部数据类型",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib"],
+  "dependencies": {
+    "dsh-lark-contracts": "workspace:*"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  }
+}

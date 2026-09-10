@@ -1,0 +1,97 @@
+# 当前 dsh-lark Web 组合覆盖官方 dsh-web-app 的部署默认值。
+# 只重述被本层拥有的完整 config，避免覆盖官方 Web Host 的其他行。
+
+- id: agent-default-model
+  config:
+    provider: openai
+    model: gpt-5.6-luna
+    # reasoningEffort 由 agent-default-model 的 settings 层保存；当前用户
+    # settings.yaml 已固定为 max，避免把不属于插件 Config 的字段硬塞进 schema。
+
+- id: agent-presets
+  config:
+    default: standard
+    roots:
+      # full/OCI profile 的 system 根：保留轻量默认与 lark-standard 持久化 ID，
+      # 同时暴露优化模式和官方 preset。
+      # 用户根必须关闭；lightweight/full/OCI 都只接受仓库声明的 system preset。
+      - path: !!js process.cwd() + '/node_modules/dsh-lark-web-bundle/agent-presets-lightweight'
+        trust: system
+      - path: !!js process.cwd() + '/node_modules/dsh-lark-web-bundle/agent-presets'
+        trust: system
+      - path: !!js process.cwd() + '/node_modules/@deepseek-ai/dsh-agent-presets/presets'
+        trust: system
+    includeUserRoot: false
+
+- id: system-prompt
+  config:
+    persona: >-
+      你是 MewClaw，运行在 dsh-lark 的官方 Web 与飞书共用 Agent 平台上。
+      你的输出面可能是浏览器聊天或飞书卡片；重要结论放最前，不展示隐藏推理、
+      密钥、令牌或敏感配置。涉及删除、不可逆变更或外部副作用时先确认。
+
+# 上游聚合包的 perf 层会覆盖 JSONL 写入延迟；生产继续使用升级前的官方默认，
+# 并显式保留现有 root/编码，避免同一会话目录发生格式漂移。
+- id: session-persistence-jsonl
+  config:
+    root: !!js dshHomePath('sessions')
+    packChunks: true
+    compression: zstd
+    preparedSessionCacheSize: 5
+    writeBatchMaxDelayMs: 200
+
+# 官方 dsh Web Host 自带唯一的 userQuestions provider，并通过 /api 与事件
+# 通道驱动官方问题面板。Web profile 不再加载飞书专用 provider，避免违反
+# dsh-user-questions 的单 provider 契约；飞书专用 profile 继续保留该插件。
+- id: lark-approval
+  disabled: true
+
+# 第三方聚合包先安装完整 roster，本地政策层再关闭与现有 Scope、凭证、
+# 认证或 preset 合同冲突的能力。执行型 UI 的 profile 差异由 app overlay 决定。
+- id: web-ui-dsh-aionui-panel
+  disabled: true
+- id: web-ui-plugin-manager
+  disabled: true
+- id: web-ui-market
+  disabled: true
+- id: web-ui-desktop-launcher
+  disabled: true
+- id: web-ui-doctor
+  disabled: true
+- id: web-ui-dsh-perf
+  disabled: true
+- id: web-ui-skin-center
+  disabled: true
+- id: web-ui-git-graph
+  disabled: true
+- id: web-ui-task-board
+  disabled: true
+- id: web-ui-remote-web-ui
+  disabled: true
+- id: web-ui-ssh
+  disabled: true
+- id: web-ui-describe-image
+  disabled: true
+- id: web-ui-liangshen
+  disabled: true
+- id: web-ui-pet
+  disabled: true
+- id: web-ui-archive-manager
+  disabled: true
+- id: web-ui-session-branch
+  disabled: true
+- id: web-ui-session-rdb
+  disabled: true
+- id: web-ui-conversation-message-actions
+  disabled: true
+- id: ui-brand-official
+  disabled: true
+
+# Worker Web Host 只接受 Auth Edge 注入的内部凭证；直连 3081 不得绕过登录。
+- insert:
+    - id: lark-web-auth
+      name: dsh-lark-web-auth
+      config:
+        tokenEnv: WORKER_TOKEN
+    - id: atw-brand
+      name: dsh-lark-atw-brand

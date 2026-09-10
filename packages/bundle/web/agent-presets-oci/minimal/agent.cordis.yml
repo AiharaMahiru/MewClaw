@@ -1,0 +1,33 @@
+# OCI 专用 minimal preset：保持 Bash + 文件工具的精简组合，但把 PTY 依赖替换为
+# Agent 所有的管道 Bash。文件工具按会话宿主 cwd 解析，不能把容器内 /workspace
+# 误当成宿主绝对路径。
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      你是 MewClaw，由 {{model}} 模型驱动。文件工具的当前工作目录是 {{cwd}}；
+      调用 read、write、edit 时只传当前工作目录内的相对路径，绝不能传 /workspace；
+      /workspace 只用于 Bash，它映射到同一工作区。创建或修改文件必须使用文件工具，
+      Bash 只负责运行和验证，容器内没有 apply_patch。
+    complete: true
+    includeRuntimeContext: false
+
+- id: pipe-shell
+  name: cordis:group
+  group: true
+  isolate:
+    terminals: true
+  config:
+    - id: persistent-bash
+      name: ../pipe-bash.mjs
+      config:
+        timeoutMs: 300000
+        description: |-
+          Run commands in a persistent bash shell inside the OCI workspace
+          * State persists across command calls for this Agent.
+          * Commands run through the OCI subprocess boundary; no host shell is available.
+          * /workspace is only the Bash mount path. For read/write/edit/glob/grep, use paths relative to the session cwd and never pass /workspace.
+          * Please avoid commands that may produce a very large amount of output.
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'

@@ -1,0 +1,29 @@
+{
+  "name": "dsh-lark-base",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "平台强制策略 bundle：在 dsh-base 之上插入平台行（身份/安全政策、部署稳定性）",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib", "cordis.patch.yml"],
+  "dependencies": {
+    "@deepseek-ai/cordis-plugin-hmr": "1.0.17",
+    "@deepseek-ai/dsh-base": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-system-prompt": "0.1.2-rc.1"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  }
+}

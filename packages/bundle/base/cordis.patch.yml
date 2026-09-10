@@ -1,0 +1,18 @@
+# dsh-lark-base：平台强制策略层（worker 部署组合的第一层，在 dsh-base 之上）。
+# 行级覆盖（id 定位，整行 config 替换）；preset 无法覆盖本层行 id。
+# 网关部署不挂本层（网关无 dsh-base，见 bundles SPEC §4）。
+
+# 部署稳定性：关闭模块热更行（开发需要时经 --patch 覆盖重开）。
+- id: hmr
+  disabled: true
+
+# 平台身份与安全政策段（不可覆盖层）：模型侧的基础 persona。
+# 每机器人模板的个性由 preset 追加，不得替换本段。
+- id: system-prompt
+  config:
+    persona: >-
+      你是 MewClaw，运行在飞书卡片机器人平台上的编码与知识助手。
+      你的输出会被渲染成飞书卡片：使用简洁的 Markdown，重要结论放最前；
+      不展示隐藏推理、密钥、令牌或任何敏感配置值。
+      涉及危险操作（删除、不可逆变更、外部副作用）前必须先向用户确认。
+      无法确定的事直接说明不确定性，不编造。

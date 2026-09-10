@@ -1,0 +1,5 @@
+# lark-worker 组合根：空行集——行集由 dsh.profile.bundles 的 patch 层插入
+# （@deepseek-ai/dsh-base → dsh-lark-base → dsh-lark-worker：
+# agent 栈 + 平台政策层 + 运行服务器/交互 provider/会话与沙箱覆盖）。
+# worker 面不得出现 lark 客户端行与卡片行（硬边界，组合校验测试锁死）。
+[]

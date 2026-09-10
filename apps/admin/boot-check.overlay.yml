@@ -1,0 +1,16 @@
+# 本地启动验证专用：使用随机 loopback 端口，不与运行中的 admin 服务冲突。
+
+- id: host-webserver
+  config:
+    host: 127.0.0.1
+    port: 0
+
+# 发布门禁不连接数据面；生产 overlay 保持这些 Provider 开启。
+- id: lark-billing
+  disabled: true
+- id: knowledge-postgres
+  disabled: true
+- id: memory-mem0
+  disabled: true
+- id: lark-admin
+  disabled: true

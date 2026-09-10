@@ -1,0 +1,29 @@
+{
+  "name": "dsh-dooragent-migration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DoorAgent 冻结快照到 DSH 的一次性用户迁移能力",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib"],
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.2",
+    "dsh-lark-auth": "workspace:*",
+    "dsh-lark-contracts": "workspace:*"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "vitest": "4.1.10"
+  }
+}

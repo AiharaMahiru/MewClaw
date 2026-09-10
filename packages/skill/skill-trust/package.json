@@ -1,0 +1,27 @@
+{
+  "name": "dsh-skill-trust",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "技能供应链预检：trust-manifest 摘要/版本/能力声明核对，失败拒绝加载",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib", "metadata.mjs", "metadata.d.mts"],
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.2",
+    "yaml": "2.9.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2"
+  }
+}

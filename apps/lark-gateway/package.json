@@ -1,0 +1,27 @@
+{
+  "name": "dsh-lark-gateway-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "飞书网关部署 bin：tsx 源码引导 + bundle 层 + cordis.yml 组合",
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "dsh-lark-gateway-bundle"
+      ]
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-app-boot": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-credentials-local": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-launch-environment": "0.1.2-rc.1",
+    "dsh-lark": "workspace:*",
+    "dsh-lark-card": "workspace:*",
+    "dsh-lark-commands": "workspace:*",
+    "dsh-lark-gateway": "workspace:*",
+    "dsh-lark-gateway-bundle": "workspace:*",
+    "dsh-lark-run-client": "workspace:*",
+    "dsh-lark-ws": "workspace:*"
+  }
+}

@@ -1,0 +1,4 @@
+# lark-admin 组合根：空行集——行集由 dsh.profile.bundles 的 patch 层插入
+# （dsh-lark-admin-bundle：凭证 + host-webserver + knowledge + admin 面）。
+# admin 面不得出现任何工具/agent 行（硬边界，组合校验测试锁死）。
+[]

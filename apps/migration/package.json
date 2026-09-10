@@ -1,0 +1,28 @@
+{
+  "name": "dsh-dooragent-migration-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DoorAgent 到 DSH 的一次性离线迁移管理应用",
+  "exports": {
+    "./consumer": {
+      "types": "./dist/types/consumer.d.ts",
+      "default": "./dist/consumer.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-app-boot": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-credentials-local": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-launch-environment": "0.1.2-rc.1",
+    "dsh-dooragent-migration": "workspace:*",
+    "dsh-lark-auth": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "4.1.10"
+  }
+}

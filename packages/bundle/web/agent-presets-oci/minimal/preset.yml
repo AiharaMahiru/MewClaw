@@ -1,0 +1,3 @@
+name: 极简模式
+description: 仅提供持久 Bash 与会话文件工具的精简编码 Agent（OCI 管道实现）。
+order: 3

@@ -1,0 +1,5 @@
+Inst postgresql-common (278 Debian:13.0/stable [all])
+Inst postgresql-17 (17.9-0+deb13u1 Debian:13.0/stable [amd64])
+Inst podman (5.4.2+ds1-2+b2 Debian:13.0/stable [amd64])
+Conf postgresql-common (278 Debian:13.0/stable [all])
+Conf postgresql-17 (17.9-0+deb13u1 Debian:13.0/stable [amd64])

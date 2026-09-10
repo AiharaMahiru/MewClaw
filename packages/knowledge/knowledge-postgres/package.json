@@ -1,0 +1,37 @@
+{
+  "name": "dsh-knowledge-postgres",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "知识能力缝 Provider：pgvector 混合检索（ACL 查询内过滤）、摄入事务、版本激活、管理面（SPEC knowledge.md）",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": [
+    "lib"
+  ],
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.2",
+    "dsh-knowledge": "workspace:*",
+    "dsh-lark-contracts": "workspace:*",
+    "dsh-lark-postgres-runtime": "workspace:*",
+    "pg": "^8.22.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-credentials": "0.1.2-rc.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-credentials": "0.1.2-rc.1",
+    "@electric-sql/pglite": "^0.5.4",
+    "@electric-sql/pglite-pgvector": "0.0.6",
+    "@types/pg": "^8.20.4"
+  }
+}

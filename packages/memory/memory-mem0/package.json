@@ -1,0 +1,35 @@
+{
+  "name": "dsh-memory-mem0",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "记忆能力缝 mem0 Provider（默认启用；显式关闭时 no-op 降级；mem0ai 懒加载；pgvector 同库）",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "types": "./lib/types/index.d.ts",
+  "main": "./lib/index.js",
+  "files": ["lib"],
+  "dependencies": {
+    "@deepseek-ai/schemastery": "3.18.2",
+    "better-sqlite3": "12.6.2",
+    "dsh-lark-postgres-runtime": "workspace:*",
+    "dsh-memory": "workspace:*",
+    "mem0ai": "3.1.5",
+    "pg": "^8.22.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-credentials": "0.1.2-rc.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-credentials": "0.1.2-rc.1",
+    "@electric-sql/pglite": "^0.5.4",
+    "@types/pg": "^8.20.4"
+  }
+}

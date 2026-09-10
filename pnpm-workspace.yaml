@@ -1,0 +1,20 @@
+packages:
+  - apps/*
+  - packages/*
+  - packages/*/*
+  - infra/*
+
+autoInstallPeers: false
+
+nodeLinker: hoisted
+
+onlyBuiltDependencies:
+  - '@deepseek-ai/dsh-subprocess-local'
+  - cloudflared
+  - cpu-features
+  - esbuild
+  - koffi
+  - node-pty
+  - protobufjs
+  - better-sqlite3
+  - ssh2

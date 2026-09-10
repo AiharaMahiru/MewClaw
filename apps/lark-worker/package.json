@@ -1,0 +1,44 @@
+{
+  "name": "dsh-lark-worker-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "执行 worker 部署 bin：tsx 源码引导 + bundle 层 + cordis.yml 组合",
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "dsh-lark-base",
+        "dsh-lark-worker",
+        "@deepseek-ai/dsh-web-app",
+        "dsh-context",
+        "@linxin666/dsh-web-all",
+        "dsh-lark-web-bundle"
+      ]
+    }
+  },
+  "dependencies": {
+    "@linxin666/dsh-web-all": "0.3.16",
+    "@linxin666/dsh-perf": "0.3.14",
+    "@linxin666/dsh-desktop-launcher": "0.3.13",
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-app-boot": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-base": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-cmdline": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-launch-environment": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-permission-presets": "0.1.2-rc.1",
+    "@deepseek-ai/dsh-web-app": "0.1.2-rc.1",
+    "dsh-better-sidebar": "0.18.0",
+    "dsh-context": "0.42.0",
+    "dsh-lark-web-bundle": "workspace:*",
+    "@deepseek-ai/dsh": "0.1.2-rc.1",
+    "dsh-lark-approval": "workspace:*",
+    "dsh-lark-base": "workspace:*",
+    "dsh-lark-run": "workspace:*",
+    "dsh-lark-worker": "workspace:*",
+    "dsh-skill-trust": "workspace:*",
+    "clsx": "2.1.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

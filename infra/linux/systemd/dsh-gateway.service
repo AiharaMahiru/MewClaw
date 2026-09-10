@@ -1,0 +1,28 @@
+[Unit]
+Description=MewClaw Feishu Gateway
+After=network-online.target dsh-worker.service
+Wants=network-online.target
+Requires=dsh-worker.service
+
+[Service]
+Type=simple
+User=dsh
+Group=dsh
+WorkingDirectory=/opt/dsh/current
+EnvironmentFile=/etc/dsh/postgres.env
+EnvironmentFile=/etc/dsh/production.env
+Environment=DSH_PROJECT_ENV_DIR=/var/lib/dsh
+ExecStart=/opt/dsh/runtime/node/bin/node /opt/dsh/current/apps/lark-gateway/dist/main.js --patch infra/linux/overlays/gateway.production.yml
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/dsh
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

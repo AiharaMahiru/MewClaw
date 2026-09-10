@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-08-29T15:07:00+08:00",
+  "host": {
+    "os": "Debian GNU/Linux 13 (trixie)",
+    "architecture": "amd64"
+  },
+  "packages": [
+    {
+      "name": "postgresql-17",
+      "version": "17.9-0+deb13u1",
+      "architecture": "amd64",
+      "repository": "http://ftp.debian.org/debian trixie/main",
+      "archiveContentSha1": "8e78f206f6767f2a958c36696872c56ce2af5264",
+      "archiveUrl": "https://snapshot.debian.org/file/8e78f206f6767f2a958c36696872c56ce2af5264",
+      "filename": "pool/main/p/postgresql-17/postgresql-17_17.9-0+deb13u1_amd64.deb",
+      "size": 16582844,
+      "sha256": "8e2662369a54db8d81ac6b5c8756f07e12e7a6ce5506e77345e7008cee001970"
+    },
+    {
+      "name": "postgresql-client-17",
+      "version": "17.9-0+deb13u1",
+      "architecture": "amd64",
+      "repository": "http://ftp.debian.org/debian trixie/main",
+      "archiveContentSha1": "cdffd4959b739d72f91a5f8602b80047bf68b2a7",
+      "archiveUrl": "https://snapshot.debian.org/file/cdffd4959b739d72f91a5f8602b80047bf68b2a7",
+      "filename": "pool/main/p/postgresql-17/postgresql-client-17_17.9-0+deb13u1_amd64.deb",
+      "size": 2042340,
+      "sha256": "91e708dcf6a0be20f1d40e771cf7c7011976ceb8d68846f4af3b0ea50d3f929a"
+    },
+    {
+      "name": "postgresql-17-pgvector",
+      "version": "0.8.0-1",
+      "architecture": "amd64",
+      "repository": "http://ftp.debian.org/debian trixie/main",
+      "archiveContentSha1": null,
+      "archiveUrl": null,
+      "filename": "pool/main/p/pgvector/postgresql-17-pgvector_0.8.0-1_amd64.deb",
+      "size": 261480,
+      "sha256": "6e8a457eb252617b66cf7b2908c736127eae43703fffec94492ac131ca921515"
+    },
+    {
+      "name": "chromium",
+      "version": "147.0.7727.55-1~deb13u1",
+      "architecture": "amd64",
+      "repository": "http://security.debian.org/debian-security trixie-security/main",
+      "archiveContentSha1": "57ce5bdd2e20a6ea0aa27dc85a1ee84058ae8ed7",
+      "archiveUrl": "https://snapshot.debian.org/file/57ce5bdd2e20a6ea0aa27dc85a1ee84058ae8ed7",
+      "filename": "pool/updates/main/c/chromium/chromium_147.0.7727.55-1~deb13u1_amd64.deb",
+      "size": 84342856,
+      "sha256": "c9bc37e9a9a3cbda7e664afaf846e4cca50fbe764637bb5bdfc01b62fe7e6d7e"
+    },
+    {
+      "name": "chromium-common",
+      "version": "147.0.7727.55-1~deb13u1",
+      "architecture": "amd64",
+      "repository": "http://security.debian.org/debian-security trixie-security/main",
+      "archiveContentSha1": "68535392e6391664414dc2f75efedc98efd4978b",
+      "archiveUrl": "https://snapshot.debian.org/file/68535392e6391664414dc2f75efedc98efd4978b",
+      "filename": "pool/updates/main/c/chromium/chromium-common_147.0.7727.55-1~deb13u1_amd64.deb",
+      "size": 25368580,
+      "sha256": "71686b509ff7728d4a6d3667d1ebbdf4cee389e4fa89405cf01107075252ac02"
+    },
+    {
+      "name": "chromium-sandbox",
+      "version": "147.0.7727.55-1~deb13u1",
+      "architecture": "amd64",
+      "repository": "http://security.debian.org/debian-security trixie-security/main",
+      "archiveContentSha1": "9e83a8cfdb6f70a32c4820ae04427d91970f963f",
+      "archiveUrl": "https://snapshot.debian.org/file/9e83a8cfdb6f70a32c4820ae04427d91970f963f",
+      "filename": "pool/updates/main/c/chromium/chromium-sandbox_147.0.7727.55-1~deb13u1_amd64.deb",
+      "size": 113656,
+      "sha256": "7a81aff79d312bc5844dc322342c5eaeb7935c2065b99c5902ab31619a516b97"
+    },
+    {
+      "name": "podman",
+      "version": "5.4.2+ds1-2+b2",
+      "architecture": "amd64",
+      "repository": "http://ftp.debian.org/debian trixie/main",
+      "archiveContentSha1": null,
+      "archiveUrl": null,
+      "filename": "pool/main/p/podman/podman_5.4.2+ds1-2+b2_amd64.deb",
+      "size": 24686200,
+      "sha256": "e3987a9d1e6d46cbd4ee11bd067927a5f7f886e41c7a2dbe5b89a436905d44a0"
+    },
+    {
+      "name": "uidmap",
+      "version": "1:4.17.4-2",
+      "architecture": "amd64",
+      "repository": "http://ftp.debian.org/debian trixie/main",
+      "archiveContentSha1": null,
+      "archiveUrl": null,
+      "filename": "pool/main/s/shadow/uidmap_4.17.4-2_amd64.deb",
+      "size": 193956,
+      "sha256": "a017182d42a32ca241cd830a59153488e1f65ae6e31a760014575878044a9d2d"
+    },
+    {
+      "name": "slirp4netns",
+      "version": "1.2.1-1.1",
+      "architecture": "amd64",
+      "repository": "http://ftp.debian.org/debian trixie/main",
+      "archiveContentSha1": null,
+      "archiveUrl": null,
+      "filename": "pool/main/s/slirp4netns/slirp4netns_1.2.1-1.1_amd64.deb",
+      "size": 39268,
+      "sha256": "c294a4df952b9ae54e19e0ab19ac09a7e398fbf7aa8969cfcae07f92dc4f30ac"
+    },
+    {
+      "name": "fuse-overlayfs",
+      "version": "1.14-1+b1",
+      "architecture": "amd64",
+      "repository": "http://ftp.debian.org/debian trixie/main",
+      "archiveContentSha1": null,
+      "archiveUrl": null,
+      "filename": "pool/main/f/fuse-overlayfs/fuse-overlayfs_1.14-1+b1_amd64.deb",
+      "size": 44880,
+      "sha256": "e796f6f3c6b7dbef0df283f0a7c277d60a97db0e50665199dafbd2e3733ccae0"
+    }
+  ],
+  "runtimes": [
+    {
+      "name": "node",
+      "version": "24.19.0",
+      "platform": "linux",
+      "architecture": "x64",
+      "url": "https://nodejs.org/dist/v24.19.0/node-v24.19.0-linux-x64.tar.xz",
+      "size": 31633904,
+      "sha256": "14b342e71204f811bde6153be8e04b62aef63c236fef92b55f9c83154b409647"
+    }
+  ]
+}

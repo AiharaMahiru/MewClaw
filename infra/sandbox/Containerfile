@@ -1,0 +1,62 @@
+# 沙箱 OCI 镜像定义（Podman rootless，读写根、降权、资源上限、默认断网）。
+# 来源：lark-claw infra/sandbox（整体平移，M0；路径改名 dsh-lark）。
+# syntax=docker/dockerfile:1.7
+ARG NODE_IMAGE=node:24.11.1-bookworm-slim
+ARG PYTHON_IMAGE=python:3.13.7-slim-bookworm
+ARG DOTNET_IMAGE=mcr.microsoft.com/dotnet/sdk:10.0.302
+ARG RUST_IMAGE=rust:1.93.0-bookworm
+ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.12.1
+
+FROM ${NODE_IMAGE} AS node_runtime
+FROM ${DOTNET_IMAGE} AS dotnet_runtime
+FROM ${RUST_IMAGE} AS rust_runtime
+FROM ${UV_IMAGE} AS uv_runtime
+FROM ${PYTHON_IMAGE} AS runtime
+
+ARG SANDBOX_UID=10001
+ARG SANDBOX_GID=10001
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+      bash build-essential ca-certificates clang cmake curl file git jq \
+      libssl-dev pkg-config ripgrep unzip xz-utils zip \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=node_runtime /usr/local/ /usr/local/
+COPY --from=dotnet_runtime /usr/share/dotnet/ /usr/share/dotnet/
+COPY --from=rust_runtime /usr/local/cargo/ /usr/local/cargo/
+COPY --from=rust_runtime /usr/local/rustup/ /usr/local/rustup/
+COPY --from=uv_runtime /uv /usr/local/bin/uv
+COPY --from=uv_runtime /uvx /usr/local/bin/uvx
+
+ENV DOTNET_ROOT=/usr/share/dotnet \
+    PATH=/usr/local/cargo/bin:/usr/share/dotnet:${PATH} \
+    RUSTUP_HOME=/usr/local/rustup
+
+RUN ln -s /usr/share/dotnet/dotnet /usr/local/bin/dotnet \
+    && groupadd --gid ${SANDBOX_GID} sandbox \
+    && useradd --uid ${SANDBOX_UID} --gid ${SANDBOX_GID} --no-create-home sandbox
+
+RUN mkdir -p /opt/dsh-lark/react-runtime /opt/dsh-lark/npm-cache \
+    && cd /opt/dsh-lark/react-runtime \
+    && npm init -y >/dev/null \
+    && npm install --ignore-scripts --no-audit --no-fund \
+      react@19.2.8 react-dom@19.2.8 vite@8.2.1 \
+      @vitejs/plugin-react@6.0.5 typescript@5.9.3 \
+      @types/react@19.2.18 @types/react-dom@19.2.4 \
+      --cache=/opt/dsh-lark/npm-cache \
+    && ln -s /opt/dsh-lark/react-runtime/node_modules/vite/bin/vite.js /usr/local/bin/vite \
+    && ln -s /opt/dsh-lark/react-runtime/node_modules/typescript/bin/tsc /usr/local/bin/tsc \
+    && rm -rf /opt/dsh-lark/npm-cache/_logs
+
+ENV SANDBOX_NPM_CACHE_SEED=/opt/dsh-lark/npm-cache \
+    NPM_CONFIG_BIN_LINKS=false
+
+RUN chmod -R a+rX /opt/dsh-lark/npm-cache
+
+LABEL org.opencontainers.image.title="Lark Claw coding sandbox" \
+      org.opencontainers.image.version="1.0.0"
+
+USER ${SANDBOX_UID}:${SANDBOX_GID}
+WORKDIR /workspace
+ENTRYPOINT ["/bin/sh"]

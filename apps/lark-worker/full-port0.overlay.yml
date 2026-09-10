@@ -1,0 +1,14 @@
+# 全功能 profile 的随机端口验证覆盖层，不改变生产端口配置。
+- id: lark-run
+  config:
+    host: 127.0.0.1
+    port: 0
+    presetId: lark-standard
+    agentPresetId: lark-standard
+    workspaceRoot: .workspaces
+    tokenEnv: WORKER_TOKEN
+
+# task-board 的 Host ledger 对同一 DSH_HOME 采用单进程锁；正式 Worker
+# 运行时不能与随机端口 smoke 共用该账本。生产 full.overlay.yml 仍保持开启。
+- id: web-ui-task-board
+  disabled: true
