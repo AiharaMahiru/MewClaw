@@ -15,20 +15,20 @@ index 689c4eafee..a14948710a 100644
 -  SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT,
 +  SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT, RIGHTBAR_DEFAULT_RATIO,
  } from './layout-state.ts'
- 
+
  /** Private values assembled by one Desktop-owned shell registration. */
 @@ -18,7 +18,7 @@ export interface AdvancedFrameInjected {
- 
+
  /** Full enhanced-mode root slot props. */
  export type AdvancedFrameProps = PropsRuntime<'root'>
 -  & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'shell.overlay'>
 +  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.overlay'>
    & AdvancedFrameInjected
- 
+
  /** Enhanced-mode owner preserving the original Desktop layout contract. */
 @@ -27,7 +27,13 @@ export function AdvancedFrame(props: AdvancedFrameProps) {
  }
- 
+
  /** Shared panel mechanics below the two mode-specific root boundaries. */
 -export function DesktopOwnedFrame({ layout, mode, platform, renderSlot, SessionProvider, useSessions }: AdvancedFrameProps & {
 +export function DesktopOwnedFrame({
@@ -49,13 +49,13 @@ index 689c4eafee..a14948710a 100644
 -    const current = state.current
 -    return current !== undefined && state.byId[current]?.blank === false ? current : undefined
 -  })
- 
+
    useEffect(() => {
      const element = frameRef.current
 @@ -61,21 +63,19 @@ export function DesktopOwnedFrame({ layout, mode, platform, renderSlot, SessionP
    const narrow = viewport < SIDEBAR_AUTO_COLLAPSE
    useEffect(() => { layout.setNarrow(narrow) }, [layout, narrow])
- 
+
 -  const previousSession = useRef(detailsSession)
 -  useLayoutEffect(() => {
 -    if (detailsSession === undefined) return
@@ -84,7 +84,7 @@ index 689c4eafee..a14948710a 100644
    // Enhanced macOS keeps a wider native rail around the centered upstream
 @@ -85,23 +85,23 @@ export function DesktopOwnedFrame({ layout, mode, platform, renderSlot, SessionP
    columnsRef.current = columns
- 
+
    const sidebarBase = useRef(0)
 -  const detailsBase = useRef(0)
 +  const rightbarBase = useRef(0)
@@ -109,7 +109,7 @@ index 689c4eafee..a14948710a 100644
 +  const onRightbarDrag = useCallback((dx: number) => {
 +    layout.setRightbar(rightbarBase.current - dx, viewport)
 +  }, [layout, viewport])
- 
+
    return (
      <div
 @@ -110,9 +110,10 @@ export function DesktopOwnedFrame({ layout, mode, platform, renderSlot, SessionP
@@ -159,7 +159,7 @@ index 689c4eafee..a14948710a 100644
 @@ -151,8 +152,13 @@ export function DesktopOwnedFrame({ layout, mode, platform, renderSlot, SessionP
    )
  }
- 
+
 +function MainPanel({ usePanelInfo, renderSlot }: Pick<AdvancedFrameProps, 'usePanelInfo' | 'renderSlot'>) {
 +  const panelId = usePanelInfo(info => info.activePanelId)
 +  return renderSlot('main', {}, { entryKey: panelId ?? 'conversation' })
@@ -178,11 +178,11 @@ index fa09922bac..3c3855af84 100644
 @@ -14,7 +14,7 @@ export function applyAdvancedShell(ctx: ClientContext, environment: DesktopClien
      throw new Error(`dsh-plugin-desktop: advanced shell received mode ${JSON.stringify(environment.mode)}`)
    }
- 
+
 -  const desktopLayout = new DesktopLayoutState()
 +  const desktopLayout = new DesktopLayoutState(id => ctx.slots.entries('main').some(entry => entry.options.key === id))
    installDesktopLayout(ctx, desktopLayout)
- 
+
    ctx.effect(() => {
 @@ -44,8 +44,8 @@ export function applyAdvancedShell(ctx: ClientContext, environment: DesktopClien
      name: 'root',
@@ -206,7 +206,7 @@ index cbadca55a8..16492f176a 100644
  export interface DesktopSidebarOwnerProps {
    /** Whether the sidebar is showing its compact rail. */
 @@ -8,11 +10,12 @@ export interface DesktopSidebarOwnerProps {
- 
+
  /** Public panel transitions consumed by conversation and sidebar plugins. */
  export interface DesktopLayoutService {
 -  /** Toggle the sidebar between wide and compact presentation. */
@@ -220,9 +220,9 @@ index cbadca55a8..16492f176a 100644
 -  /** Close the details panel. */
    closeDetails(): void
  }
- 
+
 @@ -54,7 +57,7 @@ export interface DesktopWindowService {
- 
+
  declare module '@deepseek-ai/cordis' {
    interface Context {
 -    /** Desktop-owned layout service in extended and enhanced modes. */
@@ -232,7 +232,7 @@ index cbadca55a8..16492f176a 100644
      desktopWindow: DesktopWindowService
 @@ -62,14 +65,15 @@ declare module '@deepseek-ai/cordis' {
  }
- 
+
  declare module '@deepseek-ai/dsh-client-ui-slots' {
 +  interface GlobalStandardProps {
 +    usePanelInfo: <Selected>(selector: (info: PanelInfo) => Selected) => Selected
@@ -255,13 +255,13 @@ index 2410e5010b..04cd5428e2 100644
 --- a/dsh-plugin-desktop/src/client/extended-shell.ts
 +++ b/dsh-plugin-desktop/src/client/extended-shell.ts
 @@ -21,7 +21,7 @@ import { DesktopThemePresenter } from './theme-presenter.ts'
- 
+
  /** Own the extended root/sidebar surface without reusing enhanced-mode chrome. */
  function applyExtendedOwnedShell(ctx: ClientContext, environment: DesktopClientEnvironment): void {
 -  const desktopLayout = new DesktopLayoutState()
 +  const desktopLayout = new DesktopLayoutState(id => ctx.slots.entries('main').some(entry => entry.options.key === id))
    installDesktopLayout(ctx, desktopLayout)
- 
+
    ctx.effect(
 @@ -43,8 +43,8 @@ function applyExtendedOwnedShell(ctx: ClientContext, environment: DesktopClientE
      name: 'root',
@@ -280,7 +280,7 @@ index 1a356b42d9..961dd85e30 100644
 +++ b/dsh-plugin-desktop/src/client/layout-service.ts
 @@ -9,7 +9,18 @@ export function installDesktopLayout(ctx: ClientContext, layout: DesktopLayoutSt
    }
- 
+
    ctx.effect(() => {
 +    const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo: {
 +      getSnapshot: () => layout.getPanelInfo(),
@@ -329,7 +329,7 @@ index eb02943257..42cea10e0a 100644
 +  /** Rendered rightbar width. */
 +  rightbar: number
  }
- 
+
  /** Default compact rail used by the upstream sidebar. */
 @@ -28,10 +34,10 @@ export const SIDEBAR_DEFAULT = 280
  export const SIDEBAR_MIN = 264
@@ -343,12 +343,12 @@ index eb02943257..42cea10e0a 100644
 +export const RIGHTBAR_MIN = 300
 +export const RIGHTBAR_MAX_RATIO = 0.7
 +export const CENTER_MIN = 400
- 
+
  /** Keep the wider macOS rail private to enhanced mode; extended uses upstream geometry. */
  export function collapsedSidebarWidth(
 @@ -44,28 +50,24 @@ export function collapsedSidebarWidth(
  }
- 
+
  /**
 - * Resolve three desktop columns without allowing details to squeeze the conversation below its floor.
 + * Resolve three desktop columns without allowing rightbar to squeeze the conversation below its floor.
@@ -381,10 +381,10 @@ index eb02943257..42cea10e0a 100644
 +    : Math.min(available, clamp(rightbar, RIGHTBAR_MIN, viewport * RIGHTBAR_MAX_RATIO))
 +  return { sidebar: sidebarWidth, center: Math.max(0, viewport - sidebarWidth - resolvedRightbar), rightbar: resolvedRightbar }
  }
- 
+
  function clamp(value: number, min: number, max: number): number {
 @@ -74,9 +76,47 @@ function clamp(value: number, min: number, max: number): number {
- 
+
  /** Small observable panel controller used by the advanced root registration. */
  export class DesktopLayoutState {
 +  private panelInfo: PanelInfo = Object.freeze({ activePanelId: null })
@@ -435,7 +435,7 @@ index eb02943257..42cea10e0a 100644
 @@ -108,24 +148,35 @@ export class DesktopLayoutState {
      this.publish({ ...this.snapshot, narrow, narrowExpanded: false })
    }
- 
+
 -  /** Open details at its default width. */
 -  openDetails(): void {
 -    if (this.snapshot.details === 0) this.publish({ ...this.snapshot, details: DETAILS_DEFAULT })
@@ -447,7 +447,7 @@ index eb02943257..42cea10e0a 100644
 +      rightbarFullscreen: fullscreen,
 +      narrowExpanded: this.snapshot.narrow ? false : this.snapshot.narrowExpanded })
    }
- 
+
 -  /** Close details while keeping its slot mounted. */
 -  closeDetails(): void {
 -    if (this.snapshot.details !== 0) this.publish({ ...this.snapshot, details: 0 })
@@ -456,7 +456,7 @@ index eb02943257..42cea10e0a 100644
 +    if (!this.snapshot.rightbarShown) return
 +    this.publish({ ...this.snapshot, rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false })
    }
- 
+
 +  /** Compatibility alias for older details-slot consumers. */
 +  openDetails(): void { this.openRightbar(true, false) }
 +
@@ -467,7 +467,7 @@ index eb02943257..42cea10e0a 100644
    setSidebar(width: number): void {
      this.publish({ ...this.snapshot, sidebar: clamp(width, SIDEBAR_MIN, SIDEBAR_MAX) })
    }
- 
+
 -  /** @param width - requested details width from a resize gesture. */
 -  setDetails(width: number): void {
 -    this.publish({ ...this.snapshot, details: clamp(width, DETAILS_MIN, DETAILS_MAX) })
@@ -475,7 +475,7 @@ index eb02943257..42cea10e0a 100644
 +  setRightbar(width: number, viewport: number): void {
 +    this.publish({ ...this.snapshot, rightbar: clamp(width, RIGHTBAR_MIN, Math.max(RIGHTBAR_MIN, viewport * RIGHTBAR_MAX_RATIO)) })
    }
- 
+
    private publish(next: DesktopLayoutSnapshot): void {
 diff --git a/dsh-plugin-desktop/src/client/styles.ts b/dsh-plugin-desktop/src/client/styles.ts
 index 0f7eeb8cb9..33458ad55a 100644
@@ -531,7 +531,7 @@ index a0e4de513c..5b215881f6 100644
  import { applyAdvancedShell } from '../src/client/advanced-shell.ts'
 @@ -27,6 +28,33 @@ import {
  } from '../src/window-chrome.ts'
- 
+
  describe('desktop client environment', () => {
 +  it.each(['darwin', 'win32', 'linux'])('composes compatibility chrome for the %s client', platform => {
 +    const marker = platform === 'win32' ? '&dsh-desktop-mica=0' : ''
@@ -565,7 +565,7 @@ index a0e4de513c..5b215881f6 100644
      const effect = vi.fn()
 @@ -66,24 +94,62 @@ describe('desktop client environment', () => {
  })
- 
+
  describe('advanced desktop layout', () => {
 +  it.each([['advanced', AdvancedFrame], ['extended', ExtendedFrame]] as const)(
 +    'passes right Sidebar geometry and preserves its track beneath fullscreen in %s mode', (_mode, Frame) => {
@@ -617,7 +617,7 @@ index a0e4de513c..5b215881f6 100644
          createElement('section', { 'data-session-provider': '' }, children),
 -      renderSlot: (name: string) => createElement('span', { 'data-slot': name }),
      } as unknown as AdvancedFrameProps
- 
+
      try {
        const markup = renderToStaticMarkup(createElement(Frame, props))
 -      expect(markup).toContain('<section data-session-provider=""><span data-slot="details"></span></section>')
@@ -641,7 +641,7 @@ index a0e4de513c..5b215881f6 100644
 +    const rightbar = frame.indexOf('className="dshDesktopRightbarSurface"')
      const caption = frame.indexOf('className="dshDesktopWindowsCaptionRow"')
      const overlay = frame.indexOf('className="dshDesktopOverlay"')
- 
+
 -    expect([conversation, details, caption, overlay]).not.toContain(-1)
 +    expect([conversation, rightbar, caption, overlay]).not.toContain(-1)
      expect(caption).toBeGreaterThan(conversation)
@@ -649,7 +649,7 @@ index a0e4de513c..5b215881f6 100644
 +    expect(caption).toBeGreaterThan(rightbar)
      expect(caption).toBeLessThan(overlay)
    })
- 
+
 @@ -129,7 +195,7 @@ describe('advanced desktop layout', () => {
        expect(css).toMatch(/\.dshDesktopFrame\[data-dragging\] \{ transition: none; \}/)
        expect(css).toMatch(/\[data-slot="sidebar\.footer\.action"\] \{[^}]*display: flex !important;[^}]*flex-direction: column;[^}]*max-height: min\(40vh, 240px\);[^}]*overflow-y: auto;/)
@@ -688,7 +688,7 @@ index a0e4de513c..5b215881f6 100644
 @@ -186,11 +253,41 @@ describe('advanced desktop layout', () => {
        effect: (factory: () => unknown) => { uninstall = factory() },
      } as unknown as ClientContext
- 
+
 -    installDesktopLayout(ctx, new DesktopLayoutState())
 +    const layout = new DesktopLayoutState()
 +    installDesktopLayout(ctx, layout)
@@ -726,7 +726,7 @@ index a0e4de513c..5b215881f6 100644
 +    layout.selectPanel('settings' as MainPanelId)
 +    expect(changed).toHaveBeenCalledTimes(2)
    })
- 
+
    it('keeps the enhanced root registration independent from the extended frame', () => {
 @@ -229,6 +326,8 @@ describe('advanced desktop layout', () => {
        },
@@ -753,7 +753,7 @@ index a0e4de513c..5b215881f6 100644
      })
 @@ -349,9 +448,9 @@ describe('advanced desktop layout', () => {
    })
- 
+
    it('keeps the wider macOS rail in enhanced mode and the upstream width in extended mode', () => {
 -    expect(computeDesktopColumns(1440, 0, 0)).toEqual({ sidebar: SIDEBAR_COLLAPSED, center: 1384, details: 0 })
 +    expect(computeDesktopColumns(1440, 0, 0)).toEqual({ sidebar: SIDEBAR_COLLAPSED, center: 1384, rightbar: 0 })
@@ -766,7 +766,7 @@ index a0e4de513c..5b215881f6 100644
 @@ -359,18 +458,25 @@ describe('advanced desktop layout', () => {
      expect(MACOS_SIDEBAR_COLLAPSED).toBe(90)
    })
- 
+
 -  it('publishes mirrored panel transitions', () => {
 +  it('reports right Sidebar presentation and preserves width across close and fullscreen', () => {
      const layout = new DesktopLayoutState()
@@ -797,7 +797,7 @@ index a0e4de513c..5b215881f6 100644
 +    expect(computeDesktopColumns(800, 0, 450)).toEqual({ sidebar: 56, center: 400, rightbar: 344 })
 +    expect(computeDesktopColumns(700, 0, 450)).toEqual({ sidebar: 56, center: 644, rightbar: 0 })
    })
- 
+
    it('lets the rail re-expand without losing its wide preference on narrow windows', () => {
 @@ -476,6 +582,8 @@ describe('independent Desktop frame', () => {
        },
@@ -829,7 +829,7 @@ index d25ae0c540..6e63eaec55 100644
  import { applyExtendedShell } from '../src/client/extended-shell.ts'
 +import { DesktopLayoutState } from '../src/client/layout-state.ts'
 +import type { MainPanelId } from '../src/client/layout-state.ts'
- 
+
  interface FakeStyleElement {
    id: string
 @@ -56,6 +58,9 @@ function makeCtx() {
@@ -849,7 +849,7 @@ index d25ae0c540..6e63eaec55 100644
 -    const layout = { mark: 'state' }
 +    const panels = new Set(['files'])
 +    const layout = new DesktopLayoutState(id => panels.has(id))
- 
+
      installDesktopLayout(ctx as never, layout as never)
      expect(ctx.reflect.get).toHaveBeenCalledWith('layout', false)
      expect(ctx.reflect.provide).toHaveBeenCalledWith('layout', layout)
@@ -866,7 +866,7 @@ index d25ae0c540..6e63eaec55 100644
 +    expect(panelInfo.getSnapshot()).toEqual({ activePanelId: null })
 +    expect(changed).toHaveBeenCalledTimes(2)
 +    stop()
- 
+
      // The disposal effect must be owned by the fiber so a later unload frees
      // the registration for whoever applies next; the factory result is what
 @@ -85,6 +104,8 @@ describe('installDesktopLayout', () => {
@@ -876,7 +876,7 @@ index d25ae0c540..6e63eaec55 100644
 +    expect(ctx.slots.provideRoot.mock.results[0]!.value).toHaveBeenCalledOnce()
 +    expect(ctx.slots.subscribe.mock.results[0]!.value).toHaveBeenCalledOnce()
    })
- 
+
    it('rejects a layout already selected by another entry', () => {
 diff --git a/dsh-plugin-desktop/tests/renderer-surface-watchdog.spec.ts b/dsh-plugin-desktop/tests/renderer-surface-watchdog.spec.ts
 index c419c32d4b..922c99b5e8 100644
@@ -884,7 +884,7 @@ index c419c32d4b..922c99b5e8 100644
 +++ b/dsh-plugin-desktop/tests/renderer-surface-watchdog.spec.ts
 @@ -109,19 +109,21 @@ describe('renderer surface watchdog', () => {
  })
- 
+
  describe('renderer surface probe', () => {
 -  function probeSurface(options: { missing?: boolean; text?: string; visible?: boolean; hidden?: boolean; loading?: boolean; offscreen?: boolean } = {}) {
 -    const root = {
@@ -912,7 +912,7 @@ index c419c32d4b..922c99b5e8 100644
 @@ -142,6 +144,11 @@ describe('renderer surface probe', () => {
      expect(probeSurface({ text: 'New conversation', offscreen: true })).toBe(false)
    })
- 
+
 +  it('requires the Desktop conversation surface when the shell owns one', () => {
 +    expect(probeSurface({ sidebarText: 'New conversation', conversation: true })).toBe(false)
 +    expect(probeSurface({ sidebarText: 'New conversation', conversation: true, text: 'How can I help?' })).toBe(true)
