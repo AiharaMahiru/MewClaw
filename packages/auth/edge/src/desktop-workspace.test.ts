@@ -37,3 +37,16 @@ it('缺少凭证与超限响应明确失败，不返回部分内容', async () =
   const response = await fetch(edge, { method: 'POST', body }); expect(response.status).toBe(502);
   expect(await response.json()).toEqual({ error: 'WORKSPACE_BRIDGE_UNAVAILABLE' });
 });
+
+it('桌面取消会关闭向Worker的在途传输', async () => {
+  let started = false, closed = false;
+  const worker = await listen(createServer((_req, res) => { started = true; res.once('close', () => { closed = true; }); }));
+  const edge = await listen(createServer((req, res) => { void proxyDesktopWorkspace(req, res, {
+    userId: 'alice', workerBaseUrl: worker, workerToken: 'fixture', requestBodyLimit: 4096,
+    findResource: async () => ({ userId: 'alice' }),
+  }); }));
+  const abort = new AbortController();
+  const pending = fetch(edge, { method: 'POST', signal: abort.signal, body: JSON.stringify({ action: 'status', sessionId: 'own' }) }).catch(() => undefined);
+  await expect.poll(() => started).toBe(true); abort.abort(); await pending;
+  await expect.poll(() => closed).toBe(true);
+});

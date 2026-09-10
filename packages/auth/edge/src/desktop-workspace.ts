@@ -34,10 +34,13 @@ export async function proxyDesktopWorkspace(req: IncomingMessage, res: ServerRes
   const resource = await options.findResource('session', command.sessionId);
   if (!resource || resource.userId !== options.userId) return send(res, 403, { error: 'RESOURCE_NOT_ALLOWED' });
   const scope = { tenantId: 'dsh-web', botId: 'dsh-web', deploymentId: 'auth-edge', userId: options.userId, conversationId: command.sessionId };
+  const cancellation = new AbortController();
+  const closed = () => { if (!res.writableEnded) cancellation.abort(); };
+  res.once('close', closed);
   try {
     const response = await fetch(new URL('/internal/desktop-workspace', options.workerBaseUrl), {
       method: 'POST', headers: { authorization: 'Bearer ' + options.workerToken, 'content-type': 'application/json' },
-      body: JSON.stringify({ scope, command, rootPath: resource.resourcePath ?? null }), signal: AbortSignal.timeout(10000), redirect: 'error',
+      body: JSON.stringify({ scope, command, rootPath: resource.resourcePath ?? null }), signal: AbortSignal.any([cancellation.signal, AbortSignal.timeout(10000)]), redirect: 'error',
     });
     const reader = response.body?.getReader();
     const chunks: Uint8Array[] = []; let size = 0;
@@ -51,5 +54,6 @@ export async function proxyDesktopWorkspace(req: IncomingMessage, res: ServerRes
     } finally { reader?.releaseLock(); }
     const body = Buffer.concat(chunks);
     res.writeHead(response.status, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(body);
-  } catch { send(res, 502, { error: 'WORKSPACE_BRIDGE_UNAVAILABLE' }); }
+  } catch { if (!res.destroyed) send(res, 502, { error: 'WORKSPACE_BRIDGE_UNAVAILABLE' }); }
+  finally { res.removeListener('close', closed); }
 }
