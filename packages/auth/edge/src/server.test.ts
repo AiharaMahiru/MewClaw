@@ -1030,9 +1030,10 @@ async function verifyLatest(service: AuthService, mail: FakeMail, email: string)
 it('桌面桥接在真实 Auth Edge 上遵守登录、CSRF、所有权与退出撤销', async () => {
   let forwarded = 0;
   const worker = await listen((_req, res) => { forwarded++; json(res, 200, { mode: 'cloud', connected: false }); });
-  const service = new AuthService({ store: new MemoryAuthStore(), mail: new FakeMail() });
+  const mail = new FakeMail();
+  const service = new AuthService({ store: new MemoryAuthStore(), mail });
   await service.register('desktop-edge@example.com', 'correct horse battery staple', 'Desktop', { requestId: 'test' });
-  const user = await service.login('desktop-edge@example.com', 'correct horse battery staple');
+  const user = await verifyLatest(service, mail, 'desktop-edge@example.com');
   await service.saveResource({ resourceType: 'session', resourceId: 'desktop-own', userId: user!.user.id, resourcePath: null, createdAt: new Date().toISOString() });
   const conf = config(worker.port); const edge = createAuthEdgeServer({ config: conf, service });
   const base = await listenEdge(edge, conf); servers.push({ close: () => edge.close() });

@@ -3,7 +3,7 @@
 | 元数据 | 值 |
 | --- | --- |
 | 包 | 桌面本地文件 Consumer 与云端桥接插件 |
-| 位置 | apps/desktop/plugins/cloud；apps/desktop/plugins/workspace；packages/auth/edge |
+| 位置 | packages/desktop/host；packages/desktop/workspace；packages/auth/edge；desktop 分支 apps/desktop/plugins/cloud |
 | 角色 | Definition / Provider / Consumer |
 | 状态 | implementing |
 | 里程碑 | Desktop 1 |

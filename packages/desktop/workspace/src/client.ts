@@ -3,12 +3,13 @@ import type { Context } from '@deepseek-ai/cordis';
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client';
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client';
 import type * as ReactType from 'react';
-const globals = globalThis as unknown as { __MEWCLAW_DESKTOP_WORKSPACE__?: boolean; __ModuleLoader__: { load(input: unknown): void } };
+const globals = globalThis as unknown as { __MEWCLAW_WORKSPACE_ENABLED__?: boolean; __MEWCLAW_DESKTOP_WORKSPACE__?: boolean; __ModuleLoader__: { load(input: unknown): void } };
 globals.__ModuleLoader__.load({ id: 'dsh-lark-desktop-workspace', factory: (require: (id: string) => unknown) => {
   const React = require('react') as typeof ReactType;
   function Location({ sessionId }: { sessionId: string }) {
     const [text, setText] = React.useState('云端工作区');
     React.useEffect(() => {
+      if (!globals.__MEWCLAW_WORKSPACE_ENABLED__) return;
       const abort = new AbortController(); let timer: ReturnType<typeof setTimeout> | undefined;
       const refresh = async () => {
         try {

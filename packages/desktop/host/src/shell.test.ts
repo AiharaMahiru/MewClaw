@@ -2,6 +2,7 @@ import { Context } from '@deepseek-ai/cordis';
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local';
 import Subprocess from '@deepseek-ai/dsh-subprocess-local';
 import Bash from '@deepseek-ai/dsh-bash-local';
+import Pwsh from '@deepseek-ai/dsh-pwsh-local';
 import { mkdtemp, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,14 +14,15 @@ it('真实官方 Shell 执行、有界输出、非零退出、超时和撤销', 
   const ctx = new Context();
   try {
     await ctx.plugin(LocalFileSystem, { cwd: root }); await ctx.plugin(Subprocess);
-    await ctx.plugin(Bash, { cwd: root, timeoutMs: 1000, maxTimeoutMs: 2000, maxOutputBytes: 1024, maxSpillBytes: 1024, graceMs: 100 });
+    const windows = process.platform === 'win32';
+    await ctx.plugin(windows ? Pwsh : Bash, { cwd: root, timeoutMs: 1000, maxTimeoutMs: 2000, maxOutputBytes: 1024, maxSpillBytes: 1024, graceMs: 100 });
     const shell = new LocalWorkspaceShell(ctx.fs, ctx.shell, root, { timeoutMs: 1000, maxOutputBytes: 1024 });
     const signal = new AbortController().signal;
-    const result = await shell.execute({ action: 'shell', command: 'printf mew; exit 7', path: '.' }, signal);
+    const result = await shell.execute({ action: 'shell', command: windows ? "[Console]::Write('mew'); exit 7" : 'printf mew; exit 7', path: '.' }, signal);
     expect(result).toMatchObject({ location: 'desktop', exitCode: 7, stdout: { text: 'mew' } });
     expect(JSON.stringify(result)).not.toContain(root);
-    expect(await shell.execute({ action: 'shell', command: 'sleep 10' }, signal)).toMatchObject({ timedOut: true });
-    const pending = shell.execute({ action: 'shell', command: 'printf ready > started; sleep 10' }, signal);
+    expect(await shell.execute({ action: 'shell', command: windows ? 'Start-Sleep -Seconds 10' : 'sleep 10' }, signal)).toMatchObject({ timedOut: true });
+    const pending = shell.execute({ action: 'shell', command: windows ? 'Set-Content -NoNewline started ready; Start-Sleep -Seconds 10' : 'printf ready > started; sleep 10' }, signal);
     await expect.poll(async () => readFile(join(root, 'started'), 'utf8').catch(() => '')).toBe('ready');
     shell.revoke();
     expect(await pending).toMatchObject({ aborted: true });

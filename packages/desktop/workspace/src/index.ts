@@ -30,6 +30,8 @@ interface Config { enabled?: boolean; tokenRef: string; requestTimeoutMs: number
 interface ScopeIndex { get(id: SessionId): unknown }
 
 export async function apply(ctx: Context, config: Config): Promise<void> {
+  ctx.effect(() => ctx.webServer.tapIndex(html => html.replace(/<head([^>]*)>/,
+    `<head$1><script>globalThis.__MEWCLAW_WORKSPACE_ENABLED__=${config.enabled !== false};</script>`)));
   const token = config.enabled === false ? undefined : await ctx.credentials.resolve(config.tokenRef as CredentialRef);
   if (config.enabled !== false && !token?.value) throw new Error('desktop-workspace: Worker凭证引用未配置');
   const journal = workspaceJournal(ctx);

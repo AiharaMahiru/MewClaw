@@ -25,8 +25,9 @@ it('真实目录双向复制二进制和嵌套文件，单边更新和删除保�
   expect(await readFile(join(b, 'remote.txt'), 'utf8')).toBe('本机修改');
   await unlink(join(b, 'remote.txt'));
   expect((await engine.run(signal)).removed).toBe(1);
-  const backups = await readdir(join(a, '.mewclaw-sync/recovery'));
+  const backups = (await readdir(join(a, '.mewclaw-sync/recovery'))).filter(name => name.endsWith('.data'));
   expect(await readFile(join(a, '.mewclaw-sync/recovery', backups[0]!), 'utf8')).toBe('本机修改');
+  expect(JSON.parse(await readFile(join(a, '.mewclaw-sync/recovery', backups[0]! + '.json'), 'utf8'))).toMatchObject({ path: 'remote.txt' });
 });
 it('两边同时修改、首次同名异内容和删除对修改均保留冲突', async () => {
   const { a, b, engine } = await fixture();
@@ -56,4 +57,11 @@ it('旧摘要写入和并发创建不能覆盖文件，取消不开始新写入'
   expect(await readFile(join(a, 'x'), 'utf8')).toBe('external');
   const abort = new AbortController(); abort.abort();
   await expect(left.write('new', '', null, abort.signal)).rejects.toThrow();
+});
+
+it('跨端大小写碰撞在任何写入前拒绝', async () => {
+  const { a, b, engine } = await fixture();
+  await writeFile(join(a, 'File'), 'a'); await writeFile(join(b, 'file'), 'b');
+  await expect(engine.run(signal)).rejects.toThrow('SYNC_CASE_COLLISION');
+  expect(await readdir(a)).toEqual(['File']); expect(await readdir(b)).toEqual(['file']);
 });

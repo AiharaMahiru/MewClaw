@@ -11,7 +11,7 @@ it('真实Tools运行时阻止父子会话的云端工具，后续allow策略不
   await ctx.plugin(SessionStore); await ctx.plugin(SystemPrompt); await ctx.plugin(Tools, { mode: 'native' });
   const scope = { tenantId: 'dsh-web', botId: 'dsh-web', deploymentId: 'auth-edge', userId: 'a', conversationId: 'parent' };
   ctx.reflect.provide('credentials', { resolve: async () => ({ value: 'fixture-token' }) });
-  ctx.reflect.provide('webServer', { register: () => () => {} });
+  ctx.reflect.provide('webServer', { register: () => () => {}, tapIndex: () => () => {} });
   ctx.reflect.provide('sessionPersistence', {});
   ctx.reflect.provide('larkScopeIndex', { get: () => scope });
   const fiber = ctx.plugin(workspace, { tokenRef: 'test', requestTimeoutMs: 1000, heartbeatTimeoutMs: 3000, maxBindings: 10 });

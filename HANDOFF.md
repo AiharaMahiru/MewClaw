@@ -1,3 +1,13 @@
+# Web 共享能力交接（2026-09-10）
+
+桌面工作区已从 desktop-dev 候选按文件迁入 `packages/desktop`，增加本机 Shell 和目录双向同步；桌面 Host/原生授权/打包仍由 `desktop` 分支维护。不要把 desktop-dev 整分支反向合并 master。
+
+共享实现：`packages/desktop/host`、`packages/desktop/workspace`；认证入口：`packages/auth/edge/src/desktop-workspace.ts`；启用示例：`config/desktop-workspace.patch.yml`。默认禁用新绑定但保留持久化模式 guard；源码推送不等于生产启用。契约见 `docs/specs/desktop-workspace.md`。
+
+本机目录授权不包含 Shell 或同步授权；两者分别原生确认。同步保留冲突和恢复副本，不离线重放写入。Shell 复用官方 Provider，不宣称目录沙箱。后续本地电脑从 desktop 拉取后合并自己的 desktop-dev，重点保留共享包唯一实现、单会话轮询与独立授权。生产启用和 Windows 实机验收仍须分别执行。
+
+以下内容为历史附件交接，不代表本次未完成项或生产操作授权。
+
 # DSH Lark 附件格式处理修复转交
 
 更新时间：2026-08-14

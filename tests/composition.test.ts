@@ -93,6 +93,16 @@ describe("网关组合（硬边界）", () => {
 });
 
 describe("worker 组合（技能与 overlay）", () => {
+  it("桌面插件默认关闭新绑定，显式 overlay 可启用且 Worker 直接解析到插件", () => {
+    const base = loadOverlayPatches("test", require.resolve("@deepseek-ai/dsh-base/cordis.patch.yml"));
+    const worker = loadOverlayPatches("test", repositoryPath("packages/bundle/worker/cordis.patch.yml"));
+    const rows = composeEntries([base, worker], () => undefined);
+    expect(rows.find(row => row.id === "desktop-workspace")?.config).toMatchObject({ enabled: false, tokenRef: "WORKER_TOKEN" });
+    const enabled = composeEntries([base, worker, loadOverlayPatches("test", repositoryPath("config/desktop-workspace.patch.yml"))], () => undefined);
+    expect(enabled.find(row => row.id === "desktop-workspace")?.config).toMatchObject({ enabled: true });
+    const workerRequire = createRequire(repositoryPath("apps/lark-worker/package.json"));
+    expect(workerRequire.resolve("dsh-lark-desktop-workspace")).toContain("packages/desktop/workspace/lib/index.js");
+  });
   it("真实补丁算法禁用官方适配器并装载可解析的路由插件", () => {
     const warnings: string[] = [];
     const rows = composeEntries([
