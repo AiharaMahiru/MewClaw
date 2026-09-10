@@ -10,6 +10,7 @@ User=dsh
 Group=dsh
 WorkingDirectory=/opt/dsh/current
 EnvironmentFile=/etc/dsh/runtime.secrets.env
+EnvironmentFile=/etc/dsh/deepseek.env
 EnvironmentFile=/etc/dsh/user-model.secrets.env
 EnvironmentFile=/etc/dsh/postgres.env
 EnvironmentFile=/etc/dsh/production.env

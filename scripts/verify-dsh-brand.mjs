@@ -88,7 +88,9 @@ for (const source of [brandClient, brandHost]) {
 }
 requireMatch(adminIndexHtml, "<title>MewClaw Harness 管理工作台</title>", "管理台页面标题");
 requireMatch(adminIndexHtml, 'rel="icon" type="image/svg+xml" href="/favicon.svg"', "管理台 favicon");
-requireMatch(adminApp, 'stroke="currentColor"', "管理台反白商标描边");
+requireMatch(adminApp, 'viewBox="0 0 512 512"', "管理台 MewClaw 商标几何");
+requireMatch(adminApp, 'className="mewclaw-mark-ink"', "管理台商标墨色分层");
+requireMatch(adminStyles, "body[data-ds-dark-theme] .mewclaw-brand-mark", "管理台商标自动深色反转");
 requireMatch(adminStyles, ".hHd-Xa_brandMark {", "管理台商标样式");
 
 if (failures.length > 0) {

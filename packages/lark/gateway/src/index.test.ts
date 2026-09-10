@@ -382,13 +382,14 @@ describe("运行编排", () => {
   it("assistant/chunk 只展示文本增量，reasoning/tool-call 不外泄且不重复完整消息", async () => {
     const env = makeEnv();
     apply(env.ctx as never, config);
-    env.runClient.submit.mockResolvedValue(stream("OK", [
-      { type: "assistant/chunk", data: { turn: 1, step: 1, chunk: { type: "reasoning-delta", index: 0, text: "内部推理" } } },
-      { type: "assistant/chunk", data: { turn: 1, step: 1, chunk: { type: "tool-call-delta", index: 1, id: "call_1", argumentsDelta: "{\"secret\":true}" } } },
-      { type: "assistant/chunk", data: { turn: 1, step: 1, chunk: { type: "text-delta", index: 0, text: "早期" } } },
-      { type: "assistant/chunk", data: { turn: 1, step: 1, chunk: { type: "text-delta", index: 0, text: "回复" } } },
-      { type: "assistant/message", data: { turn: 1, step: 1, message: { content: [{ type: "text", text: "早期回复" }] } } },
-    ]));
+    env.runClient.submit.mockResolvedValue((async function* () {
+      const envelope = { runId: "run-1", scope };
+      yield { envelope, assistant: { turn: 1, step: 1, text: "早期" } };
+      yield { envelope, assistant: { turn: 1, step: 1, text: "回复" } };
+      yield* stream("OK", [
+        { type: "assistant/message", data: { turn: 1, step: 1, message: { content: [{ type: "text", text: "早期回复（最终）" }] } } },
+      ]);
+    })());
     env.emit("lark/message/received", message({ eventId: "ev-stream-chunk" }));
 
     await vi.waitFor(() => expect(env.card.replace).toHaveBeenCalled());
@@ -399,6 +400,7 @@ describe("运行编排", () => {
     expect(appendText).not.toContain("secret");
     const finalText = String(env.card.replace.mock.calls[0]![1]);
     expect(finalText.match(/早期回复/g)).toHaveLength(1);
+    expect(finalText).toContain("早期回复（最终）");
   });
 
   it("工具行折叠使用 Gateway 配置，而非硬编码默认", async () => {

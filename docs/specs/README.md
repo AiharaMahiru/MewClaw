@@ -4,6 +4,9 @@
 
 | SPEC | 包 | 角色 | 里程碑 | 状态 |
 | --- | --- | --- | --- | --- |
+| [account-feishu-settings.md](account-feishu-settings.md) | `dsh-lark-web-auth` | 官方设置 slot 的自有 UI 贡献 | 账户 UI | implementing |
+| [feishu-bots.md](feishu-bots.md) | auth / edge / gateway / web-auth | 按账号隔离的自建应用凭证与生命周期 | 个人机器人 | implementing |
+| [session-upgrade.md](session-upgrade.md) | 历史会话副本迁移工具 | App / Consumer | DSH 0.1.5 | implementing |
 | [contracts.md](contracts.md) | `dsh-lark-contracts` | Contracts | M1 | implemented |
 | [lark.md](lark.md) | `dsh-lark` | Definition + Provider | M1 | implemented |
 | [lark-ws.md](lark-ws.md) | `dsh-lark-ws` | Plugin（长连接入口） | M1 | implemented |

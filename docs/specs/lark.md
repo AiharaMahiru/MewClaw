@@ -129,4 +129,4 @@ interface Config {
 
 ## 10 开放问题
 
-1. 飞书多应用（多 bot 模板共享网关进程）时 `ctx.lark` 是单实例多凭证还是多实例？（阻塞 M4；倾向 provider 支持按 deploymentId 选择凭证的多租户实例池）
+无。账号机器人采用每App独立Cordis根及独立 `ctx.lark`/WS；不把多个凭证塞进同一个客户端，见 [feishu-bots.md](feishu-bots.md)。

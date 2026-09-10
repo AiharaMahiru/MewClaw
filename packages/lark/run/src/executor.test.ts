@@ -53,20 +53,20 @@ function makeOptions(overrides: Partial<RunInputOptions> & { events?: Array<{ ty
   options: RunInputOptions;
   create: ReturnType<typeof vi.fn>;
   resume: ReturnType<typeof vi.fn>;
-  listSnapshots: ReturnType<typeof vi.fn>;
+  list: ReturnType<typeof vi.fn>;
   readRaw: ReturnType<typeof vi.fn>;
   agent: ReturnType<typeof makeAgent>;
 } {
   const mock = makeAgent(overrides.events);
   const create = vi.fn(async () => mock.handle);
   const resume = vi.fn(async () => mock.handle);
-  const listSnapshots = vi.fn(async () => []);
+  const list = vi.fn(async () => []);
   const readRaw = vi.fn(async () => undefined);
   const streamed: unknown[] = [];
   const options: RunInputOptions = {
     agents: { get: vi.fn(), create, resume } as never,
     agentPresets: { mount: vi.fn() } as never,
-    sessionPersistence: { listSnapshots, readRaw } as never,
+    sessionPersistence: { list, readRaw } as never,
     sessionDirectory: { resolve: vi.fn(async () => ({ mode: "deterministic" })) } as never,
     selection: { provider: "deepseek-official", model: "deepseek-chat" } as never,
     agentPresetId: "standard",
@@ -81,7 +81,7 @@ function makeOptions(overrides: Partial<RunInputOptions> & { events?: Array<{ ty
     runTimeoutMs: 60_000,
     runHardTimeoutMs: 0,
   };
-  return { options: { ...options, ...overrides }, create, resume, listSnapshots, readRaw, agent: mock };
+  return { options: { ...options, ...overrides }, create, resume, list, readRaw, agent: mock };
 }
 
 afterEach(() => {
@@ -128,8 +128,8 @@ function registerSessionLifecycleTests(): void {
   });
 
   it("存在持久化产物 → resume（重启恢复语义）", async () => {
-    const { options, create, resume, listSnapshots } = makeOptions({});
-    listSnapshots.mockResolvedValue([{ header: { id: sessionIdForScope(scopeValue, 0) } }]);
+    const { options, create, resume, list } = makeOptions({});
+    list.mockResolvedValue([{ header: { id: sessionIdForScope(scopeValue, 0) } }]);
     await executeRun(options);
     expect(resume).toHaveBeenCalledTimes(1);
     expect(create).not.toHaveBeenCalled();
@@ -215,9 +215,9 @@ function registerSessionLifecycleTests(): void {
   });
 
   it("持久化列表异常不得静默降级为新会话", async () => {
-    const { options, create, resume, listSnapshots } = makeOptions({});
+    const { options, create, resume, list } = makeOptions({});
     const error = new Error("session format unsupported");
-    listSnapshots.mockRejectedValue(error);
+    list.mockRejectedValue(error);
 
     await expect(executeRun(options)).rejects.toMatchObject({ stage: "agent-list-snapshots", original: error });
     expect(create).not.toHaveBeenCalled();

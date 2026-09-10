@@ -30,7 +30,7 @@ release 根禁止出现 `patches/` 或 `pnpm.patchedDependencies`；依赖包自
 - **现状**：`@deepseek-ai` npm 作用域需组织权限，本仓库暂不具备 → **不发布 npm 包**；
 - **分发策略**：仓库私有，按 **`file:` 依赖 + git 归档** 分发（部署机 clone/归档后
   `pnpm install --frozen-lockfile` 即可运行）；dsh 生态包保持精确锁版本
-  （当前核心包为 0.1.2-rc.1，`pnpm-lock.yaml` 固化）；
+  （当前源码核心包为 0.1.5-rc.1，`pnpm-lock.yaml` 固化；不等同于生产版本）；
 - **升级窗口**：dsh rc 升级作为里程碑前置任务；更新精确版本后执行
   `pnpm install --frozen-lockfile`、官方完整性、品牌、组合与全量门禁。任何官方包
   内容漂移、自有插件公开 seam 不兼容或 release manifest 校验失败都必须使升级失败；
@@ -50,6 +50,8 @@ release 根禁止出现 `patches/` 或 `pnpm.patchedDependencies`；依赖包自
    `pnpm lint`、`pnpm build`、`pnpm smoke` 和 release validator。
 
 任一门禁未通过前不得接受升级或重启生产服务。
+
+发布顺序：源码验证通过 → 说明影响与回滚并确认生产切换 → 生产测试通过 → 提交和推送远程。会话格式变化须核验旧日志转换和新代写入后的回滚边界；保留旧 release 不等于可无损回退新增会话数据。
 
 ## 2. 部署拓扑与端口交接
 

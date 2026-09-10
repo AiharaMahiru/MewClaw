@@ -124,3 +124,5 @@ export * from "./postgres-store.js";
 export * from "./service.js";
 export * from "./types.js";
 export * from "./user-model-crypto.js";
+export * from "./feishu-bots.js";
+export * from "./feishu-bot-store.js";

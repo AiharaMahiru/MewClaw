@@ -74,9 +74,9 @@ Worker profile 的加载顺序固定为：
 Scope 的 `dsh-lark-cron` 重叠）、remote-web（非 loopback 暴露尚无本仓库认证 SPEC）、SSH
 （凭证和远程执行边界不符合当前部署合同）、describe-image（复用现有凭证引用式
 `dsh-lark-vision`）和第三方 Liangshen 同步插件（不得写入用户 preset 根或覆盖平台
-persona/隔离策略）。仓库 system root 提供经过审阅的“全能优化模式” preset。默认
-`lightweight` 还禁用 git-graph 与 better-sidebar，避免本机 Git subprocess 和 PTY；full/OCI
-profile 才允许这两项。用户关闭 pet 时，lightweight 直接禁用 `web-ui-pet`，避免上游 client
+persona/隔离策略）。仓库 system root 提供经过审阅的“全能优化模式” preset。
+lightweight 与 full 对齐，启用 git-graph 与 better-sidebar；OCI 的执行仍由容器 Provider 承载。
+用户关闭 pet 时，lightweight 直接禁用 `web-ui-pet`，避免上游 client
 在 host 注销 `/api/pet/*` 后继续轮询 404，不得反向把 `pet.enabled` 改回 true。`dsh-context`、
 Web UI settings、community catalog、skill explorer 与 skin center 在三个 profile 均可激活。
 聚合包附带的 better-session 三行保持显式禁用，不替换官方 JSONL 会话事实源。
@@ -88,18 +88,18 @@ Web UI settings、community catalog、skill explorer 与 skin center 在三个 p
 
 agent preset 必须与执行隔离 profile 成对选择：
 
-- 默认 `lightweight` 使用仓库随 `dsh-lark-web-bundle` 分发的 `lark-lightweight`。它只挂载
-  persona、agent instructions、`tool-fs`、技能、goal、plan、compaction、ask-user、todo 与
-  web 工具；不得包含 shell、`tool-fs-search`、jobs、subagent、workflow 或 Ralph 行；
+2026-09-10 变更：lightweight 不再裁剪执行能力，账号、工作区归属、审批及 OCI Provider 边界不变；工具是否可执行以当前宿主实际能力与授权为准。
+
+- `lightweight` 使用仓库随 `dsh-lark-web-bundle` 分发的 `lark-lightweight`，以公开 include 复用官方 standard，不复制或裁剪工具清单；
 - `lightweight.overlay.yml` 同时把 Web `agent-presets.default` 与 `dsh-lark-run.agentPresetId`
-  设为 `lark-lightweight`。其 roster 只扫描独立的 `agent-presets-lightweight` 根，并设置
-  `includeUserRoot: false`，因此用户目录中的执行型 preset 不会进入 lightweight 选择面。
+  设为 `lark-lightweight`。其 roster 与 full 共用 system roots，并设置
+  `includeUserRoot: false`，用户目录中的任意 preset 不会进入选择面。
   Cordis patch 会整体替换 config，因此两行都必须重述各自完整配置；
 - Auth Edge 的普通用户会话可选择当前 Worker 已暴露的 system-only roster；默认仍为
   `lark-lightweight`。这不会打开用户 preset 根、宿主任意路径或管理员配置写入。
 - `full` profile 不加载 lightweight overlay，使用仓库的“飞书全功能模式”并恢复宿主本机
   执行组合；它与仓库的“全能优化模式”及官方 `standard`、`code`、`minimal`、`cordis`
-  一起组成七项 preset roster；其中 `lark-lightweight` 保持轻量工作区能力，执行型
+  一起组成系统 preset roster；其中 `lark-lightweight` 不再限制工作区执行能力，执行型
   preset 仍由 full/OCI profile 的对应 provider 承载。
 - OCI profile 同样不加载 lightweight overlay，继续暴露包含 `lark-lightweight`、`lark-standard`、
   `liangshen` 与官方四个 preset 的七项 system roster，且只扫描 system roots；执行边界由
@@ -232,6 +232,8 @@ better-sidebar 桌面/移动布局可观察。截图与 live
 协议结果归档到 [dsh-web-protocol-20260817.md](../evidence/dsh-web-protocol-20260817.md)。
 
 ## 7 迁移与行为变化
+
+DSH 0.1.5 的自有 persona 配置使用 `prefix`，部署 SystemPrompt 使用 `personaPrefix`；全能优化模式从官方导出的 prefix/suffix section 名称识别人设，提升后通过 `presentAs('ptc')` 选择工具呈现。保持原提示词正文、Scope及OCI策略不变。回归必须以安装版本的公开 schema 校验预设，不允许只用旧字段字符串断言作为兼容证据。Worker `--boot-check` 必须逐个调用官方 `standingKeyFor` 挂载所有可发现预设，并在finally释放Context；Linux发布门禁覆盖lightweight/full/OCI三组合。检查不创建会话、不调用模型或执行工具。
 
 旧版仅 dashboard/conversations/knowledge 的 admin-first 说明不再是聊天 Web 的实现
 基线；它描述的能力归 [admin.md](admin.md) 管理面所有。官方 Web 采用后：

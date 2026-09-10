@@ -6,6 +6,7 @@ import type {} from "@deepseek-ai/dsh-workspace";
 import type { RunRequest } from "dsh-lark-contracts";
 import type {} from "dsh-lark-presets";
 import type {} from "dsh-lark-billing";
+import { inspectStoredSession } from "dsh-lark-session-directory";
 
 // lark/* 会话事件必须在任何持久化恢复前注册，避免历史 session 被误判为不兼容。
 import "dsh-lark-contracts";
@@ -49,7 +50,10 @@ export async function apply(ctx: Context, input: RunConfig): Promise<void> {
   const config = resolveRunConfig(input);
   const preset = resolveRunPreset(ctx, config.presetId);
   await indexFeishuSessions({
-    persistence: ctx.sessionPersistence!,
+    persistence: {
+      list: async () => (await ctx.sessionPersistence.list()).map((snapshot) => snapshot.header),
+      inspect: (id) => inspectStoredSession(ctx.sessionPersistence, id),
+    },
     registry: ctx.workspaceRegistry,
     projectionCache: ctx.sessionProjectionCache,
     workspaceRoot: config.workspaceRoot,

@@ -74,6 +74,8 @@ interface Scope {
 
 ### 4.3 运行与控制契约（wire 类型）
 
+DSH 0.1.5-rc.1：`RunStreamItem` 为同一完整运行信封下的 `{ event: SessionEvent } | { assistant: { turn: number; step: number; text: string } }`。assistant 行仅转发官方 `agent/assistant-stream` 的临时 text-delta，不伪造持久化 session 事件、seq 或模型输入；最终消息及其嵌入 stream 由官方 `assistant/message` / `assistant/attempt` 落盘。网关先验 Scope/runId，再校验非负安全整数 turn/step 和字符串 text；拒绝同时包含 event 与 assistant 的行。完成消息到达时以最终正文替换该 step 的临时正文，不能将部分流输出当作最终结果。断线不重放副作用；Worker/Gateway 必须配套升级。
+
 ```ts
 interface RunRequest {           // 网关 → worker
   runId: RunId

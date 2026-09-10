@@ -1,43 +1,16 @@
 # dsh-lark-gateway-bundle：网关组合层（独立于 dsh-base——网关绝不含工具/agent 行）。
-# 行集：凭证 + 飞书客户端 + 长连接 + 渲染 + 命令 + 桥接客户端 + 编排。
+# 只提供账号机器人宿主；客户端/长连接/渲染/命令由fleet在独立账号根装载。
 
 - insert:
     # 凭证提供方（项目 .env 层回退，经 app bin 的 loadLayeredEnv 冻结环境快照）。
     - id: credentials
       name: '@deepseek-ai/dsh-credentials-local'
 
-    # 飞书 OpenAPI 唯一封装面（凭证引用，值绝不写入组合）。
-    - id: lark
-      name: 'dsh-lark'
-      config:
-        appIdEnv: LARK_APP_ID
-        appSecretEnv: LARK_APP_SECRET
-        baseURL: !!js process.env.LARK_DOMAIN ?? 'feishu.cn'
-
-    # WS 长连接入口（同凭证引用）。
-    - id: lark-ws
-      name: 'dsh-lark-ws'
-      config:
-        appIdEnv: LARK_APP_ID
-        appSecretEnv: LARK_APP_SECRET
-        baseURL: !!js process.env.LARK_DOMAIN ?? 'feishu.cn'
-
-    # 网关确定性命令表。
-    - id: lark-commands
-      name: 'dsh-lark-commands'
-      config:
-        pairingEndpoint: !!js process.env.AUTH_PAIRING_ENDPOINT
-        pairingTokenEnv: AUTH_PAIRING_TOKEN
-
     # CDG 加密附件桥接（网关保存附件时探测加密标记；未配置 = 明文语义）。
     - id: cdg-bridge
       name: 'dsh-cdg-bridge'
       config:
         command: !!js process.env.CDG_BRIDGE_PATH
-
-    # 卡片渲染与投递。
-    - id: lark-card
-      name: 'dsh-lark-card'
 
     # worker 桥接客户端（本机部署 loopback；8788 = 迁移期并存端口）。
     - id: lark-run-client
@@ -48,13 +21,11 @@
         tokenEnv: WORKER_TOKEN
 
     # 宿主面编排（授权/去重/Scope 引导/运行协调/审批呈现）。
-    - id: lark-gateway
-      name: 'dsh-lark-gateway'
+    - id: account-bot-fleet
+      name: 'dsh-lark-gateway/bot-fleet'
       config:
-        authorizedOpenIds: !!js (process.env.AUTHORIZED_OPEN_IDS ?? '').split(',').filter(Boolean)
-        allowedChatIds: !!js (process.env.LARK_ALLOWED_CHAT_IDS ?? '').split(',').filter(Boolean)
-        processingCardText: '正在思考…'
-        failureCardTemplate: '运行失败（{{code}}）：{{hint}}'
-        unauthorizedCardText: '未授权使用（请联系管理员）。'
-        stateDir: var/gateway
-        uploadsRoot: !!js process.cwd() + '/.uploads'
+        authEndpoint: !!js (process.env.AUTH_PAIRING_ENDPOINT ?? 'http://127.0.0.1:3080/internal/pairing/start').replace('/internal/pairing/start', '/internal/feishu-bots')
+        tokenEnv: AUTH_PAIRING_TOKEN
+        stateDir: var/account-bots
+        uploadsRoot: !!js process.cwd() + '/.uploads/account-bots'
+        pollIntervalMs: 5000

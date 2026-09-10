@@ -1,4 +1,5 @@
 import { AccountCenterSection } from "./client-account.js";
+import { FeishuConnectionsSection } from "./client-feishu.js";
 import type { AccountUser, ClientContext, ModuleLoader, ReactApi } from "./client-contracts.js";
 import { useAccountUser } from "./client-data.js";
 import { installAccountStyles } from "./client-styles.js";
@@ -119,6 +120,12 @@ loader?.load({
         order: -30,
         label: () => "账户中心",
       }, () => AccountCenterSection(React))), "dsh-lark-web-auth: account center section");
+      ctx.effect(() => ctx.slots.inject("settings.section", () => ctx.slots.register({
+        name: "settings.section",
+        id: "mewclaw-feishu",
+        order: -20,
+        label: () => "飞书连接",
+      }, () => FeishuConnectionsSection(React))), "dsh-lark-web-auth: feishu section");
     }
 
     return { apply, inject: ["slots", "connection", "remote", "remote.settings"] };

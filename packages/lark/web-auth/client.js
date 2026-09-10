@@ -230,11 +230,246 @@
     return decodeURIComponent((document.cookie.match(/(?:^|; )dsh_csrf=([^;]+)/) || [])[1] || "");
   }
 
+  // packages/lark/web-auth/src/client-bot-data.ts
+  function decodeAccountBot(input) {
+    const b = input?.bot;
+    if (b === null) return null;
+    if (!b || typeof b !== "object") throw Error("INVALID_BOT_RESPONSE");
+    const bot = b;
+    if (typeof bot.id !== "string" || typeof bot.appId !== "string" || typeof bot.domain !== "string" || !Array.isArray(bot.authorizedOpenIds) || bot.authorizedOpenIds.some((id) => typeof id !== "string") || typeof bot.enabled !== "boolean" || typeof bot.secretConfigured !== "boolean" || !Number.isSafeInteger(bot.revision) || !["connected", "reconnecting", "failed", "unknown", "disabled"].includes(bot.state)) throw Error("INVALID_BOT_RESPONSE");
+    return { id: bot.id, appId: bot.appId, domain: bot.domain, authorizedOpenIds: [...bot.authorizedOpenIds], secretConfigured: bot.secretConfigured, enabled: bot.enabled, revision: bot.revision, state: bot.state };
+  }
+  function useAccountBot(React, revision) {
+    const [state, setState] = React.useState({ status: "loading" });
+    React.useEffect(() => {
+      let active = true;
+      let busy = false;
+      const controller = new AbortController();
+      const load = async () => {
+        if (busy) return;
+        busy = true;
+        try {
+          const response = await fetch("/auth/feishu-bot", { credentials: "same-origin", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(1e4)]) });
+          if (!response.ok) throw Error("BOT_READ_FAILED");
+          const data = decodeAccountBot(await response.json());
+          if (active) setState({ status: "ready", data });
+        } catch {
+          if (active) setState({ status: "error" });
+        } finally {
+          busy = false;
+        }
+      };
+      void load();
+      const timer = setInterval(() => {
+        if (!document.hidden) void load();
+      }, 5e3);
+      return () => {
+        active = false;
+        controller.abort();
+        clearInterval(timer);
+      };
+    }, [revision]);
+    return state;
+  }
+  async function mutateBot(path, method, body) {
+    const response = await fetch(path, { method, credentials: "same-origin", headers: { "content-type": "application/json", "x-csrf-token": readCsrfToken() }, body: JSON.stringify(body), signal: AbortSignal.timeout(3e4) });
+    const result = await response.json();
+    if (!response.ok) throw Error(typeof result.error === "string" ? result.error : "BOT_REQUEST_FAILED");
+    return result;
+  }
+  function botError(cause) {
+    const code = cause instanceof Error ? cause.message : "";
+    return { BOT_CONFIG_CONFLICT: "\u914D\u7F6E\u5DF2\u53D8\u66F4\u6216\u6B64\u5E94\u7528\u5DF2\u88AB\u4F7F\u7528\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5\u3002", BOT_APP_RESERVED: "\u8FD9\u662F\u90E8\u7F72\u7BA1\u7406\u5458\u6B63\u5728\u4F7F\u7528\u7684\u5E94\u7528\uFF0C\u8BF7\u52FF\u91CD\u590D\u8FDE\u63A5\u3002", BOT_DISCONNECT_FIRST: "\u8BF7\u5148\u65AD\u5F00\u673A\u5668\u4EBA\uFF0C\u518D\u4FEE\u6539\u914D\u7F6E\u3002", BOT_SECRET_REQUIRED: "\u9996\u6B21\u914D\u7F6E\u6216\u66F4\u6362\u5E94\u7528\u65F6\uFF0C\u8BF7\u586B\u5199 App Secret\u3002", BOT_CHECK_FAILED: "\u6821\u9A8C\u5931\u8D25\uFF0C\u8BF7\u68C0\u67E5 App ID\u3001App Secret\u3001\u673A\u5668\u4EBA\u80FD\u529B\u53CA\u5E94\u7528\u53D1\u5E03\u72B6\u6001\u540E\u91CD\u8BD5\u3002", INVALID_BOT_CONFIG: "\u8BF7\u68C0\u67E5\u5E94\u7528 ID\u3001\u57DF\u540D\u548C\u6388\u6743 Open ID \u7684\u683C\u5F0F\u3002", BOT_STORAGE_UNAVAILABLE: "\u51ED\u8BC1\u5B58\u50A8\u6682\u4E0D\u53EF\u7528\uFF0C\u8BF7\u8054\u7CFB\u7BA1\u7406\u5458\u3002", CSRF_INVALID: "\u767B\u5F55\u72B6\u6001\u5DF2\u8FC7\u671F\uFF0C\u8BF7\u5237\u65B0\u9875\u9762\u91CD\u65B0\u767B\u5F55\u3002" }[code] ?? "\u64CD\u4F5C\u672A\u5B8C\u6210\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u5E76\u5237\u65B0\u72B6\u6001\u540E\u91CD\u8BD5\u3002";
+  }
+
+  // packages/lark/web-auth/src/client-bot.ts
+  var STATE_LABELS = { connected: "\u957F\u8FDE\u63A5\u5DF2\u8FDE\u63A5", reconnecting: "\u6B63\u5728\u8FDE\u63A5 / \u91CD\u8FDE", failed: "\u8FDE\u63A5\u5931\u8D25\uFF0C\u7F51\u5173\u5C06\u91CD\u8BD5\uFF1B\u8BF7\u68C0\u67E5\u5E94\u7528\u8BBE\u7F6E", unknown: "\u7B49\u5F85\u7F51\u5173\u72B6\u6001", disabled: "\u5DF2\u505C\u7528" };
+  function BotForm({ React, bot, refresh }) {
+    const [pending, setPending] = React.useState("");
+    const [message, setMessage] = React.useState({ text: "", error: false });
+    const execute = async (name, operation) => {
+      if (pending) return;
+      setPending(name);
+      setMessage({ text: "", error: false });
+      try {
+        setMessage({ text: await operation(), error: false });
+        refresh();
+      } catch (cause) {
+        setMessage({ text: botError(cause), error: true });
+      } finally {
+        setPending("");
+      }
+    };
+    const submit = (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const data = new FormData(form);
+      void execute("\u4FDD\u5B58\u4E2D\u2026", async () => {
+        await mutateBot("/auth/feishu-bot", "PUT", {
+          expectedRevision: bot?.revision ?? 0,
+          appId: String(data.get("appId") ?? "").trim(),
+          domain: String(data.get("domain")),
+          appSecret: String(data.get("appSecret") ?? "").trim(),
+          authorizedOpenIds: String(data.get("openIds") ?? "").split(/[\s,，]+/).filter(Boolean)
+        });
+        const secret = form.elements.namedItem("appSecret");
+        if (secret) secret.value = "";
+        return "\u5DF2\u4FDD\u5B58\uFF0C\u673A\u5668\u4EBA\u5C1A\u672A\u8FDE\u63A5\u3002\u8BF7\u6821\u9A8C\u540E\u70B9\u51FB\u8FDE\u63A5\u3002";
+      });
+    };
+    const input = (label, props) => React.createElement("label", null, React.createElement("span", null, label), React.createElement("input", { ...props, disabled: Boolean(pending) || Boolean(bot?.enabled) }));
+    return React.createElement(
+      "div",
+      { className: "mewclaw-account-section" },
+      React.createElement("p", { className: "mewclaw-account-message", role: "status" }, bot ? STATE_LABELS[bot.state] : "\u5C1A\u672A\u914D\u7F6E\u4E2A\u4EBA\u673A\u5668\u4EBA"),
+      React.createElement(
+        "form",
+        { key: bot?.revision ?? 0, className: "mewclaw-account-form mewclaw-bot-form", onSubmit: submit },
+        input("App ID *", { name: "appId", defaultValue: bot?.appId ?? "", placeholder: "cli_\u2026", required: true, pattern: "cli_[0-9a-fA-F]{16}", maxLength: 20, autoComplete: "off" }),
+        input(bot ? "App Secret\uFF08\u7559\u7A7A\u4FDD\u7559\uFF09" : "App Secret *", { name: "appSecret", type: "password", required: !bot, maxLength: 256, autoComplete: "new-password" }),
+        React.createElement("label", null, React.createElement("span", null, "\u5E94\u7528\u533A\u57DF"), React.createElement("select", { name: "domain", defaultValue: bot?.domain ?? "https://open.feishu.cn", disabled: Boolean(pending) || Boolean(bot?.enabled) }, React.createElement("option", { value: "https://open.feishu.cn" }, "\u98DE\u4E66 \xB7 \u4E2D\u56FD"), React.createElement("option", { value: "https://open.larksuite.com" }, "Lark \xB7 \u56FD\u9645"))),
+        React.createElement("label", { className: "mewclaw-account-field-wide" }, React.createElement("span", null, "\u5141\u8BB8\u4F7F\u7528\u7684 Open ID *"), React.createElement("textarea", { name: "openIds", defaultValue: bot?.authorizedOpenIds.join("\n") ?? "", rows: 3, required: true, maxLength: 14e3, placeholder: "ou_\u2026\uFF0C\u591A\u4E2A\u4EE5\u9017\u53F7\u6216\u6362\u884C\u5206\u9694", disabled: Boolean(pending) || Boolean(bot?.enabled) })),
+        React.createElement("p", { className: "mewclaw-account-message mewclaw-account-field-wide" }, "\u4F7F\u7528\u6B64\u5E94\u7528\u4E0B\u7684 Open ID\u3002\u540D\u5355\u4E2D\u7684\u7528\u6237\u53EF\u4EE5\u8C03\u7528\u673A\u5668\u4EBA\uFF1B\u4EA7\u751F\u7684\u4F1A\u8BDD\u5F52\u5F53\u524D MewClaw \u8D26\u53F7\u7BA1\u7406\u3002App Secret \u52A0\u5BC6\u4FDD\u5B58\uFF0C\u4E0D\u4F1A\u518D\u6B21\u663E\u793A\u3002"),
+        React.createElement(
+          "div",
+          { className: "mewclaw-account-form-actions" },
+          React.createElement("button", { type: "submit", className: "mewclaw-account-button primary", disabled: Boolean(pending) || Boolean(bot?.enabled) }, pending === "\u4FDD\u5B58\u4E2D\u2026" ? pending : "\u4FDD\u5B58\u914D\u7F6E"),
+          bot ? React.createElement("button", { type: "button", className: "mewclaw-account-button", disabled: Boolean(pending), onClick: () => {
+            void execute("\u6821\u9A8C\u4E2D\u2026", async () => {
+              const result = await mutateBot("/auth/feishu-bot/test", "POST", { expectedRevision: bot.revision });
+              return `\u51ED\u8BC1\u6821\u9A8C\u901A\u8FC7\uFF1A${String(result.botName)}\u3002\u4ECD\u9700\u786E\u8BA4\u957F\u8FDE\u63A5\u548C\u6D88\u606F\u6743\u9650\u3002`;
+            });
+          } }, pending === "\u6821\u9A8C\u4E2D\u2026" ? pending : "\u6821\u9A8C\u51ED\u8BC1") : null,
+          bot ? React.createElement("button", { type: "button", className: "mewclaw-account-button", disabled: Boolean(pending), onClick: () => {
+            if (bot.enabled && !window.confirm("\u65AD\u5F00\u540E\u673A\u5668\u4EBA\u5C06\u505C\u6B62\u63A5\u6536\u65B0\u6D88\u606F\uFF0C\u5386\u53F2\u4F1A\u8BDD\u4FDD\u7559\u3002\u786E\u5B9A\u65AD\u5F00\u5417\uFF1F")) return;
+            void execute("\u5904\u7406\u4E2D\u2026", async () => {
+              await mutateBot("/auth/feishu-bot/connection", "POST", { expectedRevision: bot.revision, enabled: !bot.enabled });
+              return bot.enabled ? "\u5DF2\u8BF7\u6C42\u65AD\u5F00\uFF0C\u7F51\u5173\u5C06\u5728\u4E0B\u4E00\u6B21\u540C\u6B65\u65F6\u5173\u95ED\u8FDE\u63A5\u3002" : "\u5DF2\u8BF7\u6C42\u8FDE\u63A5\uFF0C\u6B63\u5728\u7B49\u5F85\u7F51\u5173\u72B6\u6001\u3002";
+            });
+          } }, pending === "\u5904\u7406\u4E2D\u2026" ? pending : bot.enabled ? "\u65AD\u5F00\u673A\u5668\u4EBA" : "\u8FDE\u63A5\u673A\u5668\u4EBA") : null
+        )
+      ),
+      message.text ? React.createElement("p", { className: "mewclaw-account-message", role: message.error ? "alert" : "status", "data-state": message.error ? "error" : "success" }, message.text) : null
+    );
+  }
+  function BotConfiguration({ React }) {
+    const [revision, setRevision] = React.useState(0);
+    const state = useAccountBot(React, revision);
+    return React.createElement(
+      "section",
+      { className: "mewclaw-account-section", "aria-label": "\u81EA\u5EFA\u5E94\u7528\u673A\u5668\u4EBA\u914D\u7F6E" },
+      React.createElement("div", { className: "mewclaw-feishu-section-head" }, React.createElement("h3", { className: "mewclaw-account-subtitle" }, "\u81EA\u5EFA\u5E94\u7528\u673A\u5668\u4EBA"), React.createElement("button", { type: "button", className: "mewclaw-account-button", onClick: () => {
+        setRevision(revision + 1);
+      } }, "\u5237\u65B0\u72B6\u6001")),
+      state.status === "loading" ? React.createElement("p", { role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u914D\u7F6E\u2026") : state.status === "error" ? React.createElement("p", { role: "alert", className: "mewclaw-account-message", "data-state": "error" }, "\u8BFB\u53D6\u914D\u7F6E\u5931\u8D25\uFF0C\u8BF7\u5237\u65B0\u72B6\u6001\u91CD\u8BD5\u3002") : React.createElement(BotForm, { React, bot: state.data, refresh: () => {
+        setRevision(revision + 1);
+      } }),
+      React.createElement(
+        "details",
+        { className: "mewclaw-account-fold" },
+        React.createElement("summary", null, "\u98DE\u4E66\u5F00\u653E\u5E73\u53F0\u914D\u7F6E\u6B65\u9AA4"),
+        React.createElement(
+          "ol",
+          { className: "mewclaw-bot-guide" },
+          React.createElement("li", null, "\u521B\u5EFA\u4F01\u4E1A\u81EA\u5EFA\u5E94\u7528\uFF0C\u542F\u7528\u673A\u5668\u4EBA\u80FD\u529B\u3002"),
+          React.createElement("li", null, "\u4E8B\u4EF6\u8BA2\u9605\u9009\u62E9\u957F\u8FDE\u63A5\uFF0C\u8BA2\u9605 im.message.receive_v1\uFF1B\u5982\u4F7F\u7528\u5361\u7247\u4EA4\u4E92\uFF0C\u542F\u7528 card.action.trigger \u56DE\u8C03\u3002"),
+          React.createElement("li", null, "\u5F00\u901A\u8BFB\u53D6\u7528\u6237\u53D1\u7ED9\u673A\u5668\u4EBA\u7684\u6D88\u606F\u3001\u4EE5\u5E94\u7528\u8EAB\u4EFD\u53D1\u9001\u6D88\u606F\u6743\u9650\uFF1B\u9644\u4EF6\u9700\u8981\u76F8\u5E94\u8D44\u6E90\u6743\u9650\u3002"),
+          React.createElement("li", null, "\u53D1\u5E03\u5E94\u7528\u7248\u672C\u5E76\u5C06\u4F7F\u7528\u8005\u7EB3\u5165\u53EF\u7528\u8303\u56F4\uFF0C\u4FDD\u5B58\u4EE5\u4E0A\u51ED\u8BC1\u548C\u6388\u6743\u540D\u5355\u540E\u8FDE\u63A5\u3002")
+        )
+      ),
+      React.createElement("p", { className: "mewclaw-account-message" }, "\u673A\u5668\u4EBA\u7EDF\u4E00\u901A\u8FC7\u6B64\u9875\u9762\u7BA1\u7406\uFF1B\u65E7\u5E94\u7528\u9700\u5728\u6B64\u4FDD\u5B58\u5E76\u8FDE\u63A5\uFF0C\u4E0D\u4F1A\u81EA\u52A8\u5BFC\u5165\u3002\u8BF7\u52FF\u628A\u540C\u4E00\u4E2A\u5E94\u7528\u91CD\u590D\u8FDE\u63A5\u5230\u5176\u4ED6\u7F51\u5173\u3002")
+    );
+  }
+
+  // packages/lark/web-auth/src/client-feishu.ts
+  function maskIdentity(subject) {
+    return subject.length > 12 ? `${subject.slice(0, 6)}...${subject.slice(-4)}` : subject;
+  }
+  function IdentitySection({ React }) {
+    const [revision, setRevision] = React.useState(0);
+    const [pending, setPending] = React.useState("");
+    const [message, setMessage] = React.useState({ text: "", error: false });
+    const state = useIdentities(React, revision);
+    const remove = async (identity) => {
+      if (pending || !window.confirm("\u786E\u5B9A\u89E3\u7ED1\u5F53\u524D\u98DE\u4E66\u8EAB\u4EFD\u5417\uFF1F\u89E3\u7ED1\u4E0D\u4F1A\u5220\u9664\u804A\u5929\u8BB0\u5F55\u3002")) return;
+      setPending(identity.subject);
+      setMessage({ text: "", error: false });
+      try {
+        await unlinkIdentity(identity);
+        setMessage({ text: "\u98DE\u4E66\u8EAB\u4EFD\u5DF2\u89E3\u7ED1\u3002", error: false });
+        setRevision(revision + 1);
+      } catch (cause) {
+        const code = cause instanceof Error ? cause.message : "";
+        setMessage({ text: code === "IDENTITY_LAST_LOGIN_METHOD" ? "\u8FD9\u662F\u5F53\u524D\u8D26\u53F7\u6700\u540E\u7684\u767B\u5F55\u65B9\u5F0F\uFF0C\u4E0D\u80FD\u89E3\u7ED1\u3002" : "\u89E3\u7ED1\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002", error: true });
+      } finally {
+        setPending("");
+      }
+    };
+    return React.createElement(
+      "section",
+      { className: "mewclaw-account-section", "aria-label": "\u5F53\u524D\u8D26\u53F7\u7684\u98DE\u4E66\u8EAB\u4EFD" },
+      React.createElement(
+        "div",
+        { className: "mewclaw-feishu-section-head" },
+        React.createElement(
+          "div",
+          null,
+          React.createElement("h3", { className: "mewclaw-account-subtitle" }, "\u5DF2\u7ED1\u5B9A\u8EAB\u4EFD"),
+          React.createElement("p", { className: "mewclaw-account-message" }, "\u4EC5\u663E\u793A\u5F53\u524D\u767B\u5F55\u8D26\u53F7\u7684\u7ED1\u5B9A\u5173\u7CFB\u3002")
+        ),
+        React.createElement("button", { type: "button", className: "mewclaw-account-button", disabled: state.status === "loading" || Boolean(pending), onClick: () => {
+          setRevision(revision + 1);
+        } }, state.status === "loading" ? "\u5237\u65B0\u4E2D\u2026" : "\u5237\u65B0")
+      ),
+      state.status === "loading" ? React.createElement("p", { className: "mewclaw-account-message", role: "status" }, "\u6B63\u5728\u8BFB\u53D6\u98DE\u4E66\u8EAB\u4EFD\u2026") : null,
+      state.status === "error" ? React.createElement("p", { className: "mewclaw-account-message", "data-state": "error", role: "alert" }, "\u8BFB\u53D6\u5931\u8D25\uFF0C\u8BF7\u70B9\u51FB\u5237\u65B0\u91CD\u8BD5\u3002") : null,
+      state.status === "ready" ? state.data.length ? React.createElement("ul", { className: "mewclaw-identity-list" }, state.data.map((identity) => React.createElement(
+        "li",
+        { className: "mewclaw-identity-row", key: identity.subject },
+        React.createElement(
+          "div",
+          { className: "mewclaw-account-row-copy" },
+          React.createElement("strong", null, "\u98DE\u4E66\u8EAB\u4EFD"),
+          React.createElement("span", null, maskIdentity(identity.subject))
+        ),
+        React.createElement("button", { type: "button", className: "mewclaw-account-button danger", disabled: Boolean(pending), onClick: () => {
+          void remove(identity);
+        } }, pending === identity.subject ? "\u89E3\u7ED1\u4E2D\u2026" : "\u89E3\u7ED1")
+      ))) : React.createElement(
+        "div",
+        { className: "mewclaw-feishu-empty" },
+        React.createElement("strong", null, "\u5C1A\u672A\u7ED1\u5B9A\u98DE\u4E66\u8EAB\u4EFD"),
+        React.createElement("p", { className: "mewclaw-account-message" }, "\u8FDE\u63A5\u4E2A\u4EBA\u673A\u5668\u4EBA\u65E0\u9700\u7ED1\u5B9A\u767B\u5F55\u8EAB\u4EFD\uFF1B\u673A\u5668\u4EBA\u4F1A\u8BDD\u81EA\u52A8\u5F52\u5F53\u524D\u914D\u7F6E\u8D26\u53F7\u3002")
+      ) : null,
+      message.text ? React.createElement("p", { className: "mewclaw-account-message", role: "status", "aria-live": "polite", "data-state": message.error ? "error" : "success" }, message.text) : null
+    );
+  }
+  function FeishuConnectionsSection(React) {
+    return React.createElement(
+      "div",
+      { className: "mewclaw-account-center mewclaw-feishu-center" },
+      React.createElement(
+        "header",
+        { className: "mewclaw-account-center-header" },
+        React.createElement("h2", null, "\u98DE\u4E66\u8FDE\u63A5"),
+        React.createElement("p", { className: "mewclaw-account-message" }, "\u8FDE\u63A5\u81EA\u5EFA\u5E94\u7528\u673A\u5668\u4EBA\uFF0C\u7BA1\u7406\u4F60\u7684\u98DE\u4E66\u8EAB\u4EFD\u3002")
+      ),
+      React.createElement(BotConfiguration, { React }),
+      React.createElement(IdentitySection, { React }),
+      React.createElement(
+        "aside",
+        { className: "mewclaw-feishu-note" },
+        React.createElement("h3", { className: "mewclaw-account-subtitle" }, "\u8EAB\u4EFD\u4E0E\u673A\u5668\u4EBA\u7BA1\u7406\u6743"),
+        React.createElement("p", { className: "mewclaw-account-message" }, "\u5386\u53F2\u767B\u5F55\u8EAB\u4EFD\u548C\u804A\u5929\u8BB0\u5F55\u4FDD\u7559\u3002\u673A\u5668\u4EBA\u7EDF\u4E00\u5728\u4E0A\u65B9\u4FDD\u5B58\u3001\u6821\u9A8C\u548C\u8FDE\u63A5\uFF0C\u914D\u7F6E\u53CA\u65B0\u4F1A\u8BDD\u4EC5\u5F52\u5F53\u524D\u8D26\u53F7\u7BA1\u7406\u3002"),
+        React.createElement("a", { className: "mewclaw-account-link", href: "https://open.feishu.cn/app", target: "_blank", rel: "noopener noreferrer" }, "\u98DE\u4E66\u5F00\u653E\u5E73\u53F0 \u2197")
+      )
+    );
+  }
+
   // packages/lark/web-auth/src/client-account.ts
   var AREAS = [
     { id: "usage", label: "\u7528\u91CF\u4E0E\u989D\u5EA6" },
     { id: "models", label: "\u6211\u7684\u6A21\u578B" },
-    { id: "feishu", label: "\u98DE\u4E66\u8FDE\u63A5" },
     { id: "security", label: "\u5B89\u5168\u4E0E\u767B\u5F55" },
     { id: "admin", label: "\u7528\u6237\u4E0E\u6743\u9650" }
   ];
@@ -284,7 +519,7 @@
   }
   function AccountOverview({ React, user }) {
     const initial = Array.from(user.displayName.trim())[0] || "M";
-    const mode = user.defaultMode === "full" ? "Full / OCI roster" : "\u8F7B\u91CF\u6A21\u5F0F";
+    const mode = user.defaultMode === "full" ? "\u901A\u7528\u5DE5\u4F5C" : "\u65E5\u5E38\u52A9\u624B";
     return React.createElement(
       "div",
       { className: "mewclaw-account-section" },
@@ -372,35 +607,6 @@
       label,
       React.createElement("input", { name, type: "password", autoComplete, minLength: 12, maxLength: 256, required: true })
     );
-  }
-  function IdentitySection({ React }) {
-    const [revision, setRevision] = React.useState(0);
-    const state = useIdentities(React, revision);
-    if (state.status !== "ready") return loading(React, state.status === "error");
-    if (!state.data.length) return emptyState(React, "\u6682\u65E0\u98DE\u4E66\u7ED1\u5B9A");
-    const remove = async (identity) => {
-      if (!window.confirm("\u786E\u5B9A\u89E3\u7ED1\u5F53\u524D\u98DE\u4E66\u8D26\u53F7\u5417\uFF1F")) return;
-      try {
-        await unlinkIdentity(identity);
-        setRevision(revision + 1);
-      } catch (cause) {
-        const code = cause instanceof Error ? cause.message : "";
-        window.alert(code === "IDENTITY_LAST_LOGIN_METHOD" ? "\u8FD9\u662F\u5F53\u524D\u8D26\u53F7\u6700\u540E\u7684\u767B\u5F55\u65B9\u5F0F\uFF0C\u4E0D\u80FD\u89E3\u7ED1\u3002" : "\u89E3\u7ED1\u5931\u8D25\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002");
-      }
-    };
-    return React.createElement("ul", { className: "mewclaw-identity-list" }, state.data.map((identity) => React.createElement(
-      "li",
-      { className: "mewclaw-identity-row", key: identity.subject },
-      React.createElement(
-        "div",
-        { className: "mewclaw-account-row-copy" },
-        React.createElement("strong", null, "\u98DE\u4E66"),
-        React.createElement("span", null, maskIdentity(identity.subject))
-      ),
-      React.createElement("button", { type: "button", className: "mewclaw-account-button danger", onClick: () => {
-        void remove(identity);
-      } }, "\u89E3\u7ED1")
-    )));
   }
   function parseModelIds(value) {
     const modelIds = [];
@@ -647,7 +853,7 @@
         React.createElement("div", { className: "mewclaw-account-usage-progress-head" }, React.createElement("span", null, state.data.periodStart), React.createElement("span", null, `${formatUsd(quota.usedUsd)} / ${formatUsd(quota.monthlyLimitUsd)}`)),
         React.createElement(
           "div",
-          { className: "mewclaw-account-usage-progress-track", role: "progressbar", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(percent2) },
+          { className: "mewclaw-account-usage-progress-track", role: "progressbar", "aria-label": "\u672C\u6708\u989D\u5EA6\u4F7F\u7528\u6BD4\u4F8B", "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(percent2) },
           React.createElement("div", { className: "mewclaw-account-usage-progress-fill", style: { width: `${percent2}%` } })
         )
       ),
@@ -659,13 +865,18 @@
         fact(React, "\u7F13\u5B58 Token", formatCount(totals.cacheReadTokens + totals.cacheWriteTokens)),
         fact(React, "\u63A8\u7406 Token", formatCount(totals.reasoningTokens))
       ),
-      models.length ? React.createElement("ul", { className: "mewclaw-account-models" }, models.map((model) => React.createElement(
-        "li",
-        { className: "mewclaw-account-model-row", key: `${model.provider}:${model.model}` },
-        React.createElement("div", { className: "mewclaw-account-row-copy" }, React.createElement("strong", null, model.model), React.createElement("span", null, model.provider)),
-        React.createElement("span", { className: "mewclaw-account-row-meta" }, `${formatCount(model.calls)} \u6B21`),
-        React.createElement("span", null, formatUsd(model.totalUsd))
-      ))) : emptyState(React, "\u672C\u5468\u671F\u6682\u65E0\u6A21\u578B\u8C03\u7528")
+      models.length ? React.createElement(
+        "details",
+        { className: "mewclaw-account-model-detail" },
+        React.createElement("summary", null, "\u6309\u6A21\u578B\u67E5\u770B\u660E\u7EC6", React.createElement("span", null, `${models.length} \u4E2A\u6A21\u578B`)),
+        React.createElement("ul", { className: "mewclaw-account-models" }, models.map((model) => React.createElement(
+          "li",
+          { className: "mewclaw-account-model-row", key: `${model.provider}:${model.model}` },
+          React.createElement("div", { className: "mewclaw-account-row-copy" }, React.createElement("strong", null, model.model), React.createElement("span", null, model.provider)),
+          React.createElement("span", { className: "mewclaw-account-row-meta" }, `${formatCount(model.calls)} \u6B21`),
+          React.createElement("span", null, formatUsd(model.totalUsd))
+        )))
+      ) : emptyState(React, "\u672C\u5468\u671F\u6682\u65E0\u6A21\u578B\u8C03\u7528")
     );
   }
   function usageStat(React, label, value) {
@@ -697,21 +908,19 @@
   function areaContent(React, area) {
     if (area === "usage") return React.createElement(UsageSection, { React });
     if (area === "models") return React.createElement(ModelProfilesSection, { React });
-    if (area === "feishu") return React.createElement(IdentitySection, { React });
     if (area === "security") return React.createElement(PasswordSection, { React });
     return React.createElement(AdminSection, { React });
   }
   function areaMeta(area) {
     if (area === "usage") return "\u672C\u6708";
     if (area === "models") return "\u4E2A\u4EBA\u914D\u7F6E";
-    if (area === "feishu") return "\u4E2A\u4EBA\u8FDE\u63A5";
     if (area === "security") return "\u5BC6\u7801";
     return "\u7BA1\u7406\u5458";
   }
   function AccountFold(React, entry) {
     return React.createElement(
       "details",
-      { className: "mewclaw-account-fold", open: entry.id === "usage" },
+      { key: entry.id, className: "mewclaw-account-fold", open: entry.id === "usage" },
       React.createElement(
         "summary",
         null,
@@ -726,7 +935,12 @@
     return React.createElement(
       "div",
       { className: "mewclaw-account-center" },
-      React.createElement("header", { className: "mewclaw-account-center-header" }, React.createElement("h2", null, "\u8D26\u6237\u4E2D\u5FC3")),
+      React.createElement(
+        "header",
+        { className: "mewclaw-account-center-header" },
+        React.createElement("h2", null, "\u8D26\u6237\u4E2D\u5FC3"),
+        React.createElement("p", { className: "mewclaw-account-message" }, "\u67E5\u770B\u8D26\u6237\u7528\u91CF\uFF0C\u7BA1\u7406\u4E2A\u4EBA\u6A21\u578B\u4E0E\u767B\u5F55\u5B89\u5168\u3002")
+      ),
       React.createElement(AccountOverview, { React, user: state.data }),
       React.createElement("div", { className: "mewclaw-account-folds" }, areas.map((entry) => AccountFold(React, entry)))
     );
@@ -734,21 +948,44 @@
   function AccountCenterSection(React) {
     return renderAccount(React, useAccountUser(React));
   }
-  function maskIdentity(subject) {
-    return subject.length > 12 ? `${subject.slice(0, 6)}...${subject.slice(-4)}` : subject;
-  }
 
   // packages/lark/web-auth/src/client-styles.ts
   var ACCOUNT_STYLES = `
+.mewclaw-bot-form select,.mewclaw-bot-form textarea{box-sizing:border-box;width:100%;min-width:0;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:10px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit}
+.mewclaw-bot-form textarea{resize:vertical;min-height:84px}
+.mewclaw-bot-form .mewclaw-account-field-wide{grid-column:1/-1}
+.mewclaw-bot-form select:focus-visible,.mewclaw-bot-form textarea:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}
+.mewclaw-bot-form :disabled{opacity:.6}
+.mewclaw-bot-guide{padding:0 20px 16px;margin:0;display:grid;gap:10px;font-size:13px;line-height:1.6;color:var(--dsw-alias-label-secondary)}
 .mewclaw-network-status{position:fixed;z-index:2147483000;top:12px;left:50%;display:flex;max-width:min(520px,calc(100vw - 32px));min-height:34px;box-sizing:border-box;align-items:center;padding:7px 12px;border:1px solid var(--dsw-alias-state-warn-primary);border-radius:8px;background:var(--dsw-alias-bg-layer-1);box-shadow:0 8px 24px rgba(0,0,0,.14);color:var(--dsw-alias-label-primary);font-size:12px;line-height:18px;transform:translateX(-50%)}
 .mewclaw-network-status[hidden]{display:none}
 .mewclaw-settings-trigger{display:flex;align-items:center;gap:9px;min-width:0;color:inherit}
 .mewclaw-account-avatar{display:grid;width:28px;height:28px;flex:0 0 28px;place-items:center;border-radius:50%;background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);font-size:12px;font-weight:600}
 .mewclaw-account-avatar-large{width:44px;height:44px;flex-basis:44px;font-size:16px}
 .mewclaw-account-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:20px}
-.mewclaw-account-center{box-sizing:border-box;display:flex;flex-direction:column;gap:20px;width:100%;padding:2px 0 14px;color:var(--dsw-alias-label-primary)}
+.mewclaw-account-center{box-sizing:border-box;display:flex;flex-direction:column;gap:18px;width:100%;min-width:0;padding:2px 0 14px;color:var(--dsw-alias-label-primary)}
+.mewclaw-account-center-header{display:grid;gap:6px}
+.mewclaw-account-subtitle{margin:0;font-size:14px;font-weight:600;line-height:22px}
+.mewclaw-feishu-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.mewclaw-feishu-section-head>div{display:grid;min-width:0;gap:4px}
+.mewclaw-feishu-empty{display:grid;gap:8px;padding:20px;border:1px dashed var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-1)}
+.mewclaw-feishu-empty strong{font-size:14px;font-weight:500}
+.mewclaw-feishu-note{display:grid;gap:8px;padding:16px 0;border-top:1px solid var(--dsw-alias-border-l1)}
+.mewclaw-feishu-center .mewclaw-account-message{line-height:1.65;overflow-wrap:anywhere}
+.mewclaw-account-fold>summary:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px;border-radius:6px}
+.mewclaw-account-model-detail>summary::after{content:"+";font-size:16px}
+.mewclaw-account-model-detail[open]>summary::after{content:"\u2212"}
+.mewclaw-account-model-detail>summary span{margin-left:auto}
+.mewclaw-feishu-guide{display:grid;gap:10px;padding:16px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1)}
+.mewclaw-feishu-guide ol{display:grid;gap:10px;margin:0;padding-left:20px;color:var(--dsw-alias-label-secondary);font-size:13px;line-height:22px}
+.mewclaw-feishu-guide code{padding:2px 5px;border-radius:4px;background:var(--dsw-alias-interactive-bg-hover-solid);color:var(--dsw-alias-label-primary)}
+.mewclaw-account-model-detail{border-top:1px solid var(--dsw-alias-border-l1)}
+.mewclaw-account-model-detail>summary{display:flex;justify-content:space-between;gap:12px;padding:12px 0;cursor:pointer;font-size:12px;color:var(--dsw-alias-label-secondary)}
+.mewclaw-account-model-detail>summary:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}
+.mewclaw-account-model-detail>summary span{color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums}
+.mewclaw-account-model-detail>.mewclaw-account-models{border-top:0}
 .mewclaw-account-center-header h2{margin:0;font-size:18px;line-height:26px;font-weight:600}
-.mewclaw-account-profile{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;min-width:0}
+.mewclaw-account-profile{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;min-width:0;padding:4px 0 8px}
 .mewclaw-account-profile-copy{display:flex;flex-direction:column;min-width:0;gap:2px}
 .mewclaw-account-profile-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;line-height:22px;font-weight:600}
 .mewclaw-account-muted{overflow:hidden;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px;text-overflow:ellipsis;white-space:nowrap}
@@ -763,20 +1000,20 @@
 .mewclaw-account-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:0;border-top:1px solid var(--dsw-alias-border-l1);border-bottom:1px solid var(--dsw-alias-border-l1)}
 .mewclaw-account-facts>div{min-width:0;padding:12px 10px}
 .mewclaw-account-facts>div+div{border-left:1px solid var(--dsw-alias-border-l1)}
-.mewclaw-account-facts dt{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:17px}
+.mewclaw-account-facts dt{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:17px}
 .mewclaw-account-facts dd{margin:3px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:20px}
 .mewclaw-account-message{min-height:18px;margin:0;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}
 .mewclaw-account-message[data-state="error"]{color:var(--dsw-alias-state-error-primary)}
 .mewclaw-account-message[data-state="success"]{color:var(--dsw-alias-state-success-primary)}
 .mewclaw-account-folds{display:flex;flex-direction:column;width:100%;border-bottom:1px solid var(--dsw-alias-border-l2)}
 .mewclaw-account-fold{border-top:1px solid var(--dsw-alias-border-l2)}
-.mewclaw-account-fold summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:50px;padding:9px 2px;color:var(--dsw-alias-label-primary);list-style:none;cursor:pointer}
-.mewclaw-account-fold summary::-webkit-details-marker{display:none}
-.mewclaw-account-fold summary::after{content:"+";color:var(--dsw-alias-label-tertiary);font-size:18px;line-height:20px}
-.mewclaw-account-fold[open] summary::after{content:"-"}
-.mewclaw-account-fold summary:hover{color:var(--dsw-alias-state-business-primary)}
+.mewclaw-account-fold>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:50px;padding:9px 2px;color:var(--dsw-alias-label-primary);list-style:none;cursor:pointer}
+.mewclaw-account-fold>summary::-webkit-details-marker{display:none}
+.mewclaw-account-fold>summary::after{content:"+";color:var(--dsw-alias-label-tertiary);font-size:18px;line-height:20px}
+.mewclaw-account-fold[open]>summary::after{content:"-"}
+.mewclaw-account-fold>summary:hover{color:var(--dsw-alias-state-business-primary)}
 .mewclaw-account-fold-title{display:flex;align-items:center;gap:8px;font-size:14px;line-height:21px;font-weight:500}
-.mewclaw-account-fold-meta{color:var(--dsw-alias-label-tertiary);font-size:11px;font-weight:400}
+.mewclaw-account-fold-meta{color:var(--dsw-alias-label-tertiary);font-size:12px;font-weight:400}
 .mewclaw-account-fold-content{padding:2px 2px 16px}
 .mewclaw-account-section{box-sizing:border-box;display:flex;flex-direction:column;gap:16px;width:100%;color:var(--dsw-alias-label-primary)}
 .mewclaw-account-form{box-sizing:border-box;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));width:100%;max-width:560px;gap:12px}
@@ -784,7 +1021,7 @@
 .mewclaw-account-form label:first-child{grid-column:1/-1}
 .mewclaw-account-form input{box-sizing:border-box;width:100%;min-width:0;height:38px;padding:0 11px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;outline:none;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit}
 .mewclaw-account-form input:focus{border-color:var(--dsw-alias-state-business-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-state-business-primary) 16%,transparent)}
-.mewclaw-account-form-actions{display:flex;align-items:center;gap:10px;grid-column:1/-1}
+.mewclaw-account-form-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;grid-column:1/-1}
 .mewclaw-account-model-profile-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .mewclaw-account-model-profile-toolbar .mewclaw-account-message{min-height:0}
 .mewclaw-account-model-form{max-width:680px}
@@ -796,7 +1033,7 @@
 .mewclaw-account-model-profile-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 14px;padding:12px 0;border-bottom:1px solid var(--dsw-alias-border-l1)}
 .mewclaw-account-model-profile-row:last-child{border-bottom:0}
 .mewclaw-account-model-profile-badges{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:flex-end;gap:6px}
-.mewclaw-account-model-profile-badge{display:inline-flex;align-items:center;min-height:20px;padding:0 7px;border:1px solid var(--dsw-alias-border-l2);border-radius:999px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:18px;white-space:nowrap}
+.mewclaw-account-model-profile-badge{display:inline-flex;align-items:center;min-height:20px;padding:0 7px;border:1px solid var(--dsw-alias-border-l2);border-radius:999px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px;white-space:nowrap}
 .mewclaw-account-model-profile-badge.primary{border-color:color-mix(in srgb,var(--dsw-alias-state-business-primary) 40%,var(--dsw-alias-border-l2));color:var(--dsw-alias-state-business-primary)}
 .mewclaw-account-model-profile-actions{display:flex;grid-column:1/-1;flex-wrap:wrap;align-items:center;gap:8px}
 .mewclaw-account-model-profile-actions .mewclaw-account-button{min-height:30px;padding:0 10px;font-size:12px}
@@ -804,30 +1041,31 @@
 .mewclaw-account-empty strong{color:var(--dsw-alias-label-primary);font-size:13px;font-weight:500}
 .mewclaw-account-usage-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .mewclaw-account-usage-stat{display:grid;gap:3px;min-width:0;margin:0;padding:11px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1)}
-.mewclaw-account-usage-stat dt{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:17px}
+.mewclaw-account-usage-stat dt{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:17px}
 .mewclaw-account-usage-stat dd{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px;line-height:23px;font-variant-numeric:tabular-nums}
 .mewclaw-account-usage-progress{display:grid;gap:7px}
 .mewclaw-account-usage-progress-head{display:flex;justify-content:space-between;gap:12px;font-size:12px;line-height:18px}
 .mewclaw-account-usage-progress-head span:last-child{color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}
 .mewclaw-account-usage-progress-track{height:6px;overflow:hidden;border-radius:3px;background:var(--dsw-alias-interactive-bg-hover)}
-.mewclaw-account-usage-progress-fill{height:100%;border-radius:inherit;background:var(--dsw-alias-state-business-primary);transition:width .2s ease}
+.mewclaw-account-usage-progress-fill{height:100%;border-radius:inherit;background:var(--dsw-alias-state-business-primary)}
 .mewclaw-account-token-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0;border-top:1px solid var(--dsw-alias-border-l1)}
-.mewclaw-account-token-grid>div{padding:10px 8px 4px}
-.mewclaw-account-token-grid dt{color:var(--dsw-alias-label-tertiary);font-size:11px}
+.mewclaw-account-token-grid>div{min-width:0;padding:10px 8px 4px;overflow-wrap:anywhere}
+.mewclaw-account-token-grid dt{color:var(--dsw-alias-label-tertiary);font-size:12px}
 .mewclaw-account-token-grid dd{margin:3px 0 0;font-size:13px;font-variant-numeric:tabular-nums}
 .mewclaw-account-models,.mewclaw-account-admin-list,.mewclaw-identity-list{display:flex;flex-direction:column;margin:0;padding:0;list-style:none;border-top:1px solid var(--dsw-alias-border-l1)}
 .mewclaw-account-model-row,.mewclaw-account-admin-row,.mewclaw-identity-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid var(--dsw-alias-border-l1)}
 .mewclaw-account-model-row:last-child,.mewclaw-account-admin-row:last-child,.mewclaw-identity-row:last-child{border-bottom:0}
 .mewclaw-account-row-copy{display:flex;flex-direction:column;min-width:0;gap:2px}
 .mewclaw-account-row-copy strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;line-height:20px;font-weight:500}
-.mewclaw-account-row-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:17px}
-.mewclaw-account-row-meta{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:17px;text-align:right}
+.mewclaw-account-row-copy span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:17px}
+.mewclaw-account-row-meta{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:17px;text-align:right}
 .mewclaw-account-model-row{grid-template-columns:minmax(0,1fr) auto auto}
-.mewclaw-account-link{display:inline-flex;width:max-content;align-items:center;color:var(--dsw-alias-state-business-primary);font-size:13px;text-decoration:none}
+.mewclaw-account-link{display:inline-flex;width:fit-content;max-width:100%;overflow-wrap:anywhere;align-items:center;color:var(--dsw-alias-state-business-primary);font-size:13px;text-decoration:none}
 .mewclaw-account-link:hover{text-decoration:underline}
 @media(max-width:720px){div:has(>div>div>div>.mewclaw-account-center){flex-direction:column}div:has(>div>div>div>.mewclaw-account-center)>nav{box-sizing:border-box;width:100%;height:auto;gap:10px;padding:18px 16px 8px;border-bottom:1px solid var(--dsw-alias-border-l1)}div:has(>div>div>div>.mewclaw-account-center)>nav>div:first-child{width:auto;padding:0 8px}div:has(>div>div>div>.mewclaw-account-center)>nav>div:last-child{box-sizing:border-box;flex-direction:row;width:100%;height:auto;overflow-x:auto;gap:4px;padding-bottom:6px;scrollbar-width:none;overscroll-behavior-x:contain}div:has(>div>div>div>.mewclaw-account-center)>nav>div:last-child::-webkit-scrollbar{display:none}div:has(>div>div>div>.mewclaw-account-center)>nav>div:last-child>button{width:auto;min-width:max-content;flex:0 0 auto;white-space:nowrap}div:has(>div>div>div>.mewclaw-account-center)>nav+div{width:100%;height:auto;min-height:0;flex:1 1 auto}}
 @media(max-width:720px){.mewclaw-account-profile{grid-template-columns:auto minmax(0,1fr)}.mewclaw-account-session-buttons{grid-column:1/-1;justify-content:flex-start}.mewclaw-account-usage-grid,.mewclaw-account-token-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.mewclaw-account-admin-row{grid-template-columns:1fr}.mewclaw-account-row-meta{justify-content:flex-start;text-align:left}.mewclaw-account-model-profile-row{grid-template-columns:1fr}.mewclaw-account-model-profile-badges{justify-content:flex-start}}
-@media(max-width:480px){.mewclaw-account-facts,.mewclaw-account-form{grid-template-columns:1fr}.mewclaw-account-facts>div+div{border-top:1px solid var(--dsw-alias-border-l1);border-left:0}.mewclaw-account-form label:first-child,.mewclaw-account-form-actions,.mewclaw-account-model-form .mewclaw-account-field-wide{grid-column:auto}.mewclaw-account-usage-grid{grid-template-columns:1fr}.mewclaw-account-model-row{grid-template-columns:minmax(0,1fr) auto}.mewclaw-account-model-row .mewclaw-account-row-meta{grid-column:1/-1}.mewclaw-account-model-profile-toolbar{align-items:flex-start;flex-direction:column}}
+@media(max-width:480px){.mewclaw-account-facts,.mewclaw-account-form{grid-template-columns:1fr}.mewclaw-account-facts>div+div{border-top:1px solid var(--dsw-alias-border-l1);border-left:0}.mewclaw-account-form label:first-child,.mewclaw-account-form-actions,.mewclaw-account-model-form .mewclaw-account-field-wide{grid-column:auto}.mewclaw-account-usage-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.mewclaw-account-model-row{grid-template-columns:minmax(0,1fr) auto}.mewclaw-account-model-row .mewclaw-account-row-meta{grid-column:1/-1}.mewclaw-account-model-profile-toolbar{align-items:flex-start;flex-direction:column}}
+@media(pointer:coarse){.mewclaw-account-button,.mewclaw-account-model-profile-actions .mewclaw-account-button{min-height:44px}.mewclaw-account-form input{height:44px;font-size:16px}}
 `;
   function installAccountStyles() {
     if (typeof document === "undefined" || document.querySelector("style[data-mewclaw-account]") !== null) return;
@@ -1949,6 +2187,12 @@
           order: -30,
           label: () => "\u8D26\u6237\u4E2D\u5FC3"
         }, () => AccountCenterSection(React))), "dsh-lark-web-auth: account center section");
+        ctx.effect(() => ctx.slots.inject("settings.section", () => ctx.slots.register({
+          name: "settings.section",
+          id: "mewclaw-feishu",
+          order: -20,
+          label: () => "\u98DE\u4E66\u8FDE\u63A5"
+        }, () => FeishuConnectionsSection(React))), "dsh-lark-web-auth: feishu section");
       }
       return { apply, inject: ["slots", "connection", "remote", "remote.settings"] };
     }

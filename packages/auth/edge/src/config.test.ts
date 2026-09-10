@@ -10,6 +10,9 @@ const base = {
 };
 
 describe("resolveAuthConfig", () => {
+  it("旧部署机器人环境不再保留App或自动生成账号配置，OAuth保持独立", () => {
+    expect(resolveAuthConfig({ ...base, LARK_APP_ID: "cli_1234567890abcdef", LARK_APP_SECRET: "fake-old-secret" })).toEqual(resolveAuthConfig(base));
+  });
   it("默认开启审计并严格校验开关和资源限制", () => {
     expect(resolveAuthConfig(base).promptAudit).toEqual({ enabled: true, timeoutMs: 15_000, maxConcurrent: 4 });
     expect(resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_ENABLED: "false" }).promptAudit?.enabled).toBe(false);

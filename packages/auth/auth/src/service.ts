@@ -12,6 +12,7 @@ import {
 import { normalizeReturnPath } from "./policy.js";
 import { inspectImportCredential } from "./credential-policy.js";
 import { UserModelCrypto } from "./user-model-crypto.js";
+import { FeishuBotService } from "./feishu-bots.js";
 import type {
   AuthServiceOptions,
   AuthIdentity,
@@ -75,6 +76,7 @@ export type IdentityUnlinkResult =
   | { status: "last-login-method" };
 
 export class AuthService {
+  readonly feishuBots: FeishuBotService;
   readonly #store: AuthStore;
   readonly #mail: AuthServiceOptions["mail"];
   readonly #now: () => number;
@@ -99,6 +101,7 @@ export class AuthService {
     this.#userModelCrypto = options.userModelEncryptionKey
       ? new UserModelCrypto(options.userModelEncryptionKey)
       : undefined;
+    this.feishuBots = new FeishuBotService(this.#store, this.#userModelCrypto);
   }
 
   async register(emailInput: string, password: string, displayNameInput: string, metadata: RequestMetadata, _options?: RegistrationOptions): Promise<RegistrationResult> {

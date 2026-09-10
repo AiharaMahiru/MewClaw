@@ -45,11 +45,6 @@ function assistantText(event: SessionEvent): string {
   return text;
 }
 
-function assistantChunkText(event: SessionEvent): string {
-  if (event.type !== "assistant/chunk" || event.data.chunk.type !== "text-delta") return "";
-  return event.data.chunk.text;
-}
-
 export class RunObserver {
   #endedBy: EndReason | undefined;
   #failure: string | undefined;
@@ -63,6 +58,7 @@ export class RunObserver {
   #noProgress: NodeJS.Timeout | undefined;
   #hardLimit: NodeJS.Timeout | undefined;
   #unsubscribe: (() => void) | undefined;
+  #unsubscribeStream: (() => void) | undefined;
 
   constructor(private readonly options: RunObserverOptions) {
     this.#provider = options.initialModel?.provider ?? "unknown";
@@ -80,10 +76,27 @@ export class RunObserver {
       this.armNoProgress();
       this.#record(event);
     });
+    let attempt: { id: string; turn: number; step: number } | undefined;
+    this.#unsubscribeStream = agent.ctx.on("agent/assistant-stream", ({ agent: source, frame }) => {
+      if (source !== agent) return;
+      this.armNoProgress();
+      if (frame.type === "start") attempt = { id: frame.attemptId, turn: frame.turn, step: frame.step };
+      if (frame.type === "end") attempt = undefined;
+      if (frame.type !== "chunk" || !attempt || frame.attemptId !== attempt.id || frame.chunk.type !== "text-delta") return;
+      if (frame.chunk.text.trim().length > 0) {
+        if (!this.#seenVisible) this.options.onFirstVisible?.();
+        this.#seenVisible = true;
+      }
+      this.options.stream({
+        envelope: { runId: this.options.request.runId, scope: this.options.request.scope },
+        assistant: { turn: attempt.turn, step: attempt.step, text: frame.chunk.text },
+      });
+    });
   }
 
   stop(): void {
     this.#unsubscribe?.();
+    this.#unsubscribeStream?.();
     this.options.signal?.removeEventListener("abort", this.#abort);
     if (this.#noProgress) clearTimeout(this.#noProgress);
     if (this.#hardLimit) clearTimeout(this.#hardLimit);
@@ -127,11 +140,6 @@ export class RunObserver {
   #record(event: SessionEvent): void {
     const { request, stream } = this.options;
     stream({ event, envelope: { runId: request.runId, scope: request.scope } });
-    const chunkText = assistantChunkText(event);
-    if (chunkText.trim().length > 0) {
-      if (!this.#seenVisible) this.options.onFirstVisible?.();
-      this.#seenVisible = true;
-    }
     const text = assistantText(event);
     if (text.length > 0) {
       if (!this.#seenVisible) this.options.onFirstVisible?.();

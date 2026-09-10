@@ -6,11 +6,14 @@ MewClaw 是基于 **DeepSeek Harness（DSH）与 Cordis** 的智能体平台，�
 
 ## 状态
 
+DSH 核心及官方插件锁定 `0.1.5-rc.1`。lightweight 不再裁剪执行能力，保留模式 ID 并复用官方 standard；Scope、目录授权、审批及 OCI 边界不变。2026-09-10 已切换生产 `R3-dsh-015-rc1-presetfix-20260910`，包含模式人设与PTC兼容修复，基础健康检查通过，等待用户实际功能测试；尚未提交或推送。见 [升级说明](docs/dsh-0.1.5-upgrade.md)。
+
 截至 **2026-09-10，生产基线为 R3**。本机生产入口 `/opt/dsh/current` 指向 `releases/R3`；Git 分支后续提交不等于生产已发布。
 
 - R3 已发布远程设置修复和四模式整合，见 [R3 设计说明](docs/specs/web-remote-settings-r3.md) 与 [生产验收记录](docs/evidence/r3-production-20260910.md)。
 - 早期 M0–M5 飞书迁移验收见 [历史证据](docs/evidence/m5-feishu-acceptance.md)，不代表后续新增功能已通过端到端验收。
-- **进行中、尚未发布**：账户中心布局优化、飞书独立设置入口，以及按 Web 账号隔离的自建应用机器人配置。现有应用已验证获取令牌和查询机器人信息成功；账号隔离后端、消息收发与跨账号拒绝测试尚未完成。
+- **飞书统一账号管理已上线**：账户中心与「飞书连接」分离；自建应用支持 App ID/Secret 加密保存、官方凭证校验、连接/断开与状态刷新。每账号独立机器人实例和会话归属。2026-09-10 切换至 `R3-account-bots-only-20260910-2`，移除部署级连接及旧App保留限制，旧凭据不自动导入。发布验收时账号配置为0、飞书连接为0，用户需在页面保存并启用应用；历史身份和会话保留。源码回归、候选空清单运行、六服务入口及公网检查通过；真实个人飞书收发仍需应用发布/权限验收。详见 [账号机器人规范](docs/specs/feishu-bots.md) 与 [发布证据](docs/evidence/20260910-account-only-bots.md)。
+- **生产模型目录**：OpenAI/GPT保持不变；DeepSeek只公开 `DeepSeek V4.1 Flash`（逻辑ID `deepseek-v4.1-flash`），由自有路由插件序列化为供应商wire ID。Gemini Web2API已从模型Provider目录移除，Gemini搜索MCP继续作为独立工具保留。凭据仅由受管环境文件提供，不进入仓库。
 
 ## 项目结构
 
@@ -27,7 +30,7 @@ docs/       # 架构、SPEC、发布说明与验收证据
 
 ## 开发与验证
 
-需要 Node.js 24+、pnpm 10.30.3；生产构建使用部署指定的固定 Node 版本。DSH 核心依赖当前锁定为 `0.1.2-rc.1`，以锁文件为准。
+需要 Node.js 24+、pnpm 10.30.3；生产构建使用部署指定的固定 Node 版本。DSH 核心依赖当前锁定为 `0.1.5-rc.1`，以锁文件为准。
 
 ```sh
 pnpm install --frozen-lockfile

@@ -72,5 +72,6 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
 }
 
 export { FileSessionDirectory } from "./store.js";
+export { inspectStoredSession } from "./persistence.js";
 export type { FileSessionDirectoryOptions } from "./store.js";
 export type { LarkSessionDirectory, SessionClaim, SessionResolution } from "./types.js";

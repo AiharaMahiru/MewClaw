@@ -57,6 +57,8 @@ export interface Config {
   pairingEndpoint?: string;
   /** 配对端点 Bearer 凭证引用（默认 AUTH_PAIRING_TOKEN）。 */
   pairingTokenEnv?: string;
+  /** 未配置配对端点时的 /login 提示；个人机器人用它说明账号归属语义。 */
+  pairingUnavailableMessage?: string;
 }
 
 export const Config: z<Config> = z.object({
@@ -65,6 +67,7 @@ export const Config: z<Config> = z.object({
   cardActionMaxEntries: z.number(),
   pairingEndpoint: z.string(),
   pairingTokenEnv: z.string(),
+  pairingUnavailableMessage: z.string(),
 });
 
 export interface ParsedGatewayCommand {
@@ -128,6 +131,7 @@ export function apply(ctx: Context, config: Config): void {
     pairingClient: config.pairingEndpoint
       ? createFeishuPairingClient({ endpoint: config.pairingEndpoint, tokenEnv: config.pairingTokenEnv, credentials: ctx.credentials })
       : undefined,
+    pairingUnavailableMessage: config.pairingUnavailableMessage,
     defaultProfile: resolveDefaultProfile(config.defaultProfile),
     cardActions: new CardActionRegistry({
       ttlMs: resolveBoundedConfig(config.cardActionTtlMs, DEFAULT_CARD_ACTION_TTL_MS, MAX_CARD_ACTION_TTL_MS, "cardActionTtlMs"),
