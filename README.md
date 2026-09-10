@@ -6,13 +6,13 @@
 
 ## 当前状态
 
-截至 **2026-09-10，本分支是开发基线，尚无可交付的桌面安装包**。Web 生产仍为 R3；桌面提交、PR 合并和候选测试不等于生产发布。
+截至 **2026-09-10，开发源码版本为 `0.1.0-desktop.5`**。本轮交付本机 Shell 与目录双向同步，已完成隔离候选验证；没有部署生产或生成新版 Windows 安装包。Windows 实机与生产真实模型验收仍需执行。
 
 - 已验证：独立桌面底座构建、Linux Electron 启动、云端登录，以及同账号桌面/Web 两轮真实续聊同步。
-- 已实现并测试：本地文件 Consumer 的列目录、读文件、条件写入、路径边界和授权撤销；桌面云端插件共 15 项测试通过。
-- 已同步 Web `master@56c4244`：DSH 核心及官方插件升级至 `0.1.5-rc.1`，并带入四模式整合、按账号隔离的飞书自建应用机器人、MewClaw 品牌与启动体验、DeepSeek V4.1 Flash wire 路由修复及安全审计凭证链路。
-- **尚未完成**：原生目录授权与云端工具桥接、完整跨账号和断线验收、Windows x64 打包及实机测试。文件 Consumer 测试通过不代表模型已经能使用电脑工作区。
-- 首版不提供任意本地 Shell、目录双向同步、离线任务重放或多设备接管。目录授权不等于操作系统沙箱。
+- 已实现并验证：原生目录授权、文件工具、独立 Shell 授权/撤销、长命令心跳、二进制文件双向同步、冲突保留与可恢复删除；Auth Edge 到本机的离线 HTTP 全链路已通过。
+- 云端共享包与 Web 使用 DSH `0.1.5-rc.1`；独立桌面底座保持 `0.1.2-rc.1`。官方包不修改，桌面客户端和云端的共享 Consumer 分别验证兼容性。
+- 云端通过 [可选 overlay](config/desktop-workspace.patch.yml) 启用桌面桥接，默认保持关闭。Git 合并和推送不会自动切换生产。
+- 本机 Shell 以当前系统用户权限执行，cwd 不是沙箱；Shell 和同步分别原生确认。同步不复制空目录和权限位，不自动解决冲突，不重放离线写入，不自动接管其他设备。
 
 ## 分支协作
 
@@ -24,7 +24,7 @@
 
 ## 桌面架构与开发
 
-云端是会话和模型运行的唯一权威；桌面通过自有 WebServer Provider 接入同一云端，不复制 SQLite 或 JSONL 来实现同步。电脑侧仅执行已授权目录内的受限文件操作，相关桥接仍在实施。
+云端是会话和模型运行的唯一权威；桌面通过自有 WebServer Provider 接入同一云端，不复制 SQLite 或 JSONL。电脑侧消费官方 FileSystem/Shell，同步通过共享 Node Provider 实现；模型不能自行开启本机授权。
 
 官方 DSH 包保持原样。社区桌面底座有明确记录的最小消费方兼容及 Provider 选择变更，**不宣称社区桌面源码零改动**；准备脚本固定上游提交并生成 `UPSTREAM.json`，不继承社区的官方包补丁。
 
@@ -37,8 +37,7 @@ node scripts/prepare-desktop-candidate.mjs /absolute/MewClaw/upstream/dsh-deskto
 cd /absolute/new-candidate
 npm install --ignore-scripts --no-audit --no-fund
 npm run build
-npm run build --workspace dsh-lark-desktop-cloud
-npx vitest run mewclaw-cloud/src
+node /absolute/MewClaw/apps/desktop/verify-workspace.mjs /absolute/new-candidate
 ```
 
 以上仅用于开发候选构建与测试，不生成安装包。安装生命周期默认关闭，Electron 下载和目标平台原生依赖须另行审核处理；Linux 构建通过不等于 Windows 实机通过。凭证、运行数据和候选目录不得提交 Git。

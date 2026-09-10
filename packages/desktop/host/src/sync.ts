@@ -21,6 +21,11 @@ export class SyncEngine {
       const left = await this.local.snapshot(signal), right = await this.remote.snapshot(signal);
       const report: SyncReport = { transferred: 0, removed: 0, conflicts: [] };
       const paths = [...new Set([...Object.keys(left), ...Object.keys(right), ...this.baseline.keys()])].sort();
+      const folded = new Set<string>();
+      for (const path of paths) {
+        const key = path.normalize('NFC').toLowerCase();
+        if (folded.has(key)) throw new Error('SYNC_CASE_COLLISION'); folded.add(key);
+      }
       for (const path of paths) {
         signal.throwIfAborted();
         const a = left[path]?.hash, b = right[path]?.hash, base = this.baseline.get(path);

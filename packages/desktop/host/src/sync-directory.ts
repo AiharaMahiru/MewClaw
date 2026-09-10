@@ -1,7 +1,7 @@
 /** Node 二进制同步 Provider：规范路径、条件发布、恢复副本；不是 OS 沙箱。 */
 import { createHash, randomUUID } from 'node:crypto';
 import { lstat, realpath, readdir, mkdir, open, link, rename, unlink } from 'node:fs/promises';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve, relative, sep } from 'node:path';
 import type { SyncEndpoint, SyncManifest } from './sync.js';
 
 export interface SyncLimits { maxBytes: number; maxEntries: number; maxTotalBytes: number }
@@ -16,7 +16,7 @@ export function syncPath(path: string): string[] {
   return parts;
 }
 export class NodeSyncDirectory implements SyncEndpoint {
-  private tail: Promise<unknown> = Promise.resolve();
+  private static readonly tails = new Map<string, Promise<unknown>>();
   private constructor(private readonly root: string, private readonly limits: SyncLimits) {}
   static async create(path: string, limits: SyncLimits): Promise<NodeSyncDirectory> {
     const root = await realpath(path);
@@ -88,7 +88,10 @@ export class NodeSyncDirectory implements SyncEndpoint {
     return data.toString('base64');
   }
   private serial<T>(operation: () => Promise<T>): Promise<T> {
-    const next = this.tail.then(operation, operation); this.tail = next.catch(() => undefined); return next;
+    const next = (NodeSyncDirectory.tails.get(this.root) ?? Promise.resolve()).then(operation, operation);
+    const tail = next.catch(() => undefined); NodeSyncDirectory.tails.set(this.root, tail);
+    void tail.finally(() => { if (NodeSyncDirectory.tails.get(this.root) === tail) NodeSyncDirectory.tails.delete(this.root); });
+    return next;
   }
   private async recovery(): Promise<string> {
     const dir = join(this.root, '.mewclaw-sync');
@@ -101,7 +104,12 @@ export class NodeSyncDirectory implements SyncEndpoint {
   }
   private async retain(target: string, expected: string, signal: AbortSignal): Promise<string> {
     if (hash(await this.bytes(target, signal)) !== expected) throw new Error('SYNC_CONFLICT');
-    const backup = join(await this.recovery(), randomUUID());
+    const backup = join(await this.recovery(), randomUUID() + '.data');
+    const metadata = await open(backup + '.json', 'wx', 0o600);
+    try {
+      await metadata.writeFile(JSON.stringify({ path: relative(this.root, target).split(sep).join('/'), hash: expected, createdAt: new Date().toISOString() }));
+      await metadata.sync();
+    } finally { await metadata.close(); }
     signal.throwIfAborted(); await rename(target, backup);
     if (hash(await this.bytes(backup, signal)) !== expected) {
       // 排他恢复：外部已经创建新目标时不能覆盖它，恢复副本始终保留。
@@ -112,6 +120,7 @@ export class NodeSyncDirectory implements SyncEndpoint {
   }
   write(path: string, data: string, expected: string | null, signal: AbortSignal): Promise<void> {
     return this.serial(async () => {
+      signal.throwIfAborted();
       const bytes = Buffer.from(data, 'base64');
       if (bytes.length > this.limits.maxBytes || bytes.toString('base64') !== data) throw new Error('SYNC_LIMIT');
       const target = await this.target(path, true);
