@@ -37,6 +37,7 @@
     "dsh-lark-base": "workspace:*",
     "dsh-lark-run": "workspace:*",
     "dsh-lark-worker": "workspace:*",
+    "dsh-lark-deepseek-routing": "workspace:*",
     "dsh-skill-trust": "workspace:*",
     "clsx": "2.1.1",
     "react": "18.3.1",

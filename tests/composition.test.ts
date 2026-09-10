@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadOverlayPatches } from "@deepseek-ai/dsh-app-boot";
+import { composeEntries, loadOverlayPatches } from "@deepseek-ai/dsh-app-boot";
 import { describe, expect, it } from "vitest";
 
 const require = createRequire(import.meta.url);
@@ -93,6 +93,20 @@ describe("网关组合（硬边界）", () => {
 });
 
 describe("worker 组合（技能与 overlay）", () => {
+  it("真实补丁算法禁用官方适配器并装载可解析的路由插件", () => {
+    const warnings: string[] = [];
+    const rows = composeEntries([
+      loadOverlayPatches("test", require.resolve("@deepseek-ai/dsh-base/cordis.patch.yml")),
+      loadOverlayPatches("test", repositoryPath("packages/bundle/worker/cordis.patch.yml")),
+    ], (message) => warnings.push(message));
+    const flatten = (entries: typeof rows): typeof rows => entries.flatMap((row) => [row, ...(row.group && Array.isArray(row.config) ? flatten(row.config) : [])]);
+    const effective = flatten(rows);
+    expect(effective.find((row) => row.id === "llm-deepseek")?.disabled).toBe(true);
+    expect(effective.find((row) => row.id === "lark-deepseek-routing")?.name).toContain("dsh-lark-deepseek-routing");
+    expect(warnings.filter((message) => message.includes("llm-deepseek"))).toEqual([]);
+    const workerRequire = createRequire(repositoryPath("apps/lark-worker/package.json"));
+    expect(workerRequire.resolve("dsh-lark-deepseek-routing")).toContain("deepseek-routing");
+  });
   it("技能发现只扫描受审 skills 根，不包含项目或用户默认根", () => {
     const row = bundlePatches("dsh-lark-worker").find((patch) => patch.id === "lark-reviewed-skill-filesystem");
     expect(row).toMatchObject({

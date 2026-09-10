@@ -14,7 +14,7 @@ describe("DeepSeek 逻辑模型路由", () => {
     const ctx = await mounted({ models: [{ id: "deepseek-v4.1-flash", name: "DeepSeek V4.1 Flash" }] });
     try {
       const prepared = await ctx.llm.prepareCall({ provider: "deepseek-official", model: "deepseek-v4.1-flash" });
-      for await (const chunk of prepared.stream({ ...options(), model: "deepseek-v4.1-flash", ...prepared.config })) void chunk;
+      for await (const chunk of prepared.stream({ ...options(), ...prepared.config })) void chunk;
       expect(body?.model).toBe("deepseek/deepseek-v4.1-flash");
     } finally {
       vi.unstubAllGlobals();
@@ -35,7 +35,7 @@ describe("DeepSeek 逻辑模型路由", () => {
     });
     try {
       const prepared = await ctx.llm.prepareCall({ provider: "deepseek-official", model: "deepseek-v4.1-flash" });
-      for await (const chunk of prepared.stream({ ...options(), model: "deepseek-v4.1-flash", ...prepared.config })) void chunk;
+      for await (const chunk of prepared.stream({ ...options(), ...prepared.config })) void chunk;
       expect(body?.model).toBe("deepseek/deepseek-v4.1-flash");
     } finally {
       vi.unstubAllGlobals();
