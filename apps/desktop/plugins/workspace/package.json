@@ -1,5 +1,6 @@
 {
-  "name": "dsh-lark-desktop-workspace",
+  "name": "dsh-lark-desktop-workspace-compat",
+  "dependencies": { "dsh-lark-desktop-workspace": "workspace:*" },
   "version": "0.1.0",
   "private": true,
   "type": "module",

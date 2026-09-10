@@ -23,6 +23,7 @@ export interface ControllerOptions {
 export class WorkspaceController {
   private readonly active = new Map<string, ActiveBinding>();
   private readonly selecting = new Set<string>();
+  private readonly tasks = new Set<Promise<void>>();
   private lifetime = new AbortController();
   constructor(private readonly options: ControllerOptions) {}
 
@@ -99,7 +100,11 @@ export class WorkspaceController {
     this.revoke(input.sessionId);
     const active: ActiveBinding = { files, binding, abort: new AbortController(), nextSync: 0 };
     this.active.set(input.sessionId, active);
-    void this.poll(active, transport).finally(() => { if (this.active.get(input.sessionId) === active) this.revoke(input.sessionId); });
+    const task = this.poll(active, transport).finally(() => {
+      if (this.active.get(input.sessionId) === active) this.revoke(input.sessionId);
+      this.tasks.delete(task);
+    });
+    this.tasks.add(task);
     return { mode: 'desktop', connected: true, shellEnabled: false, syncEnabled: false };
   }
   private async poll(active: ActiveBinding, transport: Transport): Promise<void> {
@@ -143,5 +148,8 @@ export class WorkspaceController {
     this.lifetime.abort(); this.lifetime = new AbortController();
     for (const id of this.active.keys()) this.revoke(id);
   }
-  dispose(): void { this.lifetime.abort(); for (const id of this.active.keys()) this.revoke(id); }
+  async dispose(): Promise<void> {
+    this.lifetime.abort(); for (const id of this.active.keys()) this.revoke(id);
+    await Promise.all([...this.tasks]);
+  }
 }

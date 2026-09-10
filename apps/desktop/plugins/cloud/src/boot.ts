@@ -8,6 +8,7 @@ interface Graph { rev: string; entries: Entry[]; batches: { phase: string; url: 
 
 /** 登录页只报告自身表单可用；会话页由原桌面客户端等待 Cordis Loader 后报告。 */
 export function desktopCloudHtml(html: string, client: { revision: string; inject: string[]; workspaceRevision?: string }, parameters: string): string {
+  html = html.replace(/<head([^>]*)>/, '<head$1><script>globalThis.__MEWCLAW_DESKTOP_WORKSPACE__=true;</script>');
   const prefix = 'globalThis["__DSH_BOOT__"] = ';
   const start = html.indexOf(prefix);
   if (start >= 0) {

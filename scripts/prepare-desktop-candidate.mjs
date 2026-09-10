@@ -23,7 +23,9 @@ await cp(fileURLToPath(new URL('../packages/desktop/host', import.meta.url)), re
 const hostManifestPath = resolve(destination, 'mewclaw-host/package.json');
 const hostManifest = JSON.parse(await readFile(hostManifestPath, 'utf8'));
 // 桌面与服务器各自锁定官方版本，共享 Consumer 不把服务端版本带进 Electron。
-hostManifest.devDependencies = { '@deepseek-ai/dsh-fs': '0.1.2-rc.1', '@deepseek-ai/dsh-shell': '0.1.2-rc.1' };
+for (const name of Object.keys(hostManifest.devDependencies ?? {})) {
+  if (name.startsWith('@deepseek-ai/dsh-')) hostManifest.devDependencies[name] = '0.1.2-rc.1';
+}
 await writeFile(hostManifestPath, JSON.stringify(hostManifest, null, 2) + '\n');
 const hostTsconfigPath = resolve(destination, 'mewclaw-host/tsconfig.json');
 const hostTsconfig = JSON.parse(await readFile(hostTsconfigPath, 'utf8'));
@@ -69,7 +71,7 @@ for (const name of ['@agents-anywhere/dsh-bridge-next', 'dsh-community-market', 
 delete manifest.scripts.prepack;
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 await writeFile(resolve(destination, 'package.json'), `${JSON.stringify({
-  name: 'mewclaw-desktop-candidate', version: '0.1.0-desktop.4',
+  name: 'mewclaw-desktop-candidate', version: '0.1.0-desktop.5',
   description: 'MewClaw desktop development build', author: 'MewClaw contributors', license: 'MIT',
   private: true, type: 'module', main: 'launcher.mjs',
   dependencies: { 'dsh-plugin-desktop': manifest.version, 'dsh-lark-desktop-cloud': '0.1.0' },

@@ -1,8 +1,8 @@
 # MewClaw 桌面开发
 
-当前开发版为 `0.1.0-desktop.4`，包含增强模式布局修复、登录 Cookie 保持与云端/本地电脑切换。原生目录授权和云端桥接已通过离线链路测试；云端配套尚未部署，真实账号与模型的完整实机验收未完成，开发包不等于正式版。
+当前开发源码为 `0.1.0-desktop.5`，包含增强模式布局修复、登录 Cookie 保持、云端/本地电脑切换、独立授权的本机 Shell 与目录双向同步。隔离候选已验证文件/Shell/同步跨端链路；本轮未部署生产、未构建新版 Windows 安装包、未完成 Windows 实机或生产真实模型验收。
 
-本地模式继续使用云端账号和模型，仅支持授权目录内的列举、读取和条件写入；断线不会回退服务器文件工具。云端安装边界与验收步骤见 [工作区配套说明](workspace-deployment.md)。
+本地模式继续使用云端账号和模型。目录选择只授权文件读写；Shell 和同步需分别原生确认。Shell 按当前 OS 用户权限执行，不是目录沙箱。同步支持二进制与嵌套文件，冲突保留两端，删除和替换保留恢复副本；不复制空目录和权限位，不重放离线写入。云端安装边界与验收步骤见 [工作区配套说明](workspace-deployment.md)。
 
 ## 分支与同步
 
@@ -27,8 +27,7 @@ node scripts/prepare-desktop-candidate.mjs /absolute/MewClaw/upstream/dsh-deskto
 cd /absolute/new-candidate
 npm install --ignore-scripts --no-audit --no-fund
 npm run build
-npm run build --workspace dsh-lark-desktop-cloud
-npx vitest run mewclaw-cloud/src
+node /absolute/MewClaw/apps/desktop/verify-workspace.mjs /absolute/new-candidate
 ```
 
 需要 Node 24。安装生命周期默认关闭，Electron 下载及平台原生依赖必须另行审核处理；上述命令不是安装包构建流程。
