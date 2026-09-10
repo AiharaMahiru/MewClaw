@@ -242,6 +242,22 @@ describe("RPC authorization policy", () => {
     expect((roster.result as { value: { presets: Array<{ id: string }> } }).value.presets.map((item) => item.id)).toEqual(["lark-lightweight"]);
 
     await expect(authorizeRpc(
+      { method: "agentPresets/read", payload: { args: { agentPreset: "standard" } } },
+      { service, user: userA, roots },
+      "agentPresets/read",
+    )).resolves.not.toMatchObject({ denied: expect.any(String) });
+    await expect(authorizeRpc(
+      { method: "agentPresets/read", payload: { args: { agentPreset: "user-private" } } },
+      { service, user: userA, roots },
+      "agentPresets/read",
+    )).resolves.toMatchObject({ denied: "PRESET_NOT_ALLOWED" });
+    await expect(authorizeRpc(
+      { method: "agentPresets/read", payload: { args: {} } },
+      { service, user: userA, roots },
+      "agentPresets/read",
+    )).resolves.toMatchObject({ denied: "INVALID_RPC" });
+
+    await expect(authorizeRpc(
       { method: "session/page", payload: { args: { request: { sessionId: "owned" } } } },
       { service, user: userA, roots },
       "session/page",
@@ -275,7 +291,6 @@ describe("RPC authorization policy", () => {
       await expect(authorizeRpc({ method, payload: { args: { query: "src" } } }, { service, user: userA, roots })).resolves.toMatchObject({ denied: "INVALID_RPC" });
     }
     for (const method of [
-      "agentPresets/read",
       "agentPresets/copy",
       "agentPresets/deletePreset",
       "credentials/set",

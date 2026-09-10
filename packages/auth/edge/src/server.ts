@@ -1049,7 +1049,13 @@ function sidebarHtmlSessionId(pathname: string): string | undefined {
 }
 function isPublicAssetRequest(req: IncomingMessage, url: URL): boolean {
   if (req.method !== "GET" && req.method !== "HEAD") return false;
-  return url.pathname === "/favicon.ico" || url.pathname === "/favicon.svg" || url.pathname === "/manifest.webmanifest" || url.pathname.startsWith("/assets/") || url.pathname.startsWith("/plugins/");
+  return url.pathname === "/favicon.ico"
+    || url.pathname === "/favicon.svg"
+    || url.pathname === "/manifest.webmanifest"
+    || url.pathname === BRAND_FAVICON_PATH
+    || url.pathname === BRAND_MANIFEST_PATH
+    || url.pathname.startsWith("/assets/")
+    || url.pathname.startsWith("/plugins/");
 }
 function publicSharePrefix(pathname: string): string | undefined {
   const match = /^\/share\/([^/]+)(?:\/|$)/u.exec(pathname);

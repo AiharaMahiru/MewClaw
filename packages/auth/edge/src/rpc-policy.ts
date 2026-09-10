@@ -29,6 +29,7 @@ const READ_ONLY_CATALOG_METHODS = new Set(["settings.describe", "credentials.des
 // 会话预设选择另行校验归属；其他 set/mutate/discover/copy/delete 等操作仍拒绝。
 const USER_READ_ONLY_TYPERT_METHODS = new Set([
   "agentPresets/list",
+  "agentPresets/read",
   "credentials/describe",
   "fileReferences/list",
   "llm/listConfigurableProviders",
@@ -84,8 +85,9 @@ export async function authorizeRpc(body: Record<string, unknown>, options: RpcPo
     const requested = stringValue(args.agentPreset) ?? stringValue(args.presetId);
     if (requested && !policy.allowedPresets.includes(requested)) return { ...decision, denied: "PRESET_NOT_ALLOWED" };
   }
-  if (method === "agentPreset.read") {
+  if (method === "agentPreset.read" || method === "agentPresets.read") {
     const requested = stringValue(args.agentPreset);
+    if (!requested) return { ...decision, denied: "INVALID_RPC" };
     if (requested && !policy.allowedPresets.includes(requested)) return { ...decision, denied: "PRESET_NOT_ALLOWED" };
   }
   if (method === "session.create") {

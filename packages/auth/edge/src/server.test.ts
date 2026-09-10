@@ -118,6 +118,14 @@ describe("AuthEdgeServer", () => {
     expect(favicon.headers.get("content-type")).toBe("text/javascript");
     expect(forwarded.at(-1)).toEqual({ path: "/mewclaw-brand/favicon.svg", cookie: "dsh_worker=test" });
 
+    const directManifest = await fetch(`${base}/mewclaw-brand/manifest.webmanifest`);
+    expect(directManifest.status).toBe(200);
+    expect(forwarded.at(-1)).toEqual({ path: "/mewclaw-brand/manifest.webmanifest", cookie: "dsh_worker=test" });
+
+    const directFavicon = await fetch(`${base}/mewclaw-brand/favicon.svg`);
+    expect(directFavicon.status).toBe(200);
+    expect(forwarded.at(-1)).toEqual({ path: "/mewclaw-brand/favicon.svg", cookie: "dsh_worker=test" });
+
     const protectedApi = await fetch(`${base}/api/commands/list`);
     expect(protectedApi.status).toBe(401);
   });
