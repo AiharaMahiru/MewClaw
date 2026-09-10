@@ -1,4 +1,111 @@
-# DSH Lark 附件格式处理修复转交
+# MewClaw Desktop 开发交接
+
+更新时间：2026-09-10。适用分支：`desktop`。当前开发基线：`220e804`；桌面根 README：`7c8d99f`。本文是下一轮桌面开发的入口，不是发布验收证明。
+
+## 1. 接手位置与约束
+
+- 桌面工作树：`/opt/dsh/desktop-source`；Web 工作树：`/opt/dsh/source`。接手先检查 `git branch --show-current`、`git status --short` 和 `git worktree list`。
+- `master` 管理 Web、共享插件与云端服务；`desktop` 管理桌面组合。共享改动从基于 `master` 的短期分支提交，再以 `master → desktop` 普通 Merge PR 同步，不反复 Squash，不整分支反向合并。
+- Web 工作树已有四个 web-auth 文件及 `docs/specs/account-feishu-settings.md` 的未提交改动，不属于桌面任务，禁止混入提交或回退。
+- 上次确认生产入口为 `/opt/dsh/current → /opt/dsh/releases/R3`。接手重新核验，不把本文当实时服务状态。本轮分支和文档工作未重启或切换生产。
+- 先读 `AGENTS.md`、`docs/spec-standard.md`、`docs/reference/dsh-AGENTS.md`、[桌面 APP SPEC](docs/specs/desktop-app.md)、[本地工作区 SPEC](docs/specs/desktop-workspace.md)。先补完整契约，再实施未定义接口。
+- 官方 DSH 及官方附属包不修改；自有行为走插件、配置及公开能力。社区桌面必要派生修改须在准备脚本中可复现并记录来源，不能宣称社区底座零改动。
+- 本文只交接计划，不授权新的生产或破坏性操作。实施时遵循当时有效的用户授权；操作前说明精确范围、影响与回滚，需确认时等待确认。
+
+## 2. 已完成与明确缺口
+
+已验证的开发成果：
+
+- 固定社区底座 `a1ddcda8e701a8490c619ce411ea8a3d6daa1453`，桌面 2.0.6、DSH 0.1.2-rc.1；独立 npm 候选构建及 Linux Electron 启动通过，社区定向测试 34 项通过。
+- 自有 Cloud WebServer Provider 保留本地认证、Host/Origin 检查及云端 Cookie/CSRF 对；代理 HTTP/SSE/WS，不自动重放写请求，不把本地启动凭证发往云端。
+- 专用普通账号在桌面和独立 Web 浏览器完成两轮真实模型续聊，双方显示相同结果。不是通过复制会话数据库实现同步。
+- `LocalWorkspaceFiles` 复用官方 FileSystem，支持 list/read/write、条件更新、路径边界、体积限制与撤销。云端插件四个测试文件共 15 项通过；这不是桥接 E2E。
+
+**未完成：原生目录授权、云端工具桥接、跨账号/断线全链路验收、Windows 安装包与实机测试。尚无可交付 APP。** 登录页 `#root` 修复已进代码，仍需真实窗口停留超过 30 秒复验。官方依赖逐包完整性与 Windows 原生依赖闭包也尚未验收。
+
+关键文件：`apps/desktop/launcher.mjs`、`apps/desktop/plugins/cloud/src/{index,proxy,boot,files}.ts`、`scripts/prepare-desktop-candidate.mjs`。构建说明见 [桌面开发 README](apps/desktop/README.md)。
+
+## 3. 下一步按顺序实施
+
+### 第一步：补齐本地工作区契约（立即开始）
+
+阅读社区原生目录选择、profile 和公开服务接口，核对当前官方 tools/FileSystem 扩展点，更新本地工作区 SPEC：
+
+- 定义完整 Scope 下的会话—设备—目录授权绑定、请求 ID、超时、取消、撤销、错误分类与持久化责任。
+- 明确 Definition / Provider / Consumer，以及注册和卸载的 disposer；禁止读取社区私有 desktopRuntime 或 monkey-patch 实例。
+- 云端认证端提供可信账号与会话归属，不能信任客户端 userId；管理员身份也不能自动取得别人的电脑目录权限。
+- 首版仅 list/read/write，无 Shell、目录同步或离线副作用重放。传输可先评估窄 HTTP 轮询，不预先建设通用设备平台；选型和取舍写入 SPEC。
+- 定义本地绑定期间的云端执行型工具拒绝策略。断线或绑定恢复失败必须明确拒绝，不回退服务器目录。
+
+完成标准：wire、生命周期、授权来源、失败恢复和无密钥拒绝用例均可照契约实现；未定义接口不得先写实现。
+
+### 第二步：打通一条最小纵向链路
+
+1. 在桌面提供明确区分“云端工作区”和“本机目录”的入口，原生授权后创建 `LocalWorkspaceFiles`。重点核验社区 Windows directory-picker bridge，禁止把 `C:\\...` 传给云端 `workspace.create`。
+2. 云端桥接与工具作为共享自有插件，在基于 `master` 的独立工作树开发，不能在带飞书脏工作的目录直接切分支；默认配置不改变现有 Web 行为。
+3. 按认证 Scope 和会话归属绑定请求；云端网关只认证/转发，工具生命周期由 Worker 管理，实际文件操作在授权电脑执行。
+4. 模型只接收正常工具结果，并落入官方 session log；不可隐藏注入文件正文。工具参数不能指定其他用户或设备。
+5. 使用官方工具 guard 等公开接口阻止本地绑定会话误调用服务器执行工具；写入保持 createIfAbsent/replaceIfVersion，无条件覆盖不进入首版。
+
+完成标准：桌面授权临时目录，同一云端会话真实读取、创建并条件更新该目录文件，Web 能看到相同工具结果；无本地授权时无法操作电脑文件。
+
+### 第三步：隔离、生命周期和真实窗口回归
+
+- 无密钥测试：跨账号/跨 Scope 拒绝、伪造设备身份、绝对路径与父路径、根外 symlink、旧版本写、超限、撤销后请求拒绝。
+- 请求重复、客户端断线、云端重启和响应丢失：结果不明必须显式呈现，不自动重放写入；取消不能被宣称为已经回滚完成的磁盘写入。
+- 插件卸载关闭请求和轮询、释放监听器；重连不累加监听器、不接管其他会话。
+- 登录页停留超过 30 秒，登录/退出/重新登录、双端续聊、SSE/WS 断线恢复；不能关闭看门狗来掩盖启动错误。
+
+完成标准：定向测试通过并保存无凭证日志及必要截图，明确区分单测、Linux Electron E2E 和 Windows 实机证据。
+
+### 第四步：Windows x64 打包
+
+- 使用 MewClaw 应用标识、独立数据目录及自身发行配置；不沿用社区自动更新地址。
+- 冻结候选锁文件，核对 UPSTREAM.json 列全 settingsNamespace 与 profile Provider 选择变更，并验证官方包完整性。
+- 重新取得目标平台原生依赖，不能把 Linux Electron/sharp 复制后当 Windows 产物；检查社区 ASAR 流程对官方补丁的依赖，必要时验证无 ASAR 方案。
+- 生成安装包或 portable、SHA-256、来源与版本记录；签名状态如实注明。Linux root 测试的 `--no-sandbox` 不进入正式发行配置。
+
+完成标准：产物实际存在，Windows 安装/启动/登录/本地文件全链路通过；缺少实机或签名时明确列出缺口，不能以打包成功代替实机成功。
+
+### 第五步：必要后端发布与交付
+
+候选门禁通过后才安排必要云端桥接插件上线。先核验真实生产入口、服务基线和数据兼容性，说明变更服务、配置及回滚方案，保留 R3 和运行数据。不能仅回滚代码而忽略新绑定数据的兼容性。
+
+完成标准：生产健康与账号隔离通过，下载地址可用、摘要相符；交付说明包括版本、支持系统、签名状态、安装/卸载和授权撤销方式。Web 未相关功能不得受影响。
+
+## 4. 当前可复跑的检查
+
+以下候选路径仅是本机历史位置，接手先检查存在性及源码是否一致；旧候选通过不能替代新提交验证。
+
+```sh
+cd /opt/dsh/desktop-source
+git diff --check
+node --check apps/desktop/launcher.mjs
+node --check scripts/prepare-desktop-candidate.mjs
+cd /opt/dsh/desktop-candidates/20260910-clean-base
+export PATH=/opt/dsh/runtime/node/bin:$PATH
+npm run build --workspace dsh-lark-desktop-cloud
+npx vitest run mewclaw-cloud/src
+npx vitest run tests/window-options.spec.ts tests/profile-service.spec.ts tests/notifications.spec.ts
+```
+
+若重建候选，按桌面 README 使用不存在的新目标目录，不覆盖或直接删除旧候选。新增步骤须补对应可执行验收命令，不能将“待实现”门禁标为完成。
+
+## 5. 本机证据与测试善后
+
+- 长程记录：`/opt/dsh/desktop-source/.codex-tasks/20260910-mewclaw-desktop/`，阶段 1、2 完成，阶段 3 进行中；CSV 为里程碑状态源。PROGRESS 旧段落有历史描述，按最新记录和实际代码核验。
+- 双端 E2E 证据原件：`/opt/dsh/source/docs/evidence/desktop-cloud-20260910.md`；截图在任务 raw 目录。证据目录默认不入 Git，远端使用者不得假设这些本机文件随仓库存在。
+- 测试账号的 ID 与随机凭证保存在本机 `/tmp/mewclaw-electron-test.chrXdE/test-account.json`（应为 0600）。只在授权测试需要时受控使用，不打印、不提交、不写入文档；不得读项目 `.env`。
+- 上次交接时测试账号仍启用，状态需复核。验收结束或不再测试时，核对确为本次专用普通账号，通过公开认证存储接口禁用并撤销会话，保留测试记录；不要操作管理员或他人账号。
+- CDP 测试端口曾使用 19337/19338，测试进程有自动超时。不要假设旧 PID/session 仍有效，不得广泛 kill。停进程前核对其命令、用户数据目录和归属。
+
+---
+
+## 历史附件修复交接（2026-08-14）
+
+以下完整保留供追溯，不是桌面任务的行动指令；其中路径、生产状态、操作授权和任务记录限制均只适用于当时工作，不能覆盖上方桌面计划。
+
+### DSH Lark 附件格式处理修复转交
 
 更新时间：2026-08-14
 
