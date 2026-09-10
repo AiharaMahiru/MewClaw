@@ -1,0 +1,11 @@
+# 可选生产/候选 overlay；不放入实际凭证。Auth Edge 对应 AUTH_DESKTOP_BODY_LIMIT >= 8 MiB。
+- id: desktop-workspace
+  config:
+    enabled: true
+    tokenRef: WORKER_TOKEN
+    requestTimeoutMs: 60000
+    heartbeatTimeoutMs: 15000
+    maxBindings: 1000
+    syncMaxBytes: 1048576
+    syncMaxEntries: 2000
+    syncMaxTotalBytes: 33554432

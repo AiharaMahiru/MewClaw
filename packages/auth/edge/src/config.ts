@@ -18,6 +18,8 @@ export interface AuthEdgeConfig {
   userWorkspaceRoot: string;
   adminWorkspaceRoot: string;
   requestBodyLimit: number;
+  /** 桌面二进制同步使用独立有界体积，不扩大普通 RPC 限制。 */
+  desktopBodyLimit?: number;
   /** 默认开启；显式关闭仅用于不提供模型的隔离环境。 */
   promptAudit?: { enabled: boolean; timeoutMs: number; maxConcurrent: number };
   mail: MailConfig;
@@ -95,6 +97,7 @@ export function resolveAuthConfig(environment: Record<string, string | undefined
     userWorkspaceRoot: resolve(environment.AUTH_USER_WORKSPACE_ROOT || ".workspaces/auth/users"),
     adminWorkspaceRoot: resolve(environment.AUTH_ADMIN_WORKSPACE_ROOT || ".workspaces/auth/admin"),
     requestBodyLimit: boundedInteger(environment.AUTH_BODY_LIMIT, DEFAULT_BODY_LIMIT, 1024, 4 * 1024 * 1024),
+    desktopBodyLimit: boundedInteger(environment.AUTH_DESKTOP_BODY_LIMIT, 8 * 1024 * 1024, 1024, 16 * 1024 * 1024),
     promptAudit: {
       enabled: auditEnabled(environment.AUTH_PROMPT_AUDIT_ENABLED),
       timeoutMs: boundedInteger(environment.AUTH_PROMPT_AUDIT_TIMEOUT_MS, 15_000, 100, 60_000),

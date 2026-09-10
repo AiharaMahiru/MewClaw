@@ -36,6 +36,16 @@
     workspaceRoot: !!js dshHomePath('workspaces')
 
 - insert:
+    # 默认不接收桌面绑定，但始终保留持久化本机模式 guard；部署 overlay 显式 enabled。
+    - id: desktop-workspace
+      name: 'dsh-lark-desktop-workspace'
+      config:
+        enabled: false
+        tokenRef: WORKER_TOKEN
+        requestTimeoutMs: 60000
+        heartbeatTimeoutMs: 15000
+        maxBindings: 1000
+
     # 受审仓库技能使用独立 provider 实例，与 dsh-base/preset 的项目技能 provider
     # 分层合并。bundled 根由宿主读取，内容仍须通过下方 trust-manifest 预检。
     - id: lark-reviewed-skill-filesystem

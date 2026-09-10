@@ -55,6 +55,8 @@
     "verify": "node scripts/verify.mjs"
   },
   "dependencies": {
+    "dsh-lark-desktop-workspace": "workspace:*",
+    "dsh-lark-desktop-host": "workspace:*",
     "@deepseek-ai/cordis": "4.0.2",
     "@deepseek-ai/cordis-plugin-group": "1.0.2",
     "@deepseek-ai/cordis-plugin-include": "1.0.7",
