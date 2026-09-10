@@ -53,7 +53,10 @@ describe("Linux production overlays", () => {
     for (const unit of units) {
       const source = await readFile(new URL(`../systemd/dsh-${unit}.service`, import.meta.url), "utf8");
       expect(source).toContain("Environment=DSH_PROJECT_ENV_DIR=/var/lib/dsh");
-      if (unit === "auth") expect(source).toContain("EnvironmentFile=/etc/dsh/runtime.secrets.env");
+      if (unit === "auth") {
+        expect(source).toContain("EnvironmentFile=/etc/dsh/runtime.secrets.env");
+        expect(source).toContain("EnvironmentFile=/etc/dsh/deepseek.env");
+      }
       else expect(source).not.toContain("EnvironmentFile=/etc/dsh/runtime.secrets.env");
     }
 
@@ -125,7 +128,7 @@ describe("Linux production overlays", () => {
     expect(auth).not.toMatch(/^Requires=.*dsh-preview\.service/mu);
   });
 
-  it("通过公开 Cordis/LLM 契约装载 GPT、Astra 与 Gemini 目录", async () => {
+  it("通过公开 Cordis/LLM 契约装载 GPT、Astra，移除Gemini模型Provider并收敛DeepSeek", async () => {
     const url = new URL("../config/settings.production.yaml", import.meta.url);
     const source = await readFile(url, "utf8");
     expect(source).toContain("provider: openai");
@@ -133,7 +136,9 @@ describe("Linux production overlays", () => {
     expect(source).toContain("reasoningEffort: max");
     for (const model of ["gpt-5.6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-6-astra"]) expect(source).toContain(`id: ${model}`);
     expect(source).toContain("apiKeyEnv: OPENAI_API_KEY");
-    expect(source).toContain("apiKeyEnv: GEMINI_WEB2API_API_KEY");
+    expect(source).not.toContain("gemini-web2api");
+    expect(source).toContain("baseURL: https://api.commandcode.ai/provider/v1");
+    expect(source).toContain("id: deepseek-v4.1-flash");
     expect(source).not.toMatch(/apiKey:\s*[^\n]+/u);
     const settings = YAML.parse(source);
     const ctx = new Context();
@@ -143,12 +148,9 @@ describe("Linux production overlays", () => {
       await new Promise<void>((resolve) => setImmediate(resolve));
       await expect(ctx.llm.listModels("openai")).resolves.toEqual(expect.arrayContaining([
         expect.objectContaining({ provider: "openai", id: "gpt-5.6-luna", name: "GPT-5.6 Luna" }),
-        { provider: "openai", id: "gpt-6-astra", name: "GPT-6 Astra", inputModalities: ["text"] },
+        { provider: "openai", id: "gpt-6-astra", name: "GPT-6 Astra", inputModalities: ["text", "image"] },
       ]));
-      await expect(ctx.llm.listModels("gemini-web2api")).resolves.toEqual([
-        { provider: "gemini-web2api", id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", inputModalities: ["text"] },
-        { provider: "gemini-web2api", id: "gemini-3.1-pro", name: "Gemini 3.1 Pro", inputModalities: ["text"] },
-      ]);
+      expect(ctx.llm.listProviders().map(provider => provider.id)).not.toContain("gemini-web2api");
       await expect(ctx.llm.resolveModelInfo("openai", "gpt-6-astra")).resolves.toMatchObject({
         reasoning: { efforts: [
           { id: "off", name: "Off" }, { id: "low", name: "Low" },
@@ -201,11 +203,8 @@ describe("Linux production overlays", () => {
     const gateway = await rows("gateway");
     const admin = await rows("admin");
     expect(rowConfig(gateway, "lark-run-client")).toMatchObject({ baseURL: "http://127.0.0.1:18788" });
-    expect(rowConfig(gateway, "lark-gateway")).toMatchObject({
-      processingCardText: "正在思考…",
-      failureCardTemplate: "运行失败（{{code}}）：{{hint}}",
-      uploadsRoot: "/var/lib/dsh/uploads",
-    });
+    expect(rowConfig(gateway, "account-bot-fleet")).toMatchObject({ authEndpoint: "http://127.0.0.1:13080/internal/feishu-bots", stateDir: "/var/lib/dsh/account-bots", uploadsRoot: "/var/lib/dsh/uploads/account-bots" });
+    expect(gateway.map(row => row.id)).toEqual(["account-bot-fleet", "lark-run-client"]);
     expect(rowConfig(admin, "host-webserver")).toMatchObject({ host: "127.0.0.1", port: 18791 });
     expect(rowConfig(admin, "knowledge-postgres")).toMatchObject({
       databaseUrlEnv: "DATABASE_URL",

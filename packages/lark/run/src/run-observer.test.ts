@@ -28,14 +28,16 @@ describe("RunObserver", () => {
     });
 
     observer.start();
-    const emit = (event: unknown) => listeners[0]!({}, event);
-    emit({ type: "assistant/chunk", seq: 1, time: 1, data: { turn: 1, step: 1, chunk: { type: "reasoning-delta", index: 0, text: "hidden" } } });
-    emit({ type: "assistant/chunk", seq: 2, time: 2, data: { turn: 1, step: 1, chunk: { type: "tool-call-delta", index: 1, id: "call_1", argumentsDelta: "{}" } } });
+    const emit = (frame: unknown) => listeners[1]!({ agent, frame });
+    emit({ type: "start", attemptId: "a1", turn: 1, step: 1 });
+    emit({ type: "chunk", attemptId: "a1", chunk: { type: "reasoning-delta", index: 0, text: "hidden" } });
+    emit({ type: "chunk", attemptId: "a1", chunk: { type: "tool-call-delta", index: 1, id: "call_1", argumentsDelta: "{}" } });
     expect(onFirstVisible).not.toHaveBeenCalled();
 
-    emit({ type: "assistant/chunk", seq: 3, time: 3, data: { turn: 1, step: 1, chunk: { type: "text-delta", index: 0, text: "回答" } } });
+    emit({ type: "chunk", attemptId: "a1", chunk: { type: "text-delta", index: 0, text: "回答" } });
     expect(onFirstVisible).toHaveBeenCalledTimes(1);
-    expect(streamed).toHaveLength(3);
+    expect(streamed).toHaveLength(1);
+    expect(streamed[0]).toMatchObject({ assistant: { turn: 1, step: 1, text: "回答" } });
     observer.stop();
     expect(observer.finish(Date.now()).kind).toBe("ok");
   });

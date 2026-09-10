@@ -43,7 +43,7 @@ export interface LarkWsOptions {
 export interface LarkWsClient {
   /** 建立长连接；失败 reject（插件层 fail loud）。 */
   start(): Promise<void>;
-  /** 关停连接（SDK 类型未暴露 stop，运行时存在则调用）。 */
+  /** 关停连接并清理SDK重连定时器。 */
   stop(): void;
 }
 
@@ -116,7 +116,7 @@ export function createLarkWs(options: LarkWsOptions): LarkWsClient {
       await client.start({ eventDispatcher: dispatcher });
     },
     stop() {
-      (client as unknown as { stop?: () => void } | undefined)?.stop?.();
+      client?.close({ force: true });
     },
   };
 }

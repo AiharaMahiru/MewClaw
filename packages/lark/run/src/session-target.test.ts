@@ -44,7 +44,7 @@ function options(input: {
     run: {
       agents: { get: vi.fn(() => input.live), create, resume },
       agentPresets: { mount: vi.fn(async () => undefined) },
-      sessionPersistence: { listSnapshots: vi.fn(async () => []) },
+      sessionPersistence: { list: vi.fn(async () => []) },
       sessionDirectory: { resolve: vi.fn(async () => input.target) },
       selection: { provider: "deployment", model: "default" },
       agentPresetId: "standard",

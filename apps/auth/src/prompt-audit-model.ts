@@ -20,13 +20,8 @@ export interface PromptAuditModelOptions {
 export async function createPromptAuditModel(options: PromptAuditModelOptions): Promise<PromptAuditModel> {
   const ctx = new Context();
   try {
-    // Auth 控制面继承的环境不能覆盖 DSH Models 保存的凭证；仅审计上下文过滤进程层。
-    // 启动器必须传入原始分层快照，保留项目与用户环境的正常回退，不修改 process.env。
-    const snapshot = options.launchEnvironment;
-    ctx.provide("launchEnvironment", {
-      get: (name) => snapshot.getFrom(name, ["project-env", "user-env"]),
-      getFrom: (name, sources) => snapshot.getFrom(name, sources.filter((source) => source !== "process")),
-    } satisfies LaunchEnvironmentSnapshot);
+    // 完整传递官方冻结快照；凭证来源优先级由 dsh-credentials-local 统一实现。
+    ctx.provide("launchEnvironment", options.launchEnvironment);
     const fileConfig = options.dshHome === undefined ? {} : { dshHome: options.dshHome };
     await ctx.plugin(LocalCredentialProvider, fileConfig);
     await ctx.plugin(FileSettingsProvider, fileConfig);
@@ -57,7 +52,7 @@ export function createPromptAuditModelClient(
       let completed = false;
       for await (const chunk of stream({
         provider: "deepseek-official",
-        model: "deepseek-v4-flash",
+        model: "deepseek-v4.1-flash",
         reasoningEffort: ReasoningEffortId("off"),
         system,
         messages: [createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text }] })],
