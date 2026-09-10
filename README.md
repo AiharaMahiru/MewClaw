@@ -30,10 +30,9 @@
 需要 Node.js 24。桌面使用独立 npm 候选 workspace，不向服务器 pnpm 依赖树引入 Electron。
 
 ```sh
-git clone https://github.com/anywhere-labs/dsh-desktop /absolute/upstream
-git -C /absolute/upstream checkout a1ddcda8e701a8490c619ce411ea8a3d6daa1453
+git submodule update --init --recursive
 # 在本仓库 desktop 分支根目录执行；目标候选目录必须尚不存在。
-node scripts/prepare-desktop-candidate.mjs /absolute/upstream /absolute/new-candidate
+node scripts/prepare-desktop-candidate.mjs /absolute/MewClaw/upstream/dsh-desktop /absolute/new-candidate
 cd /absolute/new-candidate
 npm install --ignore-scripts --no-audit --no-fund
 npm run build
@@ -42,6 +41,8 @@ npx vitest run mewclaw-cloud/src
 ```
 
 以上仅用于开发候选构建与测试，不生成安装包。安装生命周期默认关闭，Electron 下载和目标平台原生依赖须另行审核处理；Linux 构建通过不等于 Windows 实机通过。凭证、运行数据和候选目录不得提交 Git。
+
+上游以 Git 子模块保存在 `upstream/dsh-desktop`，固定到已评审提交，不跟随上游 HEAD 自动升级。首次克隆可用 `git clone -b desktop --recurse-submodules https://github.com/AiharaMahiru/MewClaw.git`；已有检出执行上面的初始化命令。请将命令中的绝对路径替换为本机路径；Windows 使用绝对盘符路径。GitHub 的源码 ZIP 不包含子模块内容。
 
 详见 [桌面开发说明](apps/desktop/README.md)、[桌面 APP SPEC](docs/specs/desktop-app.md) 与 [本地工作区 SPEC](docs/specs/desktop-workspace.md)。
 

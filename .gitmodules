@@ -1,0 +1,3 @@
+[submodule "upstream/dsh-desktop"]
+	path = upstream/dsh-desktop
+	url = https://github.com/anywhere-labs/dsh-desktop.git

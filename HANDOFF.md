@@ -4,6 +4,8 @@
 
 ## 1. 接手位置与约束
 
+- 上游已通过 `upstream/dsh-desktop` Git 子模块关联。首次接手运行 `git submodule update --init --recursive`，确认 `git submodule status` 指向 `a1ddcda8e701a8490c619ce411ea8a3d6daa1453`。后续候选使用此检出，不依赖旧 `/tmp` 研究副本。升级必须同时评审子模块指针与准备脚本固定 revision，不能自动追踪远端 HEAD。
+
 - 桌面工作树：`/opt/dsh/desktop-source`；Web 工作树：`/opt/dsh/source`。接手先检查 `git branch --show-current`、`git status --short` 和 `git worktree list`。
 - `master` 管理 Web、共享插件与云端服务；`desktop` 管理桌面组合。共享改动从基于 `master` 的短期分支提交，再以 `master → desktop` 普通 Merge PR 同步，不反复 Squash，不整分支反向合并。
 - Web 工作树已有四个 web-auth 文件及 `docs/specs/account-feishu-settings.md` 的未提交改动，不属于桌面任务，禁止混入提交或回退。

@@ -17,8 +17,11 @@
 
 复用 anywhere-labs/dsh-desktop，固定提交和社区消费方派生修改由准备脚本记录。官方 DSH 包不打补丁；不继承社区根补丁配置。
 
+上游源码由 `upstream/dsh-desktop` Git 子模块关联，固定在 `a1ddcda8e701a8490c619ce411ea8a3d6daa1453`。克隆时使用 `--recurse-submodules`，或在已有仓库初始化如下。子模块保持原样，派生变换仅发生在新候选中。示例绝对路径需替换为本机路径，Windows 使用绝对盘符路径。
+
 ```sh
-node scripts/prepare-desktop-candidate.mjs /absolute/upstream /absolute/new-candidate
+git submodule update --init --recursive
+node scripts/prepare-desktop-candidate.mjs /absolute/MewClaw/upstream/dsh-desktop /absolute/new-candidate
 cd /absolute/new-candidate
 npm install --ignore-scripts --no-audit --no-fund
 npm run build
@@ -27,5 +30,7 @@ npx vitest run mewclaw-cloud/src
 ```
 
 需要 Node 24。安装生命周期默认关闭，Electron 下载及平台原生依赖必须另行审核处理；上述命令不是安装包构建流程。
+
+上游升级须单独 PR：评审新提交，同步调整准备脚本的固定 revision，重跑兼容与完整性门禁，最后提交子模块指针。不要用 `git submodule update --remote` 自动追踪最新版本；GitHub 源码 ZIP 不含子模块内容。
 
 同步 PR 门禁：构建、桌面插件测试、官方依赖完整性、登录与会话同步、本地工作区授权和断线测试。Windows 产物构建与 Windows 实机验收分别报告；门禁尚未全部完成，不得发布为正式 APP。
