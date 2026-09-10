@@ -12,7 +12,7 @@ import { WorkspaceBroker } from './broker.js';
 import { workspaceJournal } from './journal.js';
 import { workspaceRoute } from './route.js';
 import { ownerKey } from './wire.js';
-import { sessionAncestry, childToolDenial } from './lineage.js';
+import { prepareLineage, childToolDenial } from './lineage.js';
 
 export const name = 'desktop-workspace';
 export const inject = ['webServer', 'credentials', 'sessions', 'sessionPersistence', 'tools', 'larkScopeIndex'];
@@ -38,6 +38,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   const broker = new WorkspaceBroker(journal, config);
   const active = new Map<string, number>();
   const syncing = new Set<string>();
+  const lineages = new WeakMap<object, Awaited<ReturnType<typeof prepareLineage>>>();
   const scopeIndex = ctx.get('larkScopeIndex') as ScopeIndex;
   ctx.effect(() => () => broker.dispose());
   ctx.effect(() => ctx.webServer.register({ kind: 'exact', path: '/internal/desktop-workspace',
@@ -53,10 +54,16 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
             return await executeSync(dir, operation, signal);
           } finally { syncing.delete(id); }
         } }) }));
+  ctx.on('tools/pre-execute', async (exec, next) => {
+    if (exec.agent) lineages.set(exec, await prepareLineage(ctx, exec.agent.id, journal, exec.signal));
+    return next();
+  });
   ctx.on('tools/execute', async (exec, next) => {
     const id = exec.agent?.id;
     if (!id) return next();
-    const chain = sessionAncestry(ctx, id);
+    const lineage = lineages.get(exec);
+    if (!lineage || lineage.chain[0] !== id) throw new Error('WORKSPACE_LINEAGE_UNVERIFIED');
+    const chain = lineage.chain;
     if (chain.some(sessionId => broker.isChanging(sessionId) || syncing.has(sessionId))) throw new Error('WORKSPACE_SWITCH_IN_PROGRESS');
     for (const sessionId of chain) active.set(sessionId, (active.get(sessionId) ?? 0) + 1);
     try { return await next(); }
@@ -67,9 +74,11 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   });
   ctx.effect(() => ctx.tools.guard(exec => {
     if (!exec.agent) return undefined;
-    const chain = sessionAncestry(ctx, exec.agent.id);
+    const lineage = lineages.get(exec);
+    if (!lineage || lineage.chain[0] !== exec.agent.id) return 'WORKSPACE_LINEAGE_UNVERIFIED';
+    const chain = lineage.chain;
     if (chain.some(id => broker.isChanging(id))) return 'WORKSPACE_SWITCH_IN_PROGRESS';
-    const inheritedDenial = childToolDenial(chain, journal);
+    const inheritedDenial = childToolDenial(chain, lineage.journal);
     if (inheritedDenial) return inheritedDenial;
     if (journal.read(exec.agent.id)?.mode !== 'desktop') return undefined;
     const scope = scopeIndex.get(exec.agent.id);
