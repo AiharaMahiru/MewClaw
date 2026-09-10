@@ -22,7 +22,7 @@ it('真实官方 Shell 执行、有界输出、非零退出、超时和撤销', 
     expect(result).toMatchObject({ location: 'desktop', exitCode: 7, stdout: { text: 'mew' } });
     expect(JSON.stringify(result)).not.toContain(root);
     expect(await shell.execute({ action: 'shell', command: windows ? 'Start-Sleep -Seconds 10' : 'sleep 10' }, signal)).toMatchObject({ timedOut: true });
-    const pending = shell.execute({ action: 'shell', command: windows ? 'Set-Content -NoNewline started ready; Start-Sleep -Seconds 10' : 'printf ready > started; sleep 10' }, signal);
+    const pending = shell.execute({ action: 'shell', command: windows ? "Set-Content -LiteralPath './started' -NoNewline -Value 'ready'; Start-Sleep -Seconds 10" : 'printf ready > started; sleep 10' }, signal);
     await expect.poll(async () => readFile(join(root, 'started'), 'utf8').catch(() => '')).toBe('ready');
     shell.revoke();
     expect(await pending).toMatchObject({ aborted: true });

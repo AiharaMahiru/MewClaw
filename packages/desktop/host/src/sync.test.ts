@@ -44,8 +44,9 @@ it('凭证和状态默认排除，根外符号链接、父路径、大小写碰�
   await expect(left.write('.env.local', '', null, signal)).rejects.toThrow('SYNC_PATH_REJECTED');
   await symlink(b, join(a, 'escape')); await expect(left.snapshot(signal)).rejects.toThrow('SYNC_PATH_REJECTED');
   await unlink(join(a, 'escape')); await writeFile(join(a, 'X'), 'a'); await writeFile(join(a, 'x'), 'b');
-  await expect(left.snapshot(signal)).rejects.toThrow('SYNC_CASE_COLLISION');
-  await unlink(join(a, 'X')); await writeFile(join(a, 'x'), Buffer.alloc(4097));
+  const caseEntries = (await readdir(a)).filter(name => !name.startsWith('.env'));
+  if (caseEntries.length === 2) await expect(left.snapshot(signal)).rejects.toThrow('SYNC_CASE_COLLISION');
+  await unlink(join(a, caseEntries[0]!)); await writeFile(join(a, 'x'), Buffer.alloc(4097));
   await expect(left.snapshot(signal)).rejects.toThrow('SYNC_LIMIT');
 });
 it('旧摘要写入和并发创建不能覆盖文件，取消不开始新写入', async () => {

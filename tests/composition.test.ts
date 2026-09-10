@@ -101,7 +101,8 @@ describe("worker 组合（技能与 overlay）", () => {
     const enabled = composeEntries([base, worker, loadOverlayPatches("test", repositoryPath("config/desktop-workspace.patch.yml"))], () => undefined);
     expect(enabled.find(row => row.id === "desktop-workspace")?.config).toMatchObject({ enabled: true });
     const workerRequire = createRequire(repositoryPath("apps/lark-worker/package.json"));
-    expect(workerRequire.resolve("dsh-lark-desktop-workspace")).toContain("packages/desktop/workspace/lib/index.js");
+    expect(workerRequire.resolve("dsh-lark-desktop-workspace").replaceAll("\\", "/"))
+      .toContain("packages/desktop/workspace/lib/index.js");
   });
   it("真实补丁算法禁用官方适配器并装载可解析的路由插件", () => {
     const warnings: string[] = [];
