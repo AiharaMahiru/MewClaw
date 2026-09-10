@@ -22,7 +22,7 @@ export class LocalWorkspaceShell {
       timeoutMs: this.limits.timeoutMs, stdoutMaxBytes: this.limits.maxOutputBytes, signal }));
     // 不传 Provider 的 spillPath 或主机元数据。命令正文和输出由用户明确授权发送给云端。
     const output = (stream: { text: string; truncated: boolean }) => ({ text: Buffer.from(stream.text).subarray(0, this.limits.maxOutputBytes).toString('utf8'), truncated: stream.truncated || Buffer.byteLength(stream.text) > this.limits.maxOutputBytes });
-    return { location: 'desktop', exitCode: result.exitCode, timedOut: result.timedOut, aborted: result.aborted,
+    return { location: 'desktop', exitCode: result.exitCode, timedOut: result.timedOut, aborted: result.aborted || signal.aborted,
       stdout: output(result.stdout), stderr: output(result.stderr) };
   }
 }
