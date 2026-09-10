@@ -4,6 +4,7 @@
  * SPEC：docs/specs/contracts.md。任何包不得自行再定义本包导出的类型。
  */
 import "./runtime.js";
+import "./desktop-events.js";
 
 export * from "./attachments.js";
 export * from "./context.js";

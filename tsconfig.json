@@ -1,6 +1,9 @@
 {
   "files": [],
   "references": [
+    { "path": "packages/desktop/host" },
+    { "path": "packages/desktop/workspace" },
+    { "path": "packages/desktop/workspace/tsconfig.client.json" },
     { "path": "apps/lark-gateway" },
     { "path": "apps/lark-worker" },
     { "path": "apps/admin" },

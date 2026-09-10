@@ -19,6 +19,7 @@
     "cordis.patch.yml"
   ],
   "dependencies": {
+    "dsh-lark-desktop-workspace": "workspace:*",
     "@deepseek-ai/dsh-base": "0.1.5-rc.1",
     "@deepseek-ai/dsh-sandbox-policy": "0.1.5-rc.1",
     "@deepseek-ai/dsh-session-persistence-jsonl": "0.1.5-rc.1",

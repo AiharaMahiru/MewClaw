@@ -1027,6 +1027,27 @@ async function verifyLatest(service: AuthService, mail: FakeMail, email: string)
   return service.verifyEmailCode(email, code, { requestId: "test" });
 }
 
+it('桌面桥接在真实 Auth Edge 上遵守登录、CSRF、所有权与退出撤销', async () => {
+  let forwarded = 0;
+  const worker = await listen((_req, res) => { forwarded++; json(res, 200, { mode: 'cloud', connected: false }); });
+  const service = new AuthService({ store: new MemoryAuthStore(), mail: new FakeMail() });
+  await service.register('desktop-edge@example.com', 'correct horse battery staple', 'Desktop', { requestId: 'test' });
+  const user = await service.login('desktop-edge@example.com', 'correct horse battery staple');
+  await service.saveResource({ resourceType: 'session', resourceId: 'desktop-own', userId: user!.user.id, resourcePath: null, createdAt: new Date().toISOString() });
+  const conf = config(worker.port); const edge = createAuthEdgeServer({ config: conf, service });
+  const base = await listenEdge(edge, conf); servers.push({ close: () => edge.close() });
+  const headers = { origin: base, cookie: `dsh_session=${user!.token}; dsh_csrf=fixture`, 'x-csrf-token': 'fixture', 'content-type': 'application/json' };
+  const body = JSON.stringify({ action: 'status', sessionId: 'desktop-own' });
+  expect((await fetch(base + '/desktop-workspace', { method: 'POST', headers: { origin: base }, body })).status).toBe(403);
+  expect((await fetch(base + '/desktop-workspace', { method: 'POST', headers: { ...headers, cookie: 'dsh_csrf=fixture' }, body })).status).toBe(401);
+  expect((await fetch(base + '/desktop-workspace', { method: 'POST', headers, body: JSON.stringify({ action: 'status', sessionId: 'other' }) })).status).toBe(403);
+  expect((await fetch(base + '/desktop-workspace', { method: 'POST', headers, body })).status).toBe(200);
+  expect(forwarded).toBe(1);
+  expect((await fetch(base + '/auth/logout', { method: 'POST', headers })).ok).toBe(true);
+  expect((await fetch(base + '/desktop-workspace', { method: 'POST', headers, body })).status).toBe(401);
+  expect(forwarded).toBe(1);
+});
+
 function config(workerPort: number): AuthEdgeConfig {
   return {
     host: "127.0.0.1",

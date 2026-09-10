@@ -6,7 +6,7 @@ interface WorkspaceEdgeOptions {
   workerBaseUrl: string;
   workerToken: string | undefined;
   requestBodyLimit: number;
-  findResource(type: 'session', id: string): Promise<{ userId: string } | null | undefined>;
+  findResource(type: 'session', id: string): Promise<{ userId: string; resourcePath?: string | null } | null | undefined>;
 }
 function send(res: ServerResponse, status: number, value: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
@@ -29,7 +29,7 @@ export async function proxyDesktopWorkspace(req: IncomingMessage, res: ServerRes
   let command: Record<string, unknown>;
   try { command = await commandBody(req, options.requestBodyLimit); }
   catch { return send(res, 400, { error: 'INVALID_WORKSPACE_REQUEST' }); }
-  if (Object.keys(command).some(key => !['action', 'sessionId', 'generation', 'revision', 'result'].includes(key))
+  if (Object.keys(command).some(key => !['action', 'sessionId', 'generation', 'revision', 'result', 'operation'].includes(key))
     || typeof command.sessionId !== 'string' || !command.sessionId) return send(res, 400, { error: 'INVALID_WORKSPACE_REQUEST' });
   const resource = await options.findResource('session', command.sessionId);
   if (!resource || resource.userId !== options.userId) return send(res, 403, { error: 'RESOURCE_NOT_ALLOWED' });
@@ -37,10 +37,19 @@ export async function proxyDesktopWorkspace(req: IncomingMessage, res: ServerRes
   try {
     const response = await fetch(new URL('/internal/desktop-workspace', options.workerBaseUrl), {
       method: 'POST', headers: { authorization: 'Bearer ' + options.workerToken, 'content-type': 'application/json' },
-      body: JSON.stringify({ scope, command }), signal: AbortSignal.timeout(10000), redirect: 'error',
+      body: JSON.stringify({ scope, command, rootPath: resource.resourcePath ?? null }), signal: AbortSignal.timeout(10000), redirect: 'error',
     });
-    const body = await response.text();
-    if (Buffer.byteLength(body) > options.requestBodyLimit) throw new Error('WORKSPACE_RESPONSE_TOO_LARGE');
+    const reader = response.body?.getReader();
+    const chunks: Uint8Array[] = []; let size = 0;
+    try {
+      while (reader) {
+        const chunk = await reader.read(); if (chunk.done) break;
+        size += chunk.value.length;
+        if (size > options.requestBodyLimit) { await reader.cancel(); throw new Error('WORKSPACE_RESPONSE_TOO_LARGE'); }
+        chunks.push(chunk.value);
+      }
+    } finally { reader?.releaseLock(); }
+    const body = Buffer.concat(chunks);
     res.writeHead(response.status, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(body);
   } catch { send(res, 502, { error: 'WORKSPACE_BRIDGE_UNAVAILABLE' }); }
 }

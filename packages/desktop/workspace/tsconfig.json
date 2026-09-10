@@ -1,0 +1,9 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2023", "module": "NodeNext", "moduleResolution": "NodeNext",
+    "strict": true, "skipLibCheck": true, "declaration": true,
+    "rootDir": "src", "outDir": "lib", "types": ["node"], "composite": true, "declarationDir": "lib/types"
+  },
+  "include": ["src/**/*.ts"], "exclude": ["src/**/*.test.ts", "src/client.ts"], "references": [{ "path": "../host" }, { "path": "../../lark/contracts" }]
+}

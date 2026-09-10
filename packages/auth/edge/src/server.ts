@@ -136,7 +136,7 @@ export class AuthEdgeServer {
     if (!current) { sendError(res, 401, "UNAUTHORIZED"); return; }
     if (url.pathname === "/desktop-workspace") return proxyDesktopWorkspace(req, res, {
       userId: current.user.id, workerBaseUrl: this.#config.workerBaseUrl, workerToken: this.#config.workerToken,
-      requestBodyLimit: this.#config.requestBodyLimit, findResource: (type, id) => this.#service.findResource(type, id),
+      requestBodyLimit: this.#config.desktopBodyLimit ?? 8 * 1024 * 1024, findResource: (type, id) => this.#service.findResource(type, id),
     });
     if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) { await this.proxyAdmin(req, res, current.user); return; }
     if (isAdminDataPath(url.pathname)) { await this.handleAdminData(req, res, url, current.user); return; }
