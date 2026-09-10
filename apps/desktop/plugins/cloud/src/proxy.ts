@@ -2,9 +2,10 @@
 import { request as httpRequest, type IncomingMessage, type ServerResponse } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import type { Duplex } from 'node:stream';
+import { desktopSessionCookie } from './cookies.js';
 
 const HOP_HEADERS = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade']);
-export interface CloudProxyConfig { origin: string; timeoutMs: number; maxIndexBytes?: number; transformIndex?: (html: string) => string }
+export interface CloudProxyConfig { origin: string; timeoutMs: number; sessionRetentionSeconds?: number; maxIndexBytes?: number; transformIndex?: (html: string) => string }
 
 /** 只接受无凭证 HTTPS origin；本机测试可使用回环 HTTP。 */
 export function cloudOrigin(value: string): URL {
@@ -75,6 +76,8 @@ export class CloudProxy {
     });
     upstream.once('response', response => {
       const headers = { ...response.headers };
+      if (headers['set-cookie']) headers['set-cookie'] = headers['set-cookie'].map(cookie =>
+        desktopSessionCookie(cookie, this.config.sessionRetentionSeconds ?? 0));
       for (const key of HOP_HEADERS) delete headers[key];
       if (headers.location) {
         const location = new URL(headers.location, this.origin);

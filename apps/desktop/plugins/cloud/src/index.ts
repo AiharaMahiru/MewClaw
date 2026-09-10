@@ -9,8 +9,10 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { DESKTOP_CLIENT_PATH, desktopCloudHtml } from './boot.js';
+import { WorkspaceController } from './workspace-controller.js';
+import { localWorkspaceRoute } from './workspace-route.js';
 
-export interface Config extends WebConfig { cloudOrigin: string; cloudTimeoutMs: number; cloudMaxIndexBytes?: number }
+export interface Config extends WebConfig { cloudOrigin: string; cloudTimeoutMs: number; cloudSessionRetentionSeconds?: number; workspaceMaxBytes?: number; workspaceMaxEntries?: number; cloudMaxIndexBytes?: number }
 
 /** 桌面私有控制面始终留在本机，不发送到云端。 */
 export function isLocalDesktopPath(raw: string): boolean {
@@ -20,12 +22,16 @@ export function isLocalDesktopPath(raw: string): boolean {
 
 export default class MewClawDesktopWebServer extends DesktopWebServer {
   static override Config = z.intersect([WebServer.Config, z.object({
+    workspaceMaxBytes: z.number().step(1).min(1024).max(1048576).default(262144),
+    workspaceMaxEntries: z.number().step(1).min(1).max(2000).default(500),
     cloudOrigin: z.string().default('https://chat.rwr.ink'),
     cloudTimeoutMs: z.number().step(1).min(1000).max(600000).default(120000),
+    cloudSessionRetentionSeconds: z.number().step(1).min(0).max(2592000).default(2592000),
     cloudMaxIndexBytes: z.number().step(1).min(65536).max(8388608).default(2097152),
   })]);
   private readonly cloud: CloudProxy;
   private desktopParameters = '';
+  private workspace?: WorkspaceController;
 
   constructor(ctx: Context, config: Config) {
     cloudOrigin(config.cloudOrigin);
@@ -33,15 +39,40 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     const require = createRequire(import.meta.url);
     const script = readFileSync(require.resolve('dsh-plugin-desktop/client'));
     const manifest = JSON.parse(readFileSync(require.resolve('dsh-plugin-desktop/package.json'), 'utf8'));
-    const client = { revision: createHash('sha256').update(script).digest('hex').slice(0, 16), inject: manifest.dsh.client.inject as string[] };
+    const workspaceScript = Buffer.from(readFileSync(new URL('../lib/workspace-client.js', import.meta.url), 'utf8').replace('\nexport {};', ''));
+    const client = { workspaceRevision: createHash('sha256').update(workspaceScript).digest('hex').slice(0, 16), revision: createHash('sha256').update(script).digest('hex').slice(0, 16), inject: manifest.dsh.client.inject as string[] };
     this.cloud = new CloudProxy({ origin: config.cloudOrigin, timeoutMs: config.cloudTimeoutMs,
+      sessionRetentionSeconds: config.cloudSessionRetentionSeconds ?? 2592000,
       maxIndexBytes: config.cloudMaxIndexBytes ?? 2097152,
       transformIndex: html => desktopCloudHtml(html, client, this.desktopParameters),
     });
     ctx.effect(() => () => this.cloud.dispose());
+    this.installWorkspace(ctx, config, workspaceScript);
     ctx.effect(() => this.register({ kind: 'exact', path: DESKTOP_CLIENT_PATH, handler: (req, res) => {
       const rejection = this.ctx.get('connection')?.requestRejection(req);
       if (!this.ctx.get('connection') || rejection !== undefined) { res.writeHead(rejection ?? 503); res.end(); return; }
+      res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' }); res.end(script);
+    } }));
+  }
+
+  private installWorkspace(ctx: Context, config: Config, script: Buffer): void {
+    const reject = (req: Parameters<WebRoute['handler']>[0]) => {
+      const connection = ctx.get('connection');
+      return connection ? connection.requestRejection(req) : 503;
+    };
+    this.workspace = new WorkspaceController({
+      fs: () => { const fs = ctx.get('fs'); if (!fs) throw new Error('WORKSPACE_STARTING'); return fs; },
+      pick: () => { const runtime = ctx.get('desktopRuntime') as { pickDirectory(): Promise<string | null> } | undefined;
+        if (!runtime) throw new Error('WORKSPACE_STARTING'); return runtime.pickDirectory(); },
+      maxBytes: config.workspaceMaxBytes ?? 262144, maxEntries: config.workspaceMaxEntries ?? 500,
+    });
+    const controller = this.workspace;
+    ctx.effect(() => () => controller.dispose());
+    ctx.effect(() => this.register({ kind: 'exact', path: '/api/mewclaw-desktop/workspace',
+      handler: localWorkspaceRoute({ origin: config.cloudOrigin, controller, reject }) }));
+    ctx.effect(() => this.register({ kind: 'exact', path: '/_dsh/desktop/workspace-client.js', handler: (req, res) => {
+      const rejection = reject(req);
+      if (rejection !== undefined) { res.writeHead(rejection); res.end(); return; }
       res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' }); res.end(script);
     } }));
   }
@@ -55,6 +86,7 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
       if (path === '/' && !connection.authorizeIndex(req, res)) return;
       const rejection = connection.requestRejection(req);
       if (rejection !== undefined) { res.writeHead(rejection); res.end('DESKTOP_UNAUTHORIZED'); return; }
+      if (path === '/auth/logout') this.workspace?.revokeAll();
       const parameters = new URL(req.url ?? '/', 'http://127.0.0.1').searchParams;
       if (parameters.has('dsh-desktop-mode')) {
         const retained = new URLSearchParams();

@@ -31,11 +31,11 @@ MewClaw 发行入口使用社区包 package.json 的 main 字段启动完整 lau
 
 ## 4 事件契约
 
-无新增事件；后续运行接入必须另行定义事件及授权契约后实施。
+桌面布局通过公开 slot 装载工作区开关，客户端只提交会话与模式。配套云端事件和授权契约见 desktop-workspace.md。
 
 ## 5 模型可见面
 
-本阶段无模型请求、工具注册或提示词变更。
+桌面不新增模型执行；配套云端 desktop_workspace 工具及执行限制见 desktop-workspace.md。
 
 ## 6 行为契约
 
@@ -47,7 +47,11 @@ MewClaw 发行入口使用社区包 package.json 的 main 字段启动完整 lau
 
 构建阶段无生产访问；接入阶段允许访问现有生产页面，不读取密钥文件或修改官方依赖。准备阶段禁用安装生命周期脚本，后续仅按实际需求运行已检查的构建入口。目录必须独立；保留 MIT 许可证与上游提交记录。
 
-每次云端代理前保留社区 Desktop 浏览器标识与官方 Connection Host/Origin/Cookie 检查。启动 token 仅由本地 authorizeIndex 消费，token、窗口标识、设备私有请求头与本地 dsh-auth-* Cookie 均不得出站；保留云端原有 Cookie/CSRF 对。仅在本地信任检查通过后将 Origin/Referer 规范化为云端，禁止把代理作为绕过 Origin 的公开入口。云端 Cookie 原样回传，不解除 Secure/HttpOnly，不记录凭证。连接失败HTTP502；Provider退出HTTP503；不自动重放写操作或WebSocket消息。
+每次云端代理前保留社区 Desktop 浏览器标识与官方 Connection Host/Origin/Cookie 检查。启动 token 仅由本地 authorizeIndex 消费，token、窗口标识、设备私有请求头与本地 dsh-auth-* Cookie 均不得出站；保留云端原有 Cookie/CSRF 对。仅在本地信任检查通过后将 Origin/Referer 规范化为云端，禁止把代理作为绕过 Origin 的公开入口。云端 Cookie 保留 Secure/HttpOnly，不记录凭证。桌面仅为 dsh_session、__Host-dsh_session、dsh_csrf 中未声明 Max-Age/Expires 的会话 Cookie 补充 cloudSessionRetentionSeconds（默认2592000秒，整数范围0至2592000，0表示不补充）；交由 Electron 持久化分区保存，不另存密码或凭证文件。服务端显式有效期和删除指令原样保留，服务端仍校验过期与撤销。连接失败HTTP502；Provider退出HTTP503；不自动重放写操作或WebSocket消息。
+
+### Windows 开发包
+
+独立候选根目录通过 `apps/desktop/electron-builder.cjs` 配置生成 Windows x64 开发包，主入口固定为 MewClaw `launcher.mjs`，产品名为 MewClaw。安装程序为当前用户 NSIS 安装，便携版同时提供 ZIP 与启动 EXE；不发布到远端、不配置代码签名。生产依赖显式包含桌面包与云端 Provider，ASAR 只打包发行文件及生产依赖，不包含凭证、源码工作区或测试数据。ripgrep 的 win32-x64 平台包原样放入 `resources/node_modules` 并从 ASAR 排除，使官方依赖通过 Node 父目录解析得到可 spawn 的物理路径；社区烟雾接受该资源布局并实际执行二进制。其他原生二进制按 Electron ASAR 规则解包；打包后必须通过真实 Electron RunAsNode 的模块/原生依赖烟雾。开发包版本不代表全部桌面功能验收完成。
 
 ## 8 测试契约
 
@@ -59,5 +63,5 @@ MewClaw 发行入口使用社区包 package.json 的 main 字段启动完整 lau
 
 ## 10 开放问题
 
-1. 纯净官方依赖是否还存在打包或启动缺口：阻塞第一阶段，由候选测试判定。
-2. 桌面远程接入公开契约及本地会话归属：阻塞功能实现，不允许直接写会话内部数据。
+1. 工作区 Provider 配置 workspaceMaxBytes 默认262144（1024–1048576），workspaceMaxEntries 默认500（1–2000）；目录只来自原生授权。
+2. 三模式 Cordis 装卸载、Electron Cookie 重启与离线工作区链路已验证；云端配套部署和真实账号模型实机验收未完成。

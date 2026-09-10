@@ -20,6 +20,7 @@ await cp(resolve(source, 'dsh-plugin-desktop'), resolve(destination, 'dsh-plugin
 await cp(resolve(source, 'LICENSE'), resolve(destination, 'UPSTREAM-LICENSE'));
 await cp(fileURLToPath(new URL('../apps/desktop/plugins/cloud', import.meta.url)), resolve(destination, 'mewclaw-cloud'), { recursive: true });
 await cp(fileURLToPath(new URL('../apps/desktop/launcher.mjs', import.meta.url)), resolve(destination, 'launcher.mjs'));
+await cp(fileURLToPath(new URL('../apps/desktop/electron-builder.cjs', import.meta.url)), resolve(destination, 'electron-builder.cjs'));
 const sourceChanges = [];
 for (const filename of ['index.ts', 'notifications.ts']) {
   const path = resolve(destination, 'dsh-plugin-desktop/src', filename);
@@ -32,6 +33,13 @@ for (const filename of ['index.ts', 'notifications.ts']) {
   await writeFile(path, updated);
   sourceChanges.push(`${filename}: settingsNamespace 改为官方支持的字符串参数`);
 }
+const smokePath = resolve(destination, 'dsh-plugin-desktop/src/packaged-runtime-smoke.ts');
+const smokeSource = await readFile(smokePath, 'utf8');
+const asarPattern = String.raw`/([\\/])app\.asar\.unpacked\1/u.test(rgPath)`;
+if (!smokeSource.includes(asarPattern)) throw new Error('上游原生路径烟雾入口已变化');
+await writeFile(smokePath, smokeSource.replace(asarPattern,
+  String.raw`/([\\/])resources\1(?:app\.asar\.unpacked\1)?node_modules\1/u.test(rgPath)`));
+sourceChanges.push('packaged-runtime-smoke.ts: 接受独立物理 resources/node_modules 的原生依赖布局');
 const manifestPath = resolve(destination, 'dsh-plugin-desktop/package.json');
 const profilePath = resolve(destination, 'dsh-plugin-desktop/src/profile.ts');
 const profileSource = await readFile(profilePath, 'utf8');
@@ -48,7 +56,10 @@ for (const name of ['@agents-anywhere/dsh-bridge-next', 'dsh-community-market', 
 delete manifest.scripts.prepack;
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 await writeFile(resolve(destination, 'package.json'), `${JSON.stringify({
-  name: 'mewclaw-desktop-candidate', private: true, type: 'module', main: 'launcher.mjs',
+  name: 'mewclaw-desktop-candidate', version: '0.1.0-desktop.4',
+  description: 'MewClaw desktop development build', author: 'MewClaw contributors', license: 'MIT',
+  private: true, type: 'module', main: 'launcher.mjs',
+  dependencies: { 'dsh-plugin-desktop': manifest.version, 'dsh-lark-desktop-cloud': '0.1.0' },
   workspaces: ['dsh-plugin-desktop', 'mewclaw-cloud'],
   scripts: { build: 'npm run build --workspace dsh-plugin-desktop' },
 }, null, 2)}\n`);

@@ -1,13 +1,13 @@
 # MewClaw Desktop 开发交接
 
-更新时间：2026-09-10。适用分支：`desktop`。当前开发基线：`220e804`；桌面根 README：`7c8d99f`。本文是下一轮桌面开发的入口，不是发布验收证明。
+更新时间：2026-09-10。适用分支：`desktop-dev`。当前基线包含 `origin/desktop@d8c54f6`、MewClaw R3 与桌面开发版 `0.1.0-desktop.4`。本文记录桌面交付状态及 Web 版需要配合的改造，不代表生产发布授权。
 
 ## 1. 接手位置与约束
 
 - 上游已通过 `upstream/dsh-desktop` Git 子模块关联。首次接手运行 `git submodule update --init --recursive`，确认 `git submodule status` 指向 `a1ddcda8e701a8490c619ce411ea8a3d6daa1453`。后续候选使用此检出，不依赖旧 `/tmp` 研究副本。升级必须同时评审子模块指针与准备脚本固定 revision，不能自动追踪远端 HEAD。
 
 - 桌面工作树：`/opt/dsh/desktop-source`；Web 工作树：`/opt/dsh/source`。接手先检查 `git branch --show-current`、`git status --short` 和 `git worktree list`。
-- `master` 管理 Web、共享插件与云端服务；`desktop` 管理桌面组合。共享改动从基于 `master` 的短期分支提交，再以 `master → desktop` 普通 Merge PR 同步，不反复 Squash，不整分支反向合并。
+- `master` 管理 Web、共享插件与云端服务；`desktop` 管理稳定桌面组合；`desktop-dev` 保存上游合并后的桌面开发和云端配套候选。Web 需要的共享改动应从 `desktop-dev` 按文件评审后移植到基于 `master` 的短期分支，不整分支反向合并。
 - Web 工作树已有四个 web-auth 文件及 `docs/specs/account-feishu-settings.md` 的未提交改动，不属于桌面任务，禁止混入提交或回退。
 - 上次确认生产入口为 `/opt/dsh/current → /opt/dsh/releases/R3`。接手重新核验，不把本文当实时服务状态。本轮分支和文档工作未重启或切换生产。
 - 先读 `AGENTS.md`、`docs/spec-standard.md`、`docs/reference/dsh-AGENTS.md`、[桌面 APP SPEC](docs/specs/desktop-app.md)、[本地工作区 SPEC](docs/specs/desktop-workspace.md)。先补完整契约，再实施未定义接口。
@@ -21,13 +21,31 @@
 - 固定社区底座 `a1ddcda8e701a8490c619ce411ea8a3d6daa1453`，桌面 2.0.6、DSH 0.1.2-rc.1；独立 npm 候选构建及 Linux Electron 启动通过，社区定向测试 34 项通过。
 - 自有 Cloud WebServer Provider 保留本地认证、Host/Origin 检查及云端 Cookie/CSRF 对；代理 HTTP/SSE/WS，不自动重放写请求，不把本地启动凭证发往云端。
 - 专用普通账号在桌面和独立 Web 浏览器完成两轮真实模型续聊，双方显示相同结果。不是通过复制会话数据库实现同步。
-- `LocalWorkspaceFiles` 复用官方 FileSystem，支持 list/read/write、条件更新、路径边界、体积限制与撤销。云端插件四个测试文件共 15 项通过；这不是桥接 E2E。
+- `LocalWorkspaceFiles` 复用官方 FileSystem，支持 list/read/write、条件更新、路径边界、体积限制与撤销。桌面工作区离线链路共 15 个测试文件、39 项测试通过。
+- 增强/扩展模式移除云端布局所有者后再装载桌面布局，避免 `advanced and extended modes require exclusive layout ownership`；兼容模式继续使用官方布局。
+- 云端会话 Cookie 在服务端未声明有效期时可补充受限持久期，显式过期、删除、Secure 与 HttpOnly 语义保持不变；退出登录同时撤销本机目录授权。
+- Windows x64 `0.1.0-desktop.4` 的 Setup、Portable、ZIP 和解包目录已构建并通过真实 Electron 运行时验包；开发包未签名。
 
-**未完成：原生目录授权、云端工具桥接、跨账号/断线全链路验收、Windows 安装包与实机测试。尚无可交付 APP。** 登录页 `#root` 修复已进代码，仍需真实窗口停留超过 30 秒复验。官方依赖逐包完整性与 Windows 原生依赖闭包也尚未验收。
+**未完成：云端配套尚未进入 Web 生产组合，真实账号通过云端模型操作本机授权目录的全链路验收仍待完成。** 安装包可供实机测试，但不能标记为正式发布版。
 
 关键文件：`apps/desktop/launcher.mjs`、`apps/desktop/plugins/cloud/src/{index,proxy,boot,files}.ts`、`scripts/prepare-desktop-candidate.mjs`。构建说明见 [桌面开发 README](apps/desktop/README.md)。
 
-## 3. 下一步按顺序实施
+## 3. Web 版需要修改和优化
+
+Web 默认仍使用云端工作区；以下能力必须以可选 Cordis 插件接入，未启用时不得改变现有 Web 行为。
+
+1. **Auth Edge 认证代理**：评审并移植 `packages/auth/edge/src/desktop-workspace.ts` 及 `server.ts` 的 `/desktop-workspace` 入口。入口必须位于现有登录、Cookie 与 CSRF 校验之后，只允许当前用户拥有的 sessionId；完整 Scope 由服务端生成，拒绝客户端提供 userId、tenantId、botId 或 deploymentId。
+2. **Worker 工作区插件**：把 `apps/desktop/plugins/workspace` 作为独立 `dsh-lark-desktop-workspace` 包纳入 Web/Worker 工作区和构建引用。通过 Cordis 提供 `/internal/desktop-workspace`、`desktop_workspace` 工具、session journal 与 `tools.guard`，所有注册必须有 disposer；Gateway 和 Auth Edge 只认证转发，文件操作只能由已授权的桌面 Host 执行。
+3. **部署配置**：在 Worker 的 Cordis 配置中显式启用插件，并用 `tokenRef` 引用既有 Worker 凭证。Auth Edge 与 Worker 使用同一受管凭证，禁止在 YAML、源码或日志中出现 token。为 `requestTimeoutMs`、`heartbeatTimeoutMs`、`maxBindings` 提供校验后的部署值；缺失时明确返回 `WORKSPACE_BRIDGE_UNAVAILABLE`。
+4. **会话和工具安全**：`desktop/workspace` 事件必须经 `session.append` 与 `sessions.flush` 落盘后生效。绑定本机目录后，云端执行型工具不得回退到服务器目录；断线、Worker 重启、旧 revision、子会话绕过及切换时仍有在途工具都必须 fail closed。Web 页面只展示模式、连接状态和相对路径，不展示本机绝对路径、绑定令牌或凭证。
+5. **前端协同**：普通 Web 浏览器显示“云端工作区”，不允许伪装成本机已连接；桌面注入的工作区客户端才提供“云端 / 本地电脑”开关和原生目录选择。Web boot graph 应保留可组合依赖，避免重复布局所有者；桌面 advanced/extended 由桌面布局独占，compatibility 保留 Web 官方布局。
+6. **登录体验优化**：继续以服务端 session 有效期与撤销状态为准。Web 不应依赖桌面补充的 Cookie 持久期，也不能把密码或 Cookie 存入业务存储。需要覆盖登录、退出、重启后会话恢复、过期和服务端撤销；退出必须使桌面授权同时失效。
+7. **构建与回归**：根 `tsconfig.test.json` 排除独立桌面候选源码，桌面包使用自身严格 tsconfig。Web 合入时应为 Auth Edge 和 Worker 包增加直接构建入口，并覆盖跨用户拒绝、CSRF、请求大小、响应大小、Worker 超时、断线、不重放写操作、session ancestry 与工具 guard。
+8. **性能和运维**：轮询仅在本机模式启用，使用单会话单在途请求和有界超时；断线后释放内存连接容量，不删除持久化的本机模式事实。监控只记录错误分类、时延与连接数，不记录文件内容、相对路径、绝对路径、令牌或 Cookie。
+
+Web 合入门禁：`pnpm build`、`pnpm typecheck`、Auth Edge 定向测试、Worker 插件定向测试、品牌与官方包完整性检查，以及隔离环境中的 Web 原功能回归。云端部署和真实账号模型验收需要单独授权。
+
+## 4. 下一步按顺序实施
 
 ### 第一步：补齐本地工作区契约（立即开始）
 
@@ -75,7 +93,7 @@
 
 完成标准：生产健康与账号隔离通过，下载地址可用、摘要相符；交付说明包括版本、支持系统、签名状态、安装/卸载和授权撤销方式。Web 未相关功能不得受影响。
 
-## 4. 当前可复跑的检查
+## 5. 当前可复跑的检查
 
 以下候选路径仅是本机历史位置，接手先检查存在性及源码是否一致；旧候选通过不能替代新提交验证。
 
@@ -93,7 +111,7 @@ npx vitest run tests/window-options.spec.ts tests/profile-service.spec.ts tests/
 
 若重建候选，按桌面 README 使用不存在的新目标目录，不覆盖或直接删除旧候选。新增步骤须补对应可执行验收命令，不能将“待实现”门禁标为完成。
 
-## 5. 本机证据与测试善后
+## 6. 本机证据与测试善后
 
 - 长程记录：`/opt/dsh/desktop-source/.codex-tasks/20260910-mewclaw-desktop/`，阶段 1、2 完成，阶段 3 进行中；CSV 为里程碑状态源。PROGRESS 旧段落有历史描述，按最新记录和实际代码核验。
 - 双端 E2E 证据原件：`/opt/dsh/source/docs/evidence/desktop-cloud-20260910.md`；截图在任务 raw 目录。证据目录默认不入 Git，远端使用者不得假设这些本机文件随仓库存在。
