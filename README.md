@@ -1,21 +1,55 @@
-# MewClaw
+# MewClaw Desktop
 
-MewClaw 是基于 **DeepSeek Harness（DSH）与 Cordis** 的智能体平台，提供 Web 聊天、飞书自建应用机器人、账户与用量管理，以及可组合的工具和技能。仓库沿用 `dsh-lark-*` 包名。
+这是 MewClaw 的 **`desktop` 桌面开发与发行分支**，以 [anywhere-labs/dsh-desktop](https://github.com/anywhere-labs/dsh-desktop) 为 Electron 底座，基于 **DeepSeek Harness（DSH）与 Cordis**。目标是使用同一账号与 Web 端共享云端会话，并额外提供用户授权的电脑本地工作区。仓库沿用 `dsh-lark-*` 包名。
 
 会话、智能体循环、工具、子智能体、审批和沙箱等核心运行时复用 `@deepseek-ai/dsh-*`。品牌、认证、平台集成及部署策略通过自有插件、公开扩展点和配置组合实现；不修改官方 DSH 源码或附属官方包。
 
-## 状态
+## 当前状态
 
-截至 **2026-09-10，生产基线为 R3**。本机生产入口 `/opt/dsh/current` 指向 `releases/R3`；Git 分支后续提交不等于生产已发布。
+截至 **2026-09-10，本分支是开发基线，尚无可交付的桌面安装包**。Web 生产仍为 R3；桌面提交、PR 合并和候选测试不等于生产发布。
 
-- R3 已发布远程设置修复和四模式整合，见 [R3 设计说明](docs/specs/web-remote-settings-r3.md) 与 [生产验收记录](docs/evidence/r3-production-20260910.md)。
-- 早期 M0–M5 飞书迁移验收见 [历史证据](docs/evidence/m5-feishu-acceptance.md)，不代表后续新增功能已通过端到端验收。
-- **进行中、尚未发布**：账户中心布局优化、飞书独立设置入口，以及按 Web 账号隔离的自建应用机器人配置。现有应用已验证获取令牌和查询机器人信息成功；账号隔离后端、消息收发与跨账号拒绝测试尚未完成。
+- 已验证：独立桌面底座构建、Linux Electron 启动、云端登录，以及同账号桌面/Web 两轮真实续聊同步。
+- 已实现并测试：本地文件 Consumer 的列目录、读文件、条件写入、路径边界和授权撤销；桌面云端插件共 15 项测试通过。
+- **尚未完成**：原生目录授权与云端工具桥接、完整跨账号和断线验收、Windows x64 打包及实机测试。文件 Consumer 测试通过不代表模型已经能使用电脑工作区。
+- 首版不提供任意本地 Shell、目录双向同步、离线任务重放或多设备接管。目录授权不等于操作系统沙箱。
+
+## 分支协作
+
+- [`master`](https://github.com/AiharaMahiru/MewClaw/tree/master)：Web、共享插件和云端服务。
+- `desktop`：桌面启动器、自有桌面插件、打包配置与桌面发行文档。
+- Web 更新通过 **`master → desktop` PR** 同步，采用普通 Merge 保留共同历史，不对长期同步 PR 反复 Squash 或 cherry-pick。
+- 共享修复优先在基于 `master` 的短期分支提交，再同步至桌面；不把整个桌面分支反向合并进 Web。
+- 两端独立发布，桌面版本标签使用 `desktop-vX.Y.Z`；同步后仍须通过桌面兼容与验收门禁。
+
+## 桌面架构与开发
+
+云端是会话和模型运行的唯一权威；桌面通过自有 WebServer Provider 接入同一云端，不复制 SQLite 或 JSONL 来实现同步。电脑侧仅执行已授权目录内的受限文件操作，相关桥接仍在实施。
+
+官方 DSH 包保持原样。社区桌面底座有明确记录的最小消费方兼容及 Provider 选择变更，**不宣称社区桌面源码零改动**；准备脚本固定上游提交并生成 `UPSTREAM.json`，不继承社区的官方包补丁。
+
+需要 Node.js 24。桌面使用独立 npm 候选 workspace，不向服务器 pnpm 依赖树引入 Electron。
+
+```sh
+git clone https://github.com/anywhere-labs/dsh-desktop /absolute/upstream
+git -C /absolute/upstream checkout a1ddcda8e701a8490c619ce411ea8a3d6daa1453
+# 在本仓库 desktop 分支根目录执行；目标候选目录必须尚不存在。
+node scripts/prepare-desktop-candidate.mjs /absolute/upstream /absolute/new-candidate
+cd /absolute/new-candidate
+npm install --ignore-scripts --no-audit --no-fund
+npm run build
+npm run build --workspace dsh-lark-desktop-cloud
+npx vitest run mewclaw-cloud/src
+```
+
+以上仅用于开发候选构建与测试，不生成安装包。安装生命周期默认关闭，Electron 下载和目标平台原生依赖须另行审核处理；Linux 构建通过不等于 Windows 实机通过。凭证、运行数据和候选目录不得提交 Git。
+
+详见 [桌面开发说明](apps/desktop/README.md)、[桌面 APP SPEC](docs/specs/desktop-app.md) 与 [本地工作区 SPEC](docs/specs/desktop-workspace.md)。
 
 ## 项目结构
 
 ```text
-apps/       # Worker、飞书 Gateway、Auth、Admin、浏览器与预览服务入口
+apps/desktop/ # 桌面启动器和自有云端接入插件
+apps/       # 共享服务：Worker、飞书 Gateway、Auth、Admin 等
 packages/   # 自有插件：平台接入、认证、模型、知识库、记忆、工具等
 infra/      # Linux / Windows 部署、PostgreSQL 与沙箱设施
 presets/    # 智能体预设
@@ -25,7 +59,7 @@ tests/      # 跨包测试
 docs/       # 架构、SPEC、发布说明与验收证据
 ```
 
-## 开发与验证
+## 共享服务开发与验证
 
 需要 Node.js 24+、pnpm 10.30.3；生产构建使用部署指定的固定 Node 版本。DSH 核心依赖当前锁定为 `0.1.2-rc.1`，以锁文件为准。
 
@@ -63,7 +97,7 @@ pnpm verify:dsh-brand
 
 ## 关键决策速览
 
-- **仓库形态**：独立插件仓库，通过 npm 依赖 `@deepseek-ai/dsh-*`（0.1.0-rc 系列），本地开发用 pnpm workspace + 自有 app bins 从源码启动 cordis 组合。
+- **仓库形态**：独立插件仓库，通过 npm 依赖 `@deepseek-ai/dsh-*`（当前核心基线 `0.1.2-rc.1`），共享服务使用 pnpm workspace + 自有 app bins 从源码启动 Cordis 组合；桌面使用独立候选 workspace。
 - **数据面**：会话 / 运行生命周期 / 事件流全部由 DSH session log（JSONL + SQLite 查询）接管；PostgreSQL 仅保留知识库（pgvector）、cron 任务、审批待办与管理面。
 - **进程拓扑**：飞书 Gateway 与 Worker 执行面分离，Auth、Admin、浏览器和预览服务按部署组合独立运行；各入口通过 Cordis 配置装载插件。
 - **机器人模板**：映射为 DSH agent presets（每会话 isolate realm 提供隔离）；平台强制策略留在常驻 bundle 层。
