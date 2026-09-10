@@ -1009,7 +1009,13 @@ function injectRemoteSettings(body: Buffer, userId: string, admin: boolean): Buf
   // DSH 的会话选择存储是浏览器级键；账号切换时必须先清除旧账号的
   // 会话/工作区状态，避免客户端在权限列表加载前请求旧 sessionId。
   const flags = admin ? "{remoteSettings:true,remoteAdminSettings:true}" : "{remoteSettings:true}";
-  const script = `<script>(()=>{const k=${JSON.stringify(ACCOUNT_STORAGE_KEY)},u=${account};try{if(localStorage.getItem(k)!==u){for(const x of ${keys})localStorage.removeItem(x);localStorage.setItem(k,u)}}catch{}globalThis.__DSH_AUTH_EDGE__=${flags};})()</script>`;
+  // Auth Edge 是公网页面的唯一 Host 载体：它在同源 /api 上完成身份、
+  // 所有权和方法级授权，并对 settings 读结果做用户级脱敏。在官方
+  // Connection 初始化前通过其公开 transport hook 声明 Host 可达，
+  // 否则 ui-settings 会把所有非 loopback 页面固定为 memory 模式，
+  // 即使 Auth Edge 已安全提供 settings.describe 也不会读取。
+  // 保留其他载体预置的 fetch/openStream，只补充能力声明。
+  const script = `<script>(()=>{const k=${JSON.stringify(ACCOUNT_STORAGE_KEY)},u=${account};try{if(localStorage.getItem(k)!==u){for(const x of ${keys})localStorage.removeItem(x);localStorage.setItem(k,u)}}catch{}const t=globalThis.__DSH_TRANSPORT__??={};t.ownsHost=true;globalThis.__DSH_AUTH_EDGE__=${flags};})()</script>`;
   const injected = html.includes(marker) ? html.replace(marker, `${script}${marker}`) : `${script}${html}`;
   return Buffer.from(injected, "utf8");
 }
