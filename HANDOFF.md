@@ -2,6 +2,8 @@
 
 更新时间：2026-09-10。适用分支：`desktop`。当前开发基线：`220e804`；桌面根 README：`7c8d99f`。本文是下一轮桌面开发的入口，不是发布验收证明。
 
+Web `master` 已同步至 `9d17830`；其中液态玻璃主题、双色 SVG 背景以及标题/顶部标签无框样式属于共享插件能力。桌面合入后须按本分支的桌面兼容门禁重新验证，不把 Web 生产 release 或凭据复制到桌面。
+
 ## 1. 接手位置与约束
 
 - 上游已通过 `upstream/dsh-desktop` Git 子模块关联。首次接手运行 `git submodule update --init --recursive`，确认 `git submodule status` 指向 `a1ddcda8e701a8490c619ce411ea8a3d6daa1453`。后续候选使用此检出，不依赖旧 `/tmp` 研究副本。升级必须同时评审子模块指针与准备脚本固定 revision，不能自动追踪远端 HEAD。

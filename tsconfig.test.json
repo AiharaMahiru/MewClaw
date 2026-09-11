@@ -3,6 +3,8 @@
   "compilerOptions": {
     "declaration": false,
     "paths": {
+      "dsh-lark-desktop-host": ["packages/desktop/host/src/index.ts"],
+      "dsh-lark-desktop-workspace": ["packages/desktop/workspace/src/index.ts"],
       "dsh-lark": ["packages/lark/lark/src/index.ts"],
       "dsh-lark-card": ["packages/lark/card/src/index.ts"],
       "dsh-lark-approval": ["packages/lark/approval/src/index.ts"],
@@ -56,6 +58,8 @@
     "**/lib/**",
     "**/dist/**",
     "**/node_modules/**",
-    "apps/admin-web/**"
+    "apps/admin-web/**",
+    "packages/desktop/workspace/src/client.ts",
+    "apps/desktop/**"
   ]
 }

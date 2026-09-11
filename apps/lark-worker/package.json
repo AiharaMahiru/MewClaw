@@ -18,6 +18,8 @@
     }
   },
   "dependencies": {
+    "dsh-lark-liquid-glass": "workspace:*",
+    "dsh-lark-desktop-workspace": "workspace:*",
     "@deepseek-ai/dsh-agent-presets": "0.1.5-rc.1",
     "@linxin666/dsh-web-all": "0.3.19",
     "@linxin666/dsh-perf": "0.3.14",

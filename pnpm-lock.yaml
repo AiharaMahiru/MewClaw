@@ -422,6 +422,12 @@ importers:
       dsh-lark-cron:
         specifier: workspace:*
         version: link:packages/lark/cron
+      dsh-lark-desktop-host:
+        specifier: workspace:*
+        version: link:packages/desktop/host
+      dsh-lark-desktop-workspace:
+        specifier: workspace:*
+        version: link:packages/desktop/workspace
       dsh-lark-gateway:
         specifier: workspace:*
         version: link:packages/lark/gateway
@@ -431,6 +437,9 @@ importers:
       dsh-lark-image:
         specifier: workspace:*
         version: link:packages/lark/image
+      dsh-lark-liquid-glass:
+        specifier: workspace:*
+        version: link:packages/ui/liquid-glass
       dsh-lark-postgres-runtime:
         specifier: workspace:*
         version: link:infra/postgres
@@ -776,6 +785,12 @@ importers:
       dsh-lark-deepseek-routing:
         specifier: workspace:*
         version: link:../../packages/llm/deepseek-routing
+      dsh-lark-desktop-workspace:
+        specifier: workspace:*
+        version: link:../../packages/desktop/workspace
+      dsh-lark-liquid-glass:
+        specifier: workspace:*
+        version: link:../../packages/ui/liquid-glass
       dsh-lark-run:
         specifier: workspace:*
         version: link:../../packages/lark/run
@@ -1055,6 +1070,9 @@ importers:
       dsh-lark-atw-brand:
         specifier: workspace:*
         version: link:../../lark/atw-brand
+      dsh-lark-liquid-glass:
+        specifier: workspace:*
+        version: link:../../ui/liquid-glass
       dsh-lark-web-auth:
         specifier: workspace:*
         version: link:../../lark/web-auth
@@ -1104,6 +1122,9 @@ importers:
       dsh-lark-deepseek-routing:
         specifier: workspace:*
         version: link:../../llm/deepseek-routing
+      dsh-lark-desktop-workspace:
+        specifier: workspace:*
+        version: link:../../desktop/workspace
       dsh-lark-image:
         specifier: workspace:*
         version: link:../../lark/image
@@ -1174,6 +1195,46 @@ importers:
       '@deepseek-ai/cordis':
         specifier: 4.0.2
         version: 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.7)(@deepseek-ai/cordis-plugin-loader@1.0.3)
+
+  packages/desktop/host:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 4.0.2
+        version: 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.7)(@deepseek-ai/cordis-plugin-loader@1.0.3)
+      '@deepseek-ai/dsh-bash-local':
+        specifier: 0.1.5-rc.1
+        version: 0.1.5-rc.1(430f099e0537bf5935411aa57c0d0e78)
+      '@deepseek-ai/dsh-fs':
+        specifier: 0.1.5-rc.1
+        version: 0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-sandbox@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-llm@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-session@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)))))
+      '@deepseek-ai/dsh-fs-local':
+        specifier: 0.1.5-rc.1
+        version: 0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-fs@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-llm@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-sandbox@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-llm@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-session@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))))))
+      '@deepseek-ai/dsh-pwsh-local':
+        specifier: 0.1.5-rc.1
+        version: 0.1.5-rc.1(430f099e0537bf5935411aa57c0d0e78)
+      '@deepseek-ai/dsh-shell':
+        specifier: 0.1.5-rc.1
+        version: 0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-sandbox@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-llm@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-session@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)))))(@deepseek-ai/dsh-settings@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-session@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/schemastery@3.18.2))(@deepseek-ai/dsh-subprocess@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-http-proxy@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)))
+      '@deepseek-ai/dsh-subprocess-local':
+        specifier: 0.1.5-rc.1
+        version: 0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-subprocess@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-http-proxy@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2)))(@deepseek-ai/dsh-timeout@0.1.5-rc.1(@deepseek-ai/cordis@4.0.2))
+      '@types/node':
+        specifier: 24.10.1
+        version: 24.10.1
+
+  packages/desktop/workspace:
+    dependencies:
+      dsh-lark-contracts:
+        specifier: workspace:*
+        version: link:../../lark/contracts
+      dsh-lark-desktop-host:
+        specifier: workspace:*
+        version: link:../host
+    devDependencies:
+      '@types/react':
+        specifier: 18.3.28
+        version: 18.3.28
 
   packages/identity/canonical-user:
     dependencies:
@@ -2108,6 +2169,22 @@ importers:
       '@deepseek-ai/cordis':
         specifier: 4.0.2
         version: 4.0.2(@deepseek-ai/cordis-plugin-include@1.0.7)(@deepseek-ai/cordis-plugin-loader@1.0.3)
+
+  packages/ui/liquid-glass:
+    dependencies:
+      liquid-glass-react:
+        specifier: 1.1.1
+        version: 1.1.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+    devDependencies:
+      '@types/react':
+        specifier: ~18.3.1
+        version: 18.3.28
+      react:
+        specifier: 18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: 18.3.1
+        version: 18.3.1(react@18.3.1)
 
   packages/web/firecrawl:
     dependencies:
@@ -5523,6 +5600,9 @@ packages:
     peerDependencies:
       '@types/react': ^19.2.0
 
+  '@types/react@18.3.28':
+    resolution: {integrity: sha512-z9VXpC7MWrhfWipitjNdgCauoMLRdIILQsAEV+ZesIzBq/oUlxk0m3ApZuMFCXdnS4U7KrI+l3WRUEGQ8K1QKw==}
+
   '@types/react@18.3.31':
     resolution: {integrity: sha512-vfEqpXTvwT91yhmwdfouStN2hSKwTvyRs8qpLfADyrq/kxDw0hZM7Wk9Ug1FELj8hIby+S/+kQCSRFF32nv2Qw==}
 
@@ -6893,6 +6973,12 @@ packages:
 
   linkify-it@5.0.0:
     resolution: {integrity: sha512-5aHCbzQRADcdP+ATqnDuhhJ/MRIqDkZX5pyjFHRRysS8vZ5AbqGEoFIb6pYHPZ+L/OC2Lc+xT8uHVVR5CAK/wQ==}
+
+  liquid-glass-react@1.1.1:
+    resolution: {integrity: sha512-pKzaktaMAEztd93wpWcz2Z5Z9qdLJUNJdMX+n00Ca4XsnrLTQ5xJzm/+GQXZUeuFXe/PQ8ziVMZO6531PyaFJw==}
+    peerDependencies:
+      react: '>=19'
+      react-dom: '>=19'
 
   locate-path@6.0.0:
     resolution: {integrity: sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==}
@@ -12168,6 +12254,11 @@ snapshots:
     dependencies:
       '@types/react': 19.2.10
 
+  '@types/react@18.3.28':
+    dependencies:
+      '@types/prop-types': 15.7.15
+      csstype: 3.2.3
+
   '@types/react@18.3.31':
     dependencies:
       '@types/prop-types': 15.7.15
@@ -13685,6 +13776,11 @@ snapshots:
   linkify-it@5.0.0:
     dependencies:
       uc.micro: 2.1.0
+
+  liquid-glass-react@1.1.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
+    dependencies:
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   locate-path@6.0.0:
     dependencies:

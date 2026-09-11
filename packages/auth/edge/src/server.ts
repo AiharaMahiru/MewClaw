@@ -11,6 +11,7 @@ import { FAVICON_PATH as BRAND_FAVICON_PATH, MANIFEST_PATH as BRAND_MANIFEST_PAT
 import { UrlPolicy } from "dsh-lark-url-policy";
 
 import { DEFAULT_PREVIEW_URL, type AuthEdgeConfig } from "./config.js";
+import { proxyDesktopWorkspace } from "./desktop-workspace.js";
 import { appendCookie, CSRF_COOKIE, newCsrfToken, OAUTH_STATE_COOKIE, readCookie, sessionCookieName } from "./cookies.js";
 import { exchangeFeishuCode, buildFeishuAuthorizeUrl } from "./feishu.js";
 import { csrfToken, httpError, readBody, readJson, sendError, sendHtml, sendJson, sessionToken } from "./http-utils.js";
@@ -133,6 +134,10 @@ export class AuthEdgeServer {
     if (url.pathname === "/" && req.method === "GET") { await this.handleHome(req, res); return; }
     const current = await this.current(req);
     if (!current) { sendError(res, 401, "UNAUTHORIZED"); return; }
+    if (url.pathname === "/desktop-workspace") return proxyDesktopWorkspace(req, res, {
+      userId: current.user.id, workerBaseUrl: this.#config.workerBaseUrl, workerToken: this.#config.workerToken,
+      requestBodyLimit: this.#config.desktopBodyLimit ?? 8 * 1024 * 1024, findResource: (type, id) => this.#service.findResource(type, id),
+    });
     if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) { await this.proxyAdmin(req, res, current.user); return; }
     if (isAdminDataPath(url.pathname)) { await this.handleAdminData(req, res, url, current.user); return; }
     if (url.pathname.startsWith("/api/admin/")) { await this.proxyAdmin(req, res, current.user); return; }

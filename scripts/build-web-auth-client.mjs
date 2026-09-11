@@ -7,6 +7,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // Web 插件的 client.js 不会由 tsc -b 生成；所有浏览器入口必须在一次构建中
 // 物化，否则新的品牌槽位插件会在下一次发布时静默丢失。
 const entries = [
+  ["packages/desktop/workspace/src/client.ts", "packages/desktop/workspace/client.js"],
   ["packages/lark/web-auth/src/client.ts", "packages/lark/web-auth/client.js"],
   ["packages/lark/atw-brand/src/client.ts", "packages/lark/atw-brand/client.js"],
 ].map(([source, target]) => ({
@@ -23,3 +24,17 @@ await Promise.all(entries.map(({ sourcePath, targetPath }) => build({
   target: "es2022",
   legalComments: "none",
 })));
+
+// 外部 React 由官方 ModuleLoader 注入，避免折射库打包第二份 hooks runtime。
+await build({
+  entryPoints: [resolve(root, "packages/ui/liquid-glass/src/client.ts")],
+  outfile: resolve(root, "packages/ui/liquid-glass/client.js"),
+  bundle: true,
+  format: "cjs",
+  platform: "browser",
+  target: "es2022",
+  external: ["react", "react-dom", "react/jsx-runtime"],
+  legalComments: "eof",
+  banner: { js: 'globalThis.__ModuleLoader__.load({id:"dsh-lark-liquid-glass",factory:(require)=>{const module={exports:{}};const exports=module.exports;' },
+  footer: { js: "return module.exports;}});" },
+});
