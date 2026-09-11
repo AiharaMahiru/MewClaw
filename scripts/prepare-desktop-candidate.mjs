@@ -19,7 +19,23 @@ await mkdir(destination, { recursive: true });
 await cp(resolve(source, 'dsh-plugin-desktop'), resolve(destination, 'dsh-plugin-desktop'), { recursive: true });
 await cp(resolve(source, 'LICENSE'), resolve(destination, 'UPSTREAM-LICENSE'));
 await cp(fileURLToPath(new URL('../apps/desktop/plugins/cloud', import.meta.url)), resolve(destination, 'mewclaw-cloud'), { recursive: true });
+await cp(fileURLToPath(new URL('../packages/desktop/host', import.meta.url)), resolve(destination, 'mewclaw-host'), { recursive: true, filter: path => !path.split(/[\\/]/).includes('lib') });
+const hostManifestPath = resolve(destination, 'mewclaw-host/package.json');
+const hostManifest = JSON.parse(await readFile(hostManifestPath, 'utf8'));
+// 桌面与服务器各自锁定官方版本，共享 Consumer 不把服务端版本带进 Electron。
+for (const name of Object.keys(hostManifest.devDependencies ?? {})) {
+  if (name.startsWith('@deepseek-ai/dsh-')) hostManifest.devDependencies[name] = '0.1.2-rc.1';
+}
+await writeFile(hostManifestPath, JSON.stringify(hostManifest, null, 2) + '\n');
+const hostTsconfigPath = resolve(destination, 'mewclaw-host/tsconfig.json');
+const hostTsconfig = JSON.parse(await readFile(hostTsconfigPath, 'utf8'));
+delete hostTsconfig.extends;
+hostTsconfig.compilerOptions = { ...JSON.parse(await readFile(fileURLToPath(new URL('../tsconfig.base.json', import.meta.url)), 'utf8')).compilerOptions, ...hostTsconfig.compilerOptions };
+delete hostTsconfig.compilerOptions.baseUrl;
+hostTsconfig.compilerOptions.types = ['node'];
+await writeFile(hostTsconfigPath, JSON.stringify(hostTsconfig, null, 2) + '\n');
 await cp(fileURLToPath(new URL('../apps/desktop/launcher.mjs', import.meta.url)), resolve(destination, 'launcher.mjs'));
+await cp(fileURLToPath(new URL('../apps/desktop/electron-builder.cjs', import.meta.url)), resolve(destination, 'electron-builder.cjs'));
 const sourceChanges = [];
 for (const filename of ['index.ts', 'notifications.ts']) {
   const path = resolve(destination, 'dsh-plugin-desktop/src', filename);
@@ -32,6 +48,13 @@ for (const filename of ['index.ts', 'notifications.ts']) {
   await writeFile(path, updated);
   sourceChanges.push(`${filename}: settingsNamespace 改为官方支持的字符串参数`);
 }
+const smokePath = resolve(destination, 'dsh-plugin-desktop/src/packaged-runtime-smoke.ts');
+const smokeSource = await readFile(smokePath, 'utf8');
+const asarPattern = String.raw`/([\\/])app\.asar\.unpacked\1/u.test(rgPath)`;
+if (!smokeSource.includes(asarPattern)) throw new Error('上游原生路径烟雾入口已变化');
+await writeFile(smokePath, smokeSource.replace(asarPattern,
+  String.raw`/([\\/])resources\1(?:app\.asar\.unpacked\1)?node_modules\1/u.test(rgPath)`));
+sourceChanges.push('packaged-runtime-smoke.ts: 接受独立物理 resources/node_modules 的原生依赖布局');
 const manifestPath = resolve(destination, 'dsh-plugin-desktop/package.json');
 const profilePath = resolve(destination, 'dsh-plugin-desktop/src/profile.ts');
 const profileSource = await readFile(profilePath, 'utf8');
@@ -48,9 +71,12 @@ for (const name of ['@agents-anywhere/dsh-bridge-next', 'dsh-community-market', 
 delete manifest.scripts.prepack;
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 await writeFile(resolve(destination, 'package.json'), `${JSON.stringify({
-  name: 'mewclaw-desktop-candidate', private: true, type: 'module', main: 'launcher.mjs',
-  workspaces: ['dsh-plugin-desktop', 'mewclaw-cloud'],
-  scripts: { build: 'npm run build --workspace dsh-plugin-desktop' },
+  name: 'mewclaw-desktop-candidate', version: '0.1.0-desktop.5',
+  description: 'MewClaw desktop development build', author: 'MewClaw contributors', license: 'MIT',
+  private: true, type: 'module', main: 'launcher.mjs',
+  dependencies: { 'dsh-plugin-desktop': manifest.version, 'dsh-lark-desktop-cloud': '0.1.0' },
+  workspaces: ['dsh-plugin-desktop', 'mewclaw-cloud', 'mewclaw-host'],
+  scripts: { build: 'npm run build --workspace mewclaw-host && npm run build --workspace dsh-plugin-desktop && npm run build --workspace mewclaw-cloud' },
 }, null, 2)}\n`);
 await writeFile(resolve(destination, 'UPSTREAM.json'), `${JSON.stringify({
   repository: 'https://github.com/anywhere-labs/dsh-desktop', revision,
@@ -58,4 +84,5 @@ await writeFile(resolve(destination, 'UPSTREAM.json'), `${JSON.stringify({
   officialPatches: [], sourceChanges,
   manifestChanges: ['排除可选市场与 AA 依赖', '关闭发行 prepack 全仓库钩子'],
 }, null, 2)}\n`);
-console.log(`候选已创建：${destination}；仅生成候选清单，尚未验证兼容性`);
+await cp(fileURLToPath(new URL('../apps/desktop/candidate.package-lock.json', import.meta.url)), resolve(destination, 'package-lock.json'));
+console.log(`候选已创建：${destination}；已复制冻结锁文件，尚未验证兼容性`);

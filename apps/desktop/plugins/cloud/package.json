@@ -7,6 +7,7 @@
   "types": "lib/index.d.ts",
   "exports": { ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" } },
   "scripts": { "build": "tsc -p tsconfig.json" },
+  "dependencies": { "dsh-lark-desktop-host": "0.1.0" },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
     "@deepseek-ai/dsh-client-connection": "0.1.2-rc.1",

@@ -1,6 +1,8 @@
 # MewClaw 桌面开发
 
-当前为开发基线，不是可交付 APP。本地文件 Consumer 已有测试，原生目录授权、云端工具桥接、Windows 打包仍待完成。
+当前开发源码为 `0.1.0-desktop.5`，包含增强模式布局修复、登录 Cookie 保持、云端/本地电脑切换、独立授权的本机 Shell 与目录双向同步。隔离候选已验证文件/Shell/同步跨端链路；本轮未部署生产、未构建新版 Windows 安装包、未完成 Windows 实机或生产真实模型验收。
+
+本地模式继续使用云端账号和模型。目录选择只授权文件读写；Shell 和同步需分别原生确认。Shell 按当前 OS 用户权限执行，不是目录沙箱。同步支持二进制与嵌套文件，冲突保留两端，删除和替换保留恢复副本；不复制空目录和权限位，不重放离线写入。云端安装边界与验收步骤见 [工作区配套说明](workspace-deployment.md)。
 
 ## 分支与同步
 
@@ -23,13 +25,28 @@
 git submodule update --init --recursive
 node scripts/prepare-desktop-candidate.mjs /absolute/MewClaw/upstream/dsh-desktop /absolute/new-candidate
 cd /absolute/new-candidate
-npm install --ignore-scripts --no-audit --no-fund
+npm ci --ignore-scripts --no-audit --no-fund
 npm run build
-npm run build --workspace dsh-lark-desktop-cloud
-npx vitest run mewclaw-cloud/src
+node /absolute/MewClaw/apps/desktop/verify-workspace.mjs /absolute/new-candidate
 ```
 
 需要 Node 24。安装生命周期默认关闭，Electron 下载及平台原生依赖必须另行审核处理；上述命令不是安装包构建流程。
+
+准备脚本复制版本化的 `candidate.package-lock.json`，使用 `npm ci` 固定依赖；上游版本或依赖变更时，必须在隔离候选重新生成、审阅并更新此锁文件，不手工修改校验摘要。
+
+## Windows 开发包
+
+在独立候选目录执行（Node 24 / Windows x64）：
+
+```sh
+node node_modules/electron/install.js
+node node_modules/electron-builder/cli.js --config electron-builder.cjs --win --x64 --publish never
+node /absolute/MewClaw/apps/desktop/verify-package.mjs /absolute/new-candidate
+```
+
+Electron 安装器会校验固定版本的下载摘要；官方连接不可用时可对该命令设置 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`。输出目录为候选下的 `release/`，包括当前用户安装程序 `*-Setup.exe`、便携启动器 `*-Portable.exe`、完整 ZIP，以及 `win-unpacked/MewClaw.exe`。`win-unpacked` 中的 EXE 必须与整个目录一起保留。
+
+验证脚本检查 MewClaw 启动入口、官方运行时打包前后字节一致性、真实 Electron 的 DSH/pnpm/原生依赖和无头 CLI，最后打印产物 SHA-256。全部采用无凭证临时 DSH_HOME，不执行真实云端会话。开发包不包含代码签名。
 
 上游升级须单独 PR：评审新提交，同步调整准备脚本的固定 revision，重跑兼容与完整性门禁，最后提交子模块指针。不要用 `git submodule update --remote` 自动追踪最新版本；GitHub 源码 ZIP 不含子模块内容。
 

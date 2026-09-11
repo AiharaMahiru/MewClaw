@@ -4,7 +4,7 @@
 
 | SPEC | 包 | 角色 | 里程碑 | 状态 |
 | --- | --- | --- | --- | --- |
-| [liquid-glass-theme.md](liquid-glass-theme.md) | `dsh-lark-liquid-glass` | 官方 Theme/Slots 的 Provider / Consumer | 可选主题 | done（源码） |
+| [liquid-glass-theme.md](liquid-glass-theme.md) | `dsh-lark-liquid-glass` | 官方 Theme/Slots 的 Provider / Consumer | 可选主题 | done（Web生产） |
 | [desktop-app.md](desktop-app.md) | 桌面发行组合 | App / Bundle | Desktop 1 | implementing |
 | [desktop-workspace.md](desktop-workspace.md) | `dsh-lark-desktop-host` / `dsh-lark-desktop-workspace` / Auth Edge | Definition / Provider / Consumer | Desktop Shell + Sync | implementing |
 | [account-feishu-settings.md](account-feishu-settings.md) | `dsh-lark-web-auth` | 官方设置 slot 的自有 UI 贡献 | 账户 UI | implementing |

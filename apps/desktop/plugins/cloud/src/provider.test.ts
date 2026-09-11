@@ -18,8 +18,8 @@ describe('真实 Cordis Provider 注册', () => {
     try {
       await ctx.plugin(Provider, { host: '127.0.0.1', port: 0, cloudOrigin: `http://127.0.0.1:${address.port}`, cloudTimeoutMs: 1000 });
       const server = ctx.webServer;
-      const fallback = server.registerFallback((_req, res) => res.end('unexpected local'));
-      const local = server.register({ kind: 'exact', path: '/api/desktop/probe', handler: (_req, res) => res.end('local') });
+      const fallback = server.registerFallback((_req, res) => { res.end('unexpected local'); });
+      const local = server.register({ kind: 'exact', path: '/api/desktop/probe', handler: (_req, res) => { res.end('local'); } });
       const base = `http://127.0.0.1:${server.port}`;
       expect(await (await fetch(base)).text()).toBe('cloud');
       expect(await (await fetch(`${base}/api/desktop/probe`)).text()).toBe('local');
