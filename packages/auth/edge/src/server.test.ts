@@ -20,6 +20,25 @@ const servers: Array<{ close(): Promise<void> }> = [];
 afterEach(async () => { while (servers.length) await servers.pop()!.close(); });
 
 describe("AuthEdgeServer", () => {
+  it("桌面推理入口必须经过登录与CSRF，缺少默认模型明确拒绝", async () => {
+    const mail = new FakeMail();
+    const service = new AuthService({ store: new MemoryAuthStore(), mail });
+    await service.register('desktop@example.com', 'correct horse battery staple', '桌面测试', { requestId: 'test' });
+    const user = await verifyLatest(service, mail, 'desktop@example.com');
+    const edgeConfig = config(1);
+    const edge = createAuthEdgeServer({ config: edgeConfig, service });
+    const base = await listenEdge(edge, edgeConfig);
+    servers.push({ close: () => edge.close() });
+    const url = `${base}/auth/desktop-inference/chat/completions`;
+    const body = JSON.stringify({ model: 'cloud-default', stream: true, messages: [{ role: 'user', content: 'hello' }] });
+    const headers = { origin: base, cookie: `dsh_session=${user!.token}; dsh_csrf=test`, 'x-csrf-token': 'test' };
+    expect((await fetch(url, { method: 'POST', body })).status).toBe(403);
+    expect((await fetch(url, { method: 'POST', body, headers: { ...headers, origin: 'https://untrusted.invalid' } })).status).toBe(403);
+    expect((await fetch(url, { method: 'POST', body, headers: { ...headers, cookie: 'dsh_csrf=test' } })).status).toBe(401);
+    const response = await fetch(url, { method: 'POST', body, headers });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'CLOUD_DEFAULT_MODEL_REQUIRED' });
+  });
   it.each(["allow", "block", "unavailable", "missing", "throw"] as const)("提示词审计 %s 时覆盖全部入口并严格控制 Worker 转发", async (result) => {
     const forwarded: string[] = [];
     const audited: string[] = [];

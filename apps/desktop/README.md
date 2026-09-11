@@ -1,8 +1,10 @@
 # MewClaw 桌面开发
 
-当前开发源码为 `0.1.0-desktop.5`，包含增强模式布局修复、登录 Cookie 保持、云端/本地电脑切换、独立授权的本机 Shell 与目录双向同步。隔离候选已验证文件/Shell/同步跨端链路；本轮未部署生产、未构建新版 Windows 安装包、未完成 Windows 实机或生产真实模型验收。
+当前发行候选版本为 `1.0.0`。左侧栏品牌下方提供云端/本地会话切换，本地 Harness、会话与文件工具在电脑运行；打开本地目录不依赖云端工作区桥接。切换有序重启 APP，两边历史分别保留。实际验收见 [验证记录](../../docs/evidence/desktop-local-harness-20260911.md)。
 
-本地模式继续使用云端账号和模型。目录选择只授权文件读写；Shell 和同步需分别原生确认。Shell 按当前 OS 用户权限执行，不是目录沙箱。同步支持二进制与嵌套文件，冲突保留两端，删除和替换保留恢复副本；不复制空目录和权限位，不重放离线写入。云端安装边界与验收步骤见 [工作区配套说明](workspace-deployment.md)。
+桌面和 Web 官方依赖统一为 `0.1.5-rc.1`。本地复用 Web 品牌插件及 main/rightbar 布局契约；冻结官方版本闭包以避免 npm 自动混入 rc.2。新增 Markdown/编辑器依赖为社区 Consumer 构建和测试使用，不通过修改官方包规避缺失依赖。
+
+本地模式继续使用云端账号模型，当前仅支持账号私有默认模型，并需部署本轮 Auth Edge 推理接口；未部署时本地目录仍可打开，但模型推理不可用。原生目录选择只授权文件读写，本地模式禁止 Shell 和同步。退出、切换或重新登录后需重新选择目录。旧云端桥接说明见 [工作区配套说明](workspace-deployment.md)，本轮新契约及 Web 修改见 [HANDOFF](../../HANDOFF.md)。
 
 ## 分支与同步
 
@@ -43,6 +45,8 @@ node node_modules/electron/install.js
 node node_modules/electron-builder/cli.js --config electron-builder.cjs --win --x64 --publish never
 node /absolute/MewClaw/apps/desktop/verify-package.mjs /absolute/new-candidate
 ```
+
+本机本轮使用既有 `MewClaw-desktop-candidate`，为避开用户正在运行的旧 APP，构建命令追加 `--config.directories.output=release/desktop.6`，验包追加 `--release-dir=release/desktop.6`。无需另建候选目录。UI 冒烟入口：`node apps/desktop/local-ui-smoke.mjs <候选绝对路径> advanced --switch`，使用临时用户数据，不登录或请求真实模型。
 
 Electron 安装器会校验固定版本的下载摘要；官方连接不可用时可对该命令设置 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`。输出目录为候选下的 `release/`，包括当前用户安装程序 `*-Setup.exe`、便携启动器 `*-Portable.exe`、完整 ZIP，以及 `win-unpacked/MewClaw.exe`。`win-unpacked` 中的 EXE 必须与整个目录一起保留。
 

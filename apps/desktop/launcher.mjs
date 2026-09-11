@@ -5,10 +5,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const userData = join(app.getPath('appData'), 'MewClaw');
+const userData = app.commandLine.getSwitchValue('user-data-dir') || join(app.getPath('appData'), 'MewClaw');
 app.setPath('userData', userData);
 process.env.DSH_HOME ??= join(userData, 'harness');
 process.env.MEWCLAW_DESKTOP_CLOUD = '1';
+const locationPath = join(process.env.DSH_HOME, 'mewclaw-location.json');
+try { if (JSON.parse(readFileSync(locationPath, 'utf8')).location === 'local') process.env.MEWCLAW_DESKTOP_NO_PRESETS = '1'; } catch {}
 const require = createRequire(import.meta.url);
 const manifestPath = require.resolve('dsh-plugin-desktop/package.json');
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));

@@ -21,7 +21,7 @@ module.exports = {
   },
   win: {
     target: ['nsis', 'portable', 'zip'],
-    icon: 'dsh-plugin-desktop/build/app-icon.ico',
+    icon: 'mewclaw-brand/build/app-icon.ico',
     signExecutable: false,
     artifactName: 'MewClaw-${version}-win-${arch}.${ext}',
   },

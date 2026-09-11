@@ -3,6 +3,8 @@ import { cp, mkdir, readFile, writeFile, access } from 'node:fs/promises';
 import { resolve, isAbsolute } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { prepareDesktopUiContract } from './desktop-ui-contract.mjs';
+import { prepareDesktopBrand } from './prepare-desktop-brand.mjs';
 
 const [sourceArg, destinationArg] = process.argv.slice(2);
 if (!sourceArg || !destinationArg || !isAbsolute(sourceArg) || !isAbsolute(destinationArg)) {
@@ -19,14 +21,16 @@ await mkdir(destination, { recursive: true });
 await cp(resolve(source, 'dsh-plugin-desktop'), resolve(destination, 'dsh-plugin-desktop'), { recursive: true });
 const desktopPatch = fileURLToPath(new URL('../apps/desktop/patches/cloud-layout-bridge.patch', import.meta.url));
 execFileSync('git', ['apply', '--whitespace=error-all', desktopPatch], { cwd: destination, stdio: 'inherit' });
+await prepareDesktopUiContract(destination);
 await cp(resolve(source, 'LICENSE'), resolve(destination, 'UPSTREAM-LICENSE'));
 await cp(fileURLToPath(new URL('../apps/desktop/plugins/cloud', import.meta.url)), resolve(destination, 'mewclaw-cloud'), { recursive: true });
+await prepareDesktopBrand(destination);
 await cp(fileURLToPath(new URL('../packages/desktop/host', import.meta.url)), resolve(destination, 'mewclaw-host'), { recursive: true, filter: path => !path.split(/[\\/]/).includes('lib') });
 const hostManifestPath = resolve(destination, 'mewclaw-host/package.json');
 const hostManifest = JSON.parse(await readFile(hostManifestPath, 'utf8'));
 // 桌面与服务器各自锁定官方版本，共享 Consumer 不把服务端版本带进 Electron。
 for (const name of Object.keys(hostManifest.devDependencies ?? {})) {
-  if (name.startsWith('@deepseek-ai/dsh-')) hostManifest.devDependencies[name] = '0.1.2-rc.1';
+  if (name.startsWith('@deepseek-ai/dsh-')) hostManifest.devDependencies[name] = '0.1.5-rc.1';
 }
 await writeFile(hostManifestPath, JSON.stringify(hostManifest, null, 2) + '\n');
 const hostTsconfigPath = resolve(destination, 'mewclaw-host/tsconfig.json');
@@ -39,7 +43,8 @@ await writeFile(hostTsconfigPath, JSON.stringify(hostTsconfig, null, 2) + '\n');
 await cp(fileURLToPath(new URL('../apps/desktop/launcher.mjs', import.meta.url)), resolve(destination, 'launcher.mjs'));
 await cp(fileURLToPath(new URL('../apps/desktop/electron-builder.cjs', import.meta.url)), resolve(destination, 'electron-builder.cjs'));
 const sourceChanges = [];
-sourceChanges.push('dsh-plugin-desktop: 为云端 DSH 0.1.5 补齐 main/rightbar、panelInfo 与布局服务兼容契约');
+sourceChanges.push('dsh-plugin-desktop: 云端与本地统一 DSH 0.1.5 的 main/rightbar、品牌与布局服务契约');
+sourceChanges.push('原生 file 页面去掉无效 meta frame-ancestors；ProfilePatchReload 类型从公开 Profile 推导');
 for (const filename of ['index.ts', 'notifications.ts']) {
   const path = resolve(destination, 'dsh-plugin-desktop/src', filename);
   const original = await readFile(path, 'utf8');
@@ -60,12 +65,31 @@ await writeFile(smokePath, smokeSource.replace(asarPattern,
 sourceChanges.push('packaged-runtime-smoke.ts: 接受独立物理 resources/node_modules 的原生依赖布局');
 const manifestPath = resolve(destination, 'dsh-plugin-desktop/package.json');
 const profilePath = resolve(destination, 'dsh-plugin-desktop/src/profile.ts');
-const profileSource = await readFile(profilePath, 'utf8');
+const profileSource = (await readFile(profilePath, 'utf8')).replaceAll('\r\n', '\n');
 const providerLine = 'const DESKTOP_WEB_SERVER_PACKAGE = `${DESKTOP_PACKAGE_NAME}/webserver`';
 if (!profileSource.includes(providerLine)) throw new Error('桌面 WebServer 组合入口已变化');
-await writeFile(profilePath, profileSource.replace(providerLine, "const DESKTOP_WEB_SERVER_PACKAGE = process.env.MEWCLAW_DESKTOP_CLOUD === '1'\n  ? 'dsh-lark-desktop-cloud'\n  : `${DESKTOP_PACKAGE_NAME}/webserver`"));
+await writeFile(profilePath, profileSource.replace(providerLine, "const DESKTOP_WEB_SERVER_PACKAGE = process.env.MEWCLAW_DESKTOP_CLOUD === '1'\n  ? 'dsh-lark-desktop-cloud'\n  : `${DESKTOP_PACKAGE_NAME}/webserver`")
+  .replace('  type ProfilePatchReload,\n', '')
+  .replace("import { resolveDshHome }", "type ProfilePatchReload = Profile['patchReload']\nimport { resolveDshHome }"));
 sourceChanges.push('profile.ts: MewClaw 发行配置选择自有 WebServer Provider');
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+// 0.1.5 新增会话上传 peer，显式锁定，避免 npm 自动选中 rc.2 混装。
+manifest.dependencies['@deepseek-ai/dsh-client-file-upload'] = '0.1.5-rc.1';
+manifest.devDependencies.lexical = '0.49.0';
+manifest.devDependencies.shiki = '4.3.1';
+manifest.devDependencies['@shikijs/langs'] = '4.3.1';
+Object.assign(manifest.devDependencies, {
+  anser: '2.3.5', katex: '0.16.47', 'micromark-core-commonmark': '2.0.3',
+  zustand: '4.4.7', immer: '10.1.1',
+  'micromark-util-classify-character': '2.0.1', 'micromark-factory-space': '2.0.1',
+  'micromark-extension-math': '3.1.0', 'mdast-util-from-markdown': '2.0.3',
+  'mdast-util-gfm': '3.1.0', 'mdast-util-math': '3.0.0', 'micromark-extension-gfm': '3.0.0',
+});
+for (const group of ['dependencies', 'devDependencies', 'peerDependencies']) {
+  for (const name of Object.keys(manifest[group] ?? {})) {
+    if (name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) manifest[group][name] = '0.1.5-rc.1';
+  }
+}
 manifest.dependencies['dsh-lark-desktop-cloud'] = '0.1.0';
 // 第三方市场及 AA 接入不在 MewClaw 首版范围；通过配置关闭，不修改其运行时代码。
 for (const name of ['@agents-anywhere/dsh-bridge-next', 'dsh-community-market', 'dshmarket']) {
@@ -73,13 +97,15 @@ for (const name of ['@agents-anywhere/dsh-bridge-next', 'dsh-community-market', 
 }
 delete manifest.scripts.prepack;
 await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+await cp(fileURLToPath(new URL('../apps/desktop/generate-mewclaw-icon.mjs', import.meta.url)), resolve(destination, 'generate-mewclaw-icon.mjs'));
 await writeFile(resolve(destination, 'package.json'), `${JSON.stringify({
-  name: 'mewclaw-desktop-candidate', version: '0.1.0-desktop.5',
+  name: 'mewclaw-desktop-candidate', version: '1.0.0',
   description: 'MewClaw desktop development build', author: 'MewClaw contributors', license: 'MIT',
   private: true, type: 'module', main: 'launcher.mjs',
   dependencies: { 'dsh-plugin-desktop': manifest.version, 'dsh-lark-desktop-cloud': '0.1.0' },
-  workspaces: ['dsh-plugin-desktop', 'mewclaw-cloud', 'mewclaw-host'],
-  scripts: { build: 'npm run build --workspace mewclaw-host && npm run build --workspace dsh-plugin-desktop && npm run build --workspace mewclaw-cloud' },
+  overrides: JSON.parse(await readFile(fileURLToPath(new URL('../apps/desktop/dsh-overrides.json', import.meta.url)), 'utf8')),
+  workspaces: ['dsh-plugin-desktop', 'mewclaw-cloud', 'mewclaw-host', 'mewclaw-brand'],
+  scripts: { build: 'npm run build --workspace mewclaw-host && npm run build --workspace mewclaw-brand && node generate-mewclaw-icon.mjs && npm run build --workspace dsh-plugin-desktop && npm run build --workspace mewclaw-cloud' },
 }, null, 2)}\n`);
 await writeFile(resolve(destination, 'UPSTREAM.json'), `${JSON.stringify({
   repository: 'https://github.com/anywhere-labs/dsh-desktop', revision,

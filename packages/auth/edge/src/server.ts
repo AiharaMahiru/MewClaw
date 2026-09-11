@@ -11,6 +11,7 @@ import { FAVICON_PATH as BRAND_FAVICON_PATH, MANIFEST_PATH as BRAND_MANIFEST_PAT
 import { UrlPolicy } from "dsh-lark-url-policy";
 
 import { DEFAULT_PREVIEW_URL, type AuthEdgeConfig } from "./config.js";
+import { desktopInference } from "./desktop-inference.js";
 import { proxyDesktopWorkspace } from "./desktop-workspace.js";
 import { appendCookie, CSRF_COOKIE, newCsrfToken, OAUTH_STATE_COOKIE, readCookie, sessionCookieName } from "./cookies.js";
 import { exchangeFeishuCode, buildFeishuAuthorizeUrl } from "./feishu.js";
@@ -168,6 +169,15 @@ export class AuthEdgeServer {
   }
 
   private async handleAuth(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
+    if (req.method === "POST" && url.pathname === "/auth/desktop-inference/chat/completions") {
+      const current = await this.current(req);
+      if (!current) { sendError(res, 401, "UNAUTHORIZED"); return; }
+      if (!this.#generalLimiter.allow(`desktop-inference:${current.user.id}`)) throw httpError(429, "RATE_LIMITED");
+      return desktopInference(req, res, { userId: current.user.id, service: this.#service,
+        maxBytes: this.#config.desktopBodyLimit ?? 8 * 1024 * 1024, timeoutMs: this.#config.desktopInferenceTimeoutMs ?? 120000,
+        audit: text => this.#config.promptAudit?.enabled === false ? Promise.resolve('allow') : this.#promptAuditor?.audit(text) ?? Promise.resolve('unavailable'),
+        assertPublicUrl: assertPublicUserModelUrl });
+    }
     if (["/auth/feishu-bot", "/auth/feishu-bot/test", "/auth/feishu-bot/connection"].includes(url.pathname)) {
       const current = await this.current(req);
       if (!current) { sendError(res, 401, "UNAUTHORIZED"); return; }

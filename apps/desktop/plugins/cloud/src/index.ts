@@ -13,6 +13,15 @@ import { WorkspaceController } from './workspace-controller.js';
 import { localWorkspaceRoute } from './workspace-route.js';
 import type {} from '@deepseek-ai/dsh-shell';
 import type { ControllerOptions } from './workspace-controller.js';
+import { LocationPreference } from './location.js';
+import { locationRoute } from './location-route.js';
+import { prepareLocationRestart } from './location-restart.js';
+import { installLocalBrand } from './local-brand.js';
+import { sessionLocationHtml } from './session-boot.js';
+import { LocalHarnessWorkspaces } from './local-workspaces.js';
+import type {} from '@deepseek-ai/dsh-agent-default-model';
+import { CloudAccountModel, CLOUD_MODEL_PROVIDER } from './cloud-model.js';
+import { resolveDshHome } from '@deepseek-ai/dsh-home-paths';
 
 export interface Config extends WebConfig, Omit<ControllerOptions, 'fs' | 'pick' | 'shell' | 'confirm' | 'maxBytes' | 'maxEntries'> { cloudOrigin: string; cloudTimeoutMs: number; cloudSessionRetentionSeconds?: number; workspaceMaxBytes?: number; workspaceMaxEntries?: number; cloudMaxIndexBytes?: number }
 
@@ -42,6 +51,9 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
   private readonly cloud: CloudProxy;
   private desktopParameters = '';
   private workspace?: WorkspaceController;
+  private localWorkspaces?: LocalHarnessWorkspaces;
+  private accountCookie = '';
+  private readonly location = new LocationPreference(resolveDshHome());
 
   constructor(ctx: Context, config: Config) {
     cloudOrigin(config.cloudOrigin);
@@ -49,15 +61,16 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     const require = createRequire(import.meta.url);
     const script = readFileSync(require.resolve('dsh-plugin-desktop/client'));
     const manifest = JSON.parse(readFileSync(require.resolve('dsh-plugin-desktop/package.json'), 'utf8'));
-    const workspaceScript = Buffer.from(readFileSync(new URL('../lib/workspace-client.js', import.meta.url), 'utf8').replace('\nexport {};', ''));
+    const workspaceScript = Buffer.from(readFileSync(new URL('../lib/sidebar-client.js', import.meta.url), 'utf8').replace('\nexport {};', ''));
     const client = { workspaceRevision: createHash('sha256').update(workspaceScript).digest('hex').slice(0, 16), revision: createHash('sha256').update(script).digest('hex').slice(0, 16), inject: manifest.dsh.client.inject as string[] };
     this.cloud = new CloudProxy({ origin: config.cloudOrigin, timeoutMs: config.cloudTimeoutMs,
       sessionRetentionSeconds: config.cloudSessionRetentionSeconds ?? 2592000,
       maxIndexBytes: config.cloudMaxIndexBytes ?? 2097152,
-      transformIndex: html => desktopCloudHtml(html, client, this.desktopParameters),
+      transformIndex: html => sessionLocationHtml(desktopCloudHtml(html, client, this.desktopParameters), { location: 'cloud', revision: client.workspaceRevision }),
     });
     ctx.effect(() => () => this.cloud.dispose());
     this.installWorkspace(ctx, config, workspaceScript);
+    this.installLocation(ctx, config, client.workspaceRevision);
     ctx.effect(() => this.register({ kind: 'exact', path: DESKTOP_CLIENT_PATH, handler: (req, res) => {
       const rejection = this.ctx.get('connection')?.requestRejection(req);
       if (!this.ctx.get('connection') || rejection !== undefined) { res.writeHead(rejection ?? 503); res.end(); return; }
@@ -90,13 +103,47 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     });
     const controller = this.workspace;
     ctx.effect(() => () => controller.dispose());
-    ctx.effect(() => this.register({ kind: 'exact', path: '/api/mewclaw-desktop/workspace',
-      handler: localWorkspaceRoute({ origin: config.cloudOrigin, controller, reject }) }));
+    const bridge = localWorkspaceRoute({ origin: config.cloudOrigin, controller, reject });
+    ctx.effect(() => this.register({ kind: 'exact', path: '/api/mewclaw-desktop/workspace', handler: (req, res) => {
+      if (this.location.location === 'local') { res.writeHead(409); res.end('CLOUD_WORKSPACE_DISABLED_IN_LOCAL_MODE'); return; }
+      return bridge(req, res);
+    } }));
     ctx.effect(() => this.register({ kind: 'exact', path: '/_dsh/desktop/workspace-client.js', handler: (req, res) => {
       const rejection = reject(req);
       if (rejection !== undefined) { res.writeHead(rejection); res.end(); return; }
       res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' }); res.end(script);
     } }));
+  }
+
+  private installLocation(ctx: Context, config: Config, revision: string): void {
+    const reject = (req: Parameters<WebRoute['handler']>[0]) => ctx.get('connection')?.requestRejection(req) ?? (ctx.get('connection') ? undefined : 503);
+    ctx.effect(() => this.register({ kind: 'exact', path: '/api/mewclaw-desktop/location', handler: locationRoute({
+      preference: this.location, reject,
+      restart: prepareLocationRestart,
+    }) }));
+    if (this.location.location !== 'local') return;
+    ctx.inject(['tools'], local => local.effect(() => local.tools.guard(exec =>
+      exec.name === 'desktop_workspace' ? undefined : 'LOCAL_TOOL_NOT_AUTHORIZED')));
+    ctx.inject(['llm', 'agentDefaultModel'], async local => {
+      local.effect(() => local.llm.registerAdapter([CLOUD_MODEL_PROVIDER], new CloudAccountModel({ origin: cloudOrigin(config.cloudOrigin).origin, cookie: () => this.accountCookie })));
+      await local.agentDefaultModel.saveSelection({ provider: CLOUD_MODEL_PROVIDER, model: 'cloud-default' });
+    });
+    const brandRevision = installLocalBrand(ctx);
+    ctx.effect(() => this.tapIndex(html => sessionLocationHtml(html, { location: 'local', revision, brandRevision })));
+    ctx.inject(['tools', 'fs', 'sessions', 'workspaceRegistry'], local => {
+      const workspaces = new LocalHarnessWorkspaces(local, { maxBytes: config.workspaceMaxBytes ?? 262144, maxEntries: config.workspaceMaxEntries ?? 500 });
+      this.localWorkspaces = workspaces;
+      workspaces.install(local);
+      local.effect(() => this.register({ kind: 'exact', path: '/api/mewclaw-desktop/local-directory', handler: async (req, res) => {
+        const rejection = reject(req);
+        if (rejection !== undefined || req.headers.origin !== `http://${req.headers.host}`) { res.writeHead(rejection ?? 403); res.end(); return; }
+        if (req.method !== 'POST') { res.writeHead(405); res.end(); return; }
+        try {
+          const value = await workspaces.pick();
+          res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(value));
+        } catch { res.writeHead(409, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'LOCAL_DIRECTORY_UNAVAILABLE' })); }
+      } }));
+    });
   }
 
   private wrap(handler: WebRoute['handler']): WebRoute['handler'] {
@@ -108,7 +155,10 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
       if (path === '/' && !connection.authorizeIndex(req, res)) return;
       const rejection = connection.requestRejection(req);
       if (rejection !== undefined) { res.writeHead(rejection); res.end('DESKTOP_UNAUTHORIZED'); return; }
-      if (path === '/auth/logout') this.workspace?.revokeAll();
+      this.accountCookie = (req.headers.cookie ?? '').split(';').map(value => value.trim())
+        .filter(value => /^(?:__Host-dsh_session|dsh_session|dsh_csrf)=/.test(value)).join('; ');
+      if (path === '/auth/logout') { this.workspace?.revokeAll(); this.localWorkspaces?.dispose(); this.accountCookie = ''; }
+      if (this.location.location === 'local' && !path.startsWith('/auth/')) return handler(req, res);
       const parameters = new URL(req.url ?? '/', 'http://127.0.0.1').searchParams;
       if (parameters.has('dsh-desktop-mode')) {
         const retained = new URLSearchParams();
@@ -132,6 +182,7 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
       if (isLocalDesktopPath(req.url ?? '/')) return route.handler(req, socket, head);
       const connection = this.ctx.get('connection');
       if (!connection || connection.requestRejection(req) !== undefined) { socket.destroy(); return; }
+      if (this.location.location === 'local') return route.handler(req, socket, head);
       this.cloud.upgrade(req, socket, head);
     } });
   }

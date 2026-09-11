@@ -5,6 +5,7 @@
 | SPEC | 包 | 角色 | 里程碑 | 状态 |
 | --- | --- | --- | --- | --- |
 | [desktop-app.md](desktop-app.md) | 桌面发行组合 | App / Bundle | Desktop 1 | implementing |
+| [desktop-local-harness.md](desktop-local-harness.md) | 桌面本地 Harness / Auth Edge 推理代理 | Definition / Provider / Consumer | Desktop 2 | implementing |
 | [desktop-workspace.md](desktop-workspace.md) | `dsh-lark-desktop-host` / `dsh-lark-desktop-workspace` / Auth Edge | Definition / Provider / Consumer | Desktop Shell + Sync | implementing |
 | [account-feishu-settings.md](account-feishu-settings.md) | `dsh-lark-web-auth` | 官方设置 slot 的自有 UI 贡献 | 账户 UI | implementing |
 | [feishu-bots.md](feishu-bots.md) | auth / edge / gateway / web-auth | 按账号隔离的自建应用凭证与生命周期 | 个人机器人 | implementing |
