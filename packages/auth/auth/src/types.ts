@@ -1,3 +1,5 @@
+import type { FeishuBotStore } from "./feishu-bot-store.js";
+
 export type AuthRole = "admin" | "user";
 export type AuthStatus = "pending" | "active" | "disabled";
 export type AuthMode = "full" | "lightweight";
@@ -260,7 +262,7 @@ export type CommitFeishuPairingResult =
   | { status: "session-conflict" };
 
 export interface AuthStore {
-  readonly feishuBots: import("./feishu-bot-store.js").FeishuBotStore;
+  readonly feishuBots: FeishuBotStore;
   createUser(input: CreateUserInput): Promise<AuthUser>;
   findUserByEmail(email: string): Promise<AuthUser | undefined>;
   findUserById(userId: string): Promise<AuthUser | undefined>;
