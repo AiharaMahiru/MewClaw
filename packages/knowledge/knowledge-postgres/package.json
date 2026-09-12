@@ -25,11 +25,11 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-credentials": "0.1.5-rc.1"
+    "@deepseek-ai/dsh-credentials": "0.1.5-rc.2"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-credentials": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-credentials": "0.1.5-rc.2",
     "@electric-sql/pglite": "^0.5.4",
     "@electric-sql/pglite-pgvector": "0.0.6",
     "@types/pg": "^8.20.4"
