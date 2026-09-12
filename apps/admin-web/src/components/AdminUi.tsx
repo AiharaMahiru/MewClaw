@@ -18,7 +18,7 @@ export function PageHeader(props: {
   status?: ReactNode;
 }) {
   return <header className="workspace-heading">
-    <div><p className="eyebrow">{props.eyebrow}</p><h1>{props.title}</h1></div>
+    <div><h1>{props.title}</h1></div>
     {(props.status || props.actions) && <div className="heading-actions">{props.status}{props.actions}</div>}
   </header>;
 }

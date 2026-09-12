@@ -131,3 +131,9 @@
   .dashboard-grid-primary.dashboard-grid-triple .user-mix-panel { grid-column: auto; }
   .chart-panel { min-height: 0; }
 }
+
+/* 统一页面标题与指标卡，避免装饰性彩色线条抢占层级。 */
+.dashboard-workspace .workspace-heading { padding: 8px 0; border: 0; background: transparent; box-shadow: none; }
+.dashboard-workspace .workspace-heading h1 { font-size: 18px; line-height: 24px; }
+.metric-tile, .metric { border-top: 1px solid var(--line); }
+.metric-tile::before, .metric-tile.accent::before, .metric-tile.success::before, .metric-tile.warning::before { display: none; }
