@@ -121,7 +121,7 @@ export default function App() {
     </div>
     <div className="pI_x6G_centerCol">
       <main className="wSkVaW_root admin-main-root">
-        <header className="wSkVaW_header admin-header"><nav className="admin-crumbs" aria-label="页面位置"><span>管理工作台</span><span className="admin-crumb-separator">/</span><strong>{routeLabel(route)}</strong></nav><a className="admin-header-link" href="/"><span>返回工作台</span><Icon name="arrow-right" size={14} /></a></header>
+        <header className="wSkVaW_header admin-header"><div className="admin-header-context"><span className="admin-header-kicker">MEWCLAW / CONTROL PLANE</span><nav className="admin-crumbs" aria-label="页面位置"><strong>{routeLabel(route)}</strong></nav></div><a className="admin-header-link" href="/"><span>返回工作台</span><Icon name="arrow-right" size={14} /></a></header>
         <div className="wSkVaW_scrollBody admin-scroll-body"><div className="wSkVaW_viewArea"><div className="app-main"><Page route={route} onUnauthorized={handleUnauthorized} /></div></div></div>
       </main>
     </div>
