@@ -18,12 +18,12 @@
   },
   "dependencies": { "liquid-glass-react": "1.1.1" },
   "peerDependencies": {
-    "@deepseek-ai/dsh-brand": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-brand": "0.1.5-rc.2",
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-host-webserver": "0.1.5-rc.1",
-    "@deepseek-ai/dsh-client-ui-theme": "0.1.5-rc.1",
-    "@deepseek-ai/dsh-client-ui-renderer": "0.1.5-rc.1",
-    "@deepseek-ai/dsh-client-ui-settings": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-host-webserver": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-theme": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-settings": "0.1.5-rc.2",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },

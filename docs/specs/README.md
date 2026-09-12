@@ -6,6 +6,7 @@
 | --- | --- | --- | --- | --- |
 | [liquid-glass-theme.md](liquid-glass-theme.md) | `dsh-lark-liquid-glass` | 官方 Theme/Slots 的 Provider / Consumer | 可选主题 | done（源码） |
 | [desktop-workspace.md](desktop-workspace.md) | `dsh-lark-desktop-host` / `dsh-lark-desktop-workspace` / Auth Edge | Definition / Provider / Consumer | Desktop Shell + Sync | implementing |
+| [desktop-config-sync.md](desktop-config-sync.md) | desktop cloud plugin + Auth Edge | 云端配置镜像与凭证边界 | Desktop 1 | implementing |
 | [account-feishu-settings.md](account-feishu-settings.md) | `dsh-lark-web-auth` | 官方设置 slot 的自有 UI 贡献 | 账户 UI | implementing |
 | [feishu-bots.md](feishu-bots.md) | auth / edge / gateway / web-auth | 按账号隔离的自建应用凭证与生命周期 | 个人机器人 | implementing |
 | [session-upgrade.md](session-upgrade.md) | 历史会话副本迁移工具 | App / Consumer | DSH 0.1.5 | implementing |
