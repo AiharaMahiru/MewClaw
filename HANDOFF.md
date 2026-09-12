@@ -2,7 +2,7 @@
 
 更新时间：2026-09-12
 工作分支：`desktop-dev`
-本地同步基线：已将本地 `origin/desktop@554d5c7` 合入 `desktop-dev`；冲突已处理，保留桌面专属 Workspace、Shell、同步、Cloud Provider 和液态玻璃 Web 更新。GitHub HTTPS 443 在本轮不可达，因此不能把本地 remote-tracking ref 当作远端实时状态。
+本地同步基线：已拉取并合入最新 `origin/desktop@3d88e2d`，合并提交为 `ce3d0cc`；冲突已处理，保留桌面专属 Workspace、Shell、同步、Cloud Provider、admin/Auth 和液态玻璃 Web 更新。
 
 ## 当前唯一交付目录
 
@@ -71,12 +71,12 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 
 ## 推送状态与限制
 
-- 本轮改动基于本地提交 `944bf83`；rc.2、进程内切换、Release 命名、ASAR fallback、测试和文档已纳入当前提交，最终 SHA 以 `git rev-parse HEAD` 为准。
-- 之前的 HTTPS push（HTTP/1.1、HTTP/2）均因 GitHub 443 连接失败，SSH 也没有可用 public key。网络恢复后执行：
+- 本轮改动基于本地提交 `944bf83`，实现提交为 `3816d2a`，随后合入 `origin/desktop@3d88e2d` 生成 `ce3d0cc`；rc.2、进程内切换、Release 命名、ASAR fallback、测试和文档均已纳入。
+- `3816d2a` 已成功推送并核验；`ce3d0cc` 需要在本轮文档更新后再次推送并核验：
 
   ```text
   git push origin HEAD:desktop-dev
   git ls-remote origin refs/heads/desktop-dev
   ```
 
-- 远端 SHA 未核验前，不声称 `desktop-dev` 已推送；未部署 Auth Edge、未做真实模型请求或生产切换。
+- 当前远端 `desktop-dev` 已核验到 `3816d2a`；完成本轮合并文档提交后以新的 `git ls-remote origin refs/heads/desktop-dev` 结果为准。Auth Edge 尚未部署、未做真实模型请求或生产切换。

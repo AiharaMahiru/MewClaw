@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-截至 **2026-09-12，desktop-dev 已合并本地 `origin/desktop@554d5c7`**。Web 与独立 Windows 候选统一使用 DSH `0.1.5-rc.2`；当前唯一候选和 Release 产物已在 Windows x64 目录模式完成验证。GitHub 443 在本轮不可达，远端 `desktop-dev` 的实时 SHA 仍需网络恢复后核验；生产和真实模型验收仍需单独执行。
+截至 **2026-09-12，desktop-dev 已合并最新 `origin/desktop@3d88e2d`**。Web 与独立 Windows 候选统一使用 DSH `0.1.5-rc.2`；当前唯一候选和 Release 产物已在 Windows x64 目录模式完成验证。生产和真实模型验收仍需单独执行。
 
 共享 Web 主题插件已同步：`dsh-lark-liquid-glass` 提供双色 SVG 背景、个人开关和中性玻璃材质；标题及顶部标签保持透明无框。桌面端需在自己的 Electron 候选中重新验证，不将 Web 生产配置或密钥复制到本机。
 
