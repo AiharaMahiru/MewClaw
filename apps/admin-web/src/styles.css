@@ -308,6 +308,12 @@ body { background: var(--dsw-alias-bg-base); }
 .loading-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--dsw-alias-border-l2); border-top-color: var(--dsw-alias-state-business-primary); border-radius: 50%; animation: admin-spin .8s linear infinite; }
 @keyframes admin-spin { to { transform: rotate(360deg); } }
 
+/* 管理台层级保持克制：标题靠间距区分，选中态不使用彩色边线。 */
+.workspace-heading { min-height: 36px; }
+.workspace-heading .eyebrow { display: none; }
+.workspace-heading h1 { font-size: 18px; line-height: 24px; font-weight: 600; letter-spacing: -.01em; }
+.cBrkua_entry[aria-current="page"] { box-shadow: none !important; }
+
 @media (max-width: 980px) { .app-main { padding-right: 28px; padding-left: 28px; } }
 @media (max-width: 760px) { .app-main { padding: 22px 16px 44px; } .workspace-heading h1 { font-size: 22px; } }
 
@@ -338,3 +344,10 @@ body { background-image: radial-gradient(circle at 8% 8%, rgb(113 131 220 / 14%)
   body { background-image: none; }
   .pI_x6G_sidebarCol, .hHd-Xa_root, .admin-main-root, .wSkVaW_header, .dashboard-panel, .section-block, .quota-panel, .user-editor, .user-directory-toolbar, .control-form, .price-row, .account-menu { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--dsw-alias-bg-layer-1); box-shadow: none; }
 }
+
+/* 控制面板保持单一标题层级，去掉装饰性彩色边线。 */
+.admin-header-kicker { display: none; }
+.admin-crumbs strong { font-size: 16px; line-height: 22px; }
+.workspace-heading { min-height: 32px; padding: 0; }
+.workspace-heading > div { display: none; }
+.cBrkua_entry[aria-current="page"] { box-shadow: none !important; }
