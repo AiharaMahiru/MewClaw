@@ -72,11 +72,13 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 ## 推送状态与限制
 
 - 本轮改动基于本地提交 `944bf83`，实现提交为 `3816d2a`，随后合入 `origin/desktop@3d88e2d` 生成 `ce3d0cc`；rc.2、进程内切换、Release 命名、ASAR fallback、测试和文档均已纳入。
-- `3816d2a` 已成功推送并核验；合并提交 `ce3d0cc` 与文档提交 `0b599a9` 的推送在本轮因 GitHub 443 连接重置/连接失败未完成：
+- `3816d2a` 已成功推送并核验；合并提交 `ce3d0cc` 与文档提交 `0b599a9`，状态记录提交 `f3d0245` 的推送在本轮因 GitHub 443 连接重置/连接失败未完成：
 
   ```text
   git push origin HEAD:desktop-dev
   git ls-remote origin refs/heads/desktop-dev
   ```
 
-- 最后一次成功核验的远端 `desktop-dev` 是 `3816d2a`；当前本地 HEAD 为 `0b599a9`，需网络恢复后再次 push 并用 `git ls-remote origin refs/heads/desktop-dev` 核验。Auth Edge 尚未部署、未做真实模型请求或生产切换。
+- 最后一次成功核验的远端 `desktop-dev` 是 `3816d2a`；当前本地包含合并后的未推送提交（以 `git rev-parse HEAD` 为准），需网络恢复后再次 push 并用 `git ls-remote origin refs/heads/desktop-dev` 核验；当前 TCP 443 探测失败。Auth Edge 尚未部署、未做真实模型请求或生产切换。
+
+
