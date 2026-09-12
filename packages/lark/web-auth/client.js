@@ -1066,6 +1066,15 @@
 @media(max-width:720px){.mewclaw-account-profile{grid-template-columns:auto minmax(0,1fr)}.mewclaw-account-session-buttons{grid-column:1/-1;justify-content:flex-start}.mewclaw-account-usage-grid,.mewclaw-account-token-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.mewclaw-account-admin-row{grid-template-columns:1fr}.mewclaw-account-row-meta{justify-content:flex-start;text-align:left}.mewclaw-account-model-profile-row{grid-template-columns:1fr}.mewclaw-account-model-profile-badges{justify-content:flex-start}}
 @media(max-width:480px){.mewclaw-account-facts,.mewclaw-account-form{grid-template-columns:1fr}.mewclaw-account-facts>div+div{border-top:1px solid var(--dsw-alias-border-l1);border-left:0}.mewclaw-account-form label:first-child,.mewclaw-account-form-actions,.mewclaw-account-model-form .mewclaw-account-field-wide{grid-column:auto}.mewclaw-account-usage-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.mewclaw-account-model-row{grid-template-columns:minmax(0,1fr) auto}.mewclaw-account-model-row .mewclaw-account-row-meta{grid-column:1/-1}.mewclaw-account-model-profile-toolbar{align-items:flex-start;flex-direction:column}}
 @media(pointer:coarse){.mewclaw-account-button,.mewclaw-account-model-profile-actions .mewclaw-account-button{min-height:44px}.mewclaw-account-form input{height:44px;font-size:16px}}
+.mewclaw-account-center{padding:8px 2px 20px;gap:20px}
+.mewclaw-account-center-header{padding:18px 20px 0}
+.mewclaw-account-section,.mewclaw-feishu-center{padding:0 20px}
+.mewclaw-account-folds{margin:0 20px;border:1px solid color-mix(in srgb,var(--dsw-alias-border-l1) 82%,transparent);border-radius:16px;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 48%,transparent);box-shadow:inset 0 1px 0 rgb(255 255 255 / 28%)}
+.mewclaw-account-fold{padding:0 14px}.mewclaw-account-fold-content{padding:4px 0 18px}
+.mewclaw-account-button,.mewclaw-account-form input,.mewclaw-account-model-form textarea,.mewclaw-bot-form select,.mewclaw-bot-form textarea{border-radius:12px;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 56%,transparent);box-shadow:inset 0 1px 0 rgb(255 255 255 / 24%)}
+.mewclaw-account-button.primary{background:var(--dsw-alias-button-primary-fill);box-shadow:0 8px 18px rgb(40 54 110 / 18%)}
+.mewclaw-account-usage-stat,.mewclaw-feishu-guide,.mewclaw-feishu-empty{border-radius:14px;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 48%,transparent);box-shadow:inset 0 1px 0 rgb(255 255 255 / 24%)}
+.mewclaw-account-message{padding:0 2px}
 `;
   function installAccountStyles() {
     if (typeof document === "undefined" || document.querySelector("style[data-mewclaw-account]") !== null) return;
