@@ -1,46 +1,64 @@
 # MewClaw Desktop 当前交接
 
-更新时间：2026-09-11
+更新时间：2026-09-12
 工作分支：`desktop-dev`
-上游基线：`origin/desktop`（已 fetch，当前分支已包含，无待合并提交）
+本轮同步：已从 `origin/desktop` 拉取到 `554d5c7`，合并 DSH `0.1.5-rc.2` 与液态玻璃 Web 更新；合并冲突已处理并保留桌面专属本地 Workspace、Shell、同步和 Cloud Provider。
 
-## 当前交付边界
+## 当前交付
 
-- Windows Release 版本为 `1.0.0`，候选树为 `D:\AI\dsh\MewClaw-desktop-candidate`。
-- 产物目录为 `release\desktop.6`，只保留以下三个最新文件：
-  - `MewClaw-1.0.0-win-x64-Portable.exe`
-  - `MewClaw-1.0.0-win-x64-Setup.exe`
-  - `MewClaw-1.0.0-win-x64.zip`
-- Windows 图标来自品牌插件 `FAVICON_SVG`，构建脚本为 `apps/desktop/generate-mewclaw-icon.mjs`，输出 `mewclaw-brand/build/app-icon.ico`；Electron Builder 已使用该 ICO。
-- 不删除 `C:\Users\ATWER\AppData\Roaming\MewClaw`。该目录包含用户 Profile、会话、项目和配置。
+- 独立候选：`D:\AI\dsh\MewClaw-desktop-candidate-20260912-r3`。
+- 候选 npm 锁继续使用 DSH `0.1.5-rc.1`，桌面 Host、Cloud、Brand peer 范围同时兼容 `0.1.5-rc.1` 与 `0.1.5-rc.2`；服务器 Web 依赖为 rc.2。
+- Release 输出：`release\desktop.6`。
+  - `MewClaw-1.0.0-win-x64-Portable.exe` — 142,829,677 bytes — `c2decf8f0d1eae7e8ac4e6630d8ed215c1fe4eb444d23f001d8961cb1c28201d`
+  - `MewClaw-1.0.0-win-x64-Setup.exe` — 143,073,626 bytes — `3dbe1518d5fd0f16fb9519de8a479aa0ac2c4b544b4511100625f621d801ecd4`
+  - `MewClaw-1.0.0-win-x64.zip` — 186,979,225 bytes — `eaed0981a4ae9b1fd6071d8d2922e166dac1e8b19409f4c07697a6a25eb819ca`
+- 不删除 `C:\Users\ATWER\AppData\Roaming\MewClaw`，其中包含用户 Profile、会话、项目与配置。
 
-## 构建与验证
+## 已执行验证
 
-在候选树中执行：
+仓库根目录：
 
-```powershell
-npm run build
-node node_modules/electron-builder/cli.js --config electron-builder.cjs --win --x64 --publish never --config.directories.output=release/desktop.6
-node D:\AI\dsh\MewClaw-desktop\apps\desktop\verify-package.mjs D:\AI\dsh\MewClaw-desktop-candidate --release-dir=release/desktop.6
+```text
+pnpm install --frozen-lockfile --ignore-scripts       PASS
+pnpm typecheck                                        PASS
+pnpm build                                            PASS
+pnpm lint                                             PASS
+pnpm vitest run packages/desktop/host/src/shell.test.ts packages/ui/liquid-glass/src apps/desktop/plugins/cloud/src/provider.test.ts   28/28 PASS
+node apps/desktop/packaging.test.mjs                  2/2 PASS
 ```
 
-验收必须包含 `ASAR_ENTRYPOINTS_OK`、`OFFICIAL_RUNTIME_UNCHANGED`、`NATIVE_SPAWN_OK`、四个 Runtime smoke、`ZIP_PAYLOAD_MATCHES_VERIFIED_APP` 和 `MEWCLAW_PACKAGE_OK`。Release 是交付物，不能用 debug 或缓存目录替代。
+候选目录：
 
-## Web 端必须保持的契约
+```text
+npm ci --ignore-scripts --no-audit --no-fund            PASS
+npm run build                                          PASS
+node apps/desktop/verify-workspace.mjs <candidate>     21 files / 51 tests PASS
+node electron-builder ... --win --x64                  PASS
+node apps/desktop/verify-package.mjs ...               MEWCLAW_PACKAGE_OK
+node apps/desktop/local-ui-smoke.mjs ... advanced --switch  LOCAL_UI_OK; RENDERER_ERRORS 0; local-to-cloud/cloud-to-local PASS
+```
 
-1. 保留 `packages/auth/edge/src/desktop-inference.ts` 及其测试，并与 `server.ts`、`config.ts`、`server.test.ts` 一起部署。
-2. 提供 `POST /auth/desktop-inference/chat/completions`：继续使用登录 Cookie、CSRF、用户限流和 PromptAuditor；SSE 代理必须关闭缓冲，并遵守 `AUTH_DESKTOP_INFERENCE_TIMEOUT_MS`（默认 120000 ms）。
-3. 模型路由只使用认证账号的私有默认模型，API Key 留在服务器；未配置私有默认模型返回 409。不能把模型列表或固定别名当作真实推理能力证明。
-4. 本地电脑模式只读写本机 Workspace，不依赖云端 `desktop-workspace` overlay；旧云端桥接接口应继续返回明确的 409，而不是静默执行本地操作。
-5. 后续若增加模型能力查询，接口只返回不含凭证的上下文窗口、输出上限和多模态能力；共享模型回退必须另行接入服务端额度/计费规则并重新验收。
-6. 可选的 `agent-presets` 未安装时，Web 端应把 `agentPresets/list` 的能力缺失转换为空 roster 或结构化 `gateway/invocation-unavailable`；不要让本地桌面首页产生裸 404 网络错误。
+验包关键标记：`ASAR_ENTRYPOINTS_OK`、`OFFICIAL_RUNTIME_UNCHANGED`、`NATIVE_SPAWN_OK`、四个 Runtime smoke、`ZIP_PAYLOAD_MATCHES_VERIFIED_APP`、`MEWCLAW_PACKAGE_OK`。
 
-## 现场错误分类
+## 本轮兼容性修复
 
-如果启动窗口显示 `Invalid package ...\\resources\\app.asar`，错误来自 Electron ASAR 读取层，通常表示 Portable 在临时目录中的 `app.asar` 解包或读取失败，不等同于 Profile 数据损坏。先关闭同一 Portable 的残留进程，使用 `Setup.exe` 安装版复核；不要删除用户数据，也不要用兼容模式结果替代正常启动验收。若安装版仍复现，应保留完整临时路径、产物 SHA-256、Windows 版本和错误日志，再定位 ASAR/杀毒软件/文件锁问题。
+- `generate-mewclaw-icon.mjs` 从脚本自身定位候选根目录，修复独立候选执行时错误解析到 `D:\AI\mewclaw-brand` 的 Windows 构建失败。
+- `prepare-desktop-candidate.mjs` 使用平台路径分隔符保护候选覆盖上游，修复 Windows 子目录目标保护失效。
+- Cloud、Host、Brand peer 范围同时接受候选 rc.1 与服务器 rc.2；候选 Brand manifest 在生成时与冻结 npm lock 对齐。
+- Windows Shell 回归覆盖 PowerShell 冷启动，并隔离测试 `DSH_HOME`；液态玻璃路径断言兼容 Windows 分隔符。
 
-## 推送前门禁
+## Web 端配套要求
 
-- 工作树不得包含未说明的构建临时文件、旧版本产物或用户数据变更。
-- `HANDOFF.md` 只描述本交接版本，不保留已过期的 desktop.5 历史结论。
-- 推送目标为 `origin/desktop-dev`；推送后用远端分支 SHA 和 Release 验证结果回报，不声称已部署生产。
+1. 修改 `apps/web`、`packages/client` 或 Vite 配置后，必须先生成对应 `@deepseek-ai/dsh-web-frontend` dist，再更新候选锁文件；桌面 loopback WebServer 依赖 `dist/index.html`。
+2. 候选准备/验包应增加前端 dist 来源与版本一致性门禁，避免桌面继续打包旧 dist。
+3. Auth Edge 保持登录 Cookie、CSRF、限流、PromptAuditor 和 SSE 超时契约，API Key 只留在服务端；模型能力查询只返回无凭证元数据。
+4. 本地模式只操作用户授权的本机 Workspace；旧云端桥接接口应明确失败，不能静默执行本地操作。
+5. `agent-presets` 缺失时返回空 roster 或结构化 `gateway/invocation-unavailable`，避免桌面首页裸 404。
+6. `/admin/` 管理台保持独立 Web surface；如嵌入桌面，需单独处理路径前缀、资源和 API origin。
+
+## 限制与推送状态
+
+- 本轮完成源码同步、兼容性修复、Windows Release 构建和无凭证 UI 冒烟；不代表生产部署、真实模型请求或 Windows 实机全量验收。
+- 推送目标为 `origin/desktop-dev`。本轮 HTTPS push（HTTP/1.1、HTTP/2）均因 GitHub 443 连接失败，远端分支 SHA 未核验；网络恢复后执行 `git push origin HEAD:desktop-dev`，再以 `git ls-remote origin refs/heads/desktop-dev` 的 SHA 为准。
+- 保留旧候选与生产回滚点，不清理用户数据、凭证或未授权目录。
+

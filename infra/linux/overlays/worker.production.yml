@@ -2,6 +2,19 @@
 # Every Worker-owned write path is absolute and lives under the systemd
 # ReadWritePaths boundary. Relative defaults resolve under /opt/dsh/current,
 # which is intentionally read-only in production.
+- insert:
+    - id: mewclaw-liquid-glass
+      name: dsh-lark-liquid-glass
+      config:
+        enabled: true
+        defaultEnabled: true
+        refraction: true
+        displacementScale: 32
+        blurAmount: 0.12
+        saturation: 130
+        aberrationIntensity: 1
+        identityTimeoutMs: 5000
+
 - id: session-persistence-jsonl
   config:
     root: /var/lib/dsh/sessions

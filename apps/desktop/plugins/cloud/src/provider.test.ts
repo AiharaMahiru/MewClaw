@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { Context } from '@deepseek-ai/cordis';
 import { createServer } from 'node:http';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import Provider from './index.js';
 
 describe('真实 Cordis Provider 注册', () => {
@@ -9,6 +12,9 @@ describe('真实 Cordis Provider 注册', () => {
     await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
     const address = upstream.address();
     if (!address || typeof address === 'string') throw new Error('NO_ADDRESS');
+    const home = await mkdtemp(join(tmpdir(), 'mewclaw-provider-'));
+    const previousHome = process.env.DSH_HOME;
+    process.env.DSH_HOME = home;
     const ctx = new Context();
     let denied: number | undefined;
     ctx.provide('connection', {
@@ -30,6 +36,9 @@ describe('真实 Cordis Provider 注册', () => {
       await ctx.fiber.dispose();
       upstream.closeAllConnections();
       await new Promise<void>(resolve => upstream.close(() => resolve()));
+      if (previousHome === undefined) delete process.env.DSH_HOME;
+      else process.env.DSH_HOME = previousHome;
+      await rm(home, { recursive: true, force: true });
     }
   });
 });

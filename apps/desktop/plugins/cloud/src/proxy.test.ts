@@ -47,6 +47,13 @@ describe('桌面固定云端传输', () => {
     const { origin } = await fixture((req, res) => res.end(req.url));
     expect(await (await fetch(`${origin}/auth/reset?token=CLOUD`)).text()).toBe('/auth/reset?token=CLOUD');
   });
+  it('将远程设置与账号模型目录保持原路径转发到云端', async () => {
+    const seen: string[] = [];
+    const { origin } = await fixture((req, res) => { seen.push(req.url ?? ''); res.setHeader('content-type', 'application/json'); res.end('{"ok":true}'); });
+    expect((await fetch(`${origin}/api/dsh-web-ui-settings/describe`)).status).toBe(200);
+    expect((await fetch(`${origin}/auth/models`)).status).toBe(200);
+    expect(seen).toEqual(['/api/dsh-web-ui-settings/describe', '/auth/models']);
+  });
   it('同源重定向变为相对路径，保留安全 Cookie 属性', async () => {
     let cloud = '';
     const result = await fixture((_req, res) => { res.writeHead(302, { location: `${cloud}/auth/account`, 'set-cookie': 'dsh_session=value; Secure; HttpOnly; SameSite=Lax; Path=/' }); res.end(); });

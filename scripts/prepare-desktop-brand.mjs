@@ -10,6 +10,12 @@ export async function prepareDesktopBrand(destination) {
   for (const file of ['src', 'client.js', 'package.json']) await cp(resolve(source, file), resolve(target, file), { recursive: true });
   const manifest = JSON.parse(await readFile(resolve(target, 'package.json'), 'utf8'));
   manifest.scripts = { build: 'tsc -b' };
+  // 独立桌面候选锁定 rc.1；源码仓库仍由 pnpm 使用 rc.2。保持候选 workspace 元数据与 npm lock 一致。
+  for (const group of ['peerDependencies', 'devDependencies']) {
+    for (const name of Object.keys(manifest[group] ?? {})) {
+      if (name.startsWith('@deepseek-ai/dsh-')) manifest[group][name] = '0.1.5-rc.1';
+    }
+  }
   await writeFile(resolve(target, 'package.json'), JSON.stringify(manifest, null, 2) + '\n');
   const config = JSON.parse(await readFile(resolve(source, 'tsconfig.json'), 'utf8'));
   delete config.extends;

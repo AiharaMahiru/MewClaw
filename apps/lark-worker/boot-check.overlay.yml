@@ -41,3 +41,7 @@
   disabled: true
 - id: lark-web-auth
   disabled: true
+# 启动门禁不加载桌面工作区：它依赖完整运行时的 larkScopeIndex，
+# 而本 overlay 为了无副作用会禁用 lark-run。桌面桥接由独立插件测试验证。
+- id: desktop-workspace
+  disabled: true

@@ -20,12 +20,12 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-tools": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-tools": "0.1.5-rc.2",
     "dsh-browser": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-tools": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-tools": "0.1.5-rc.2",
     "dsh-browser": "workspace:*",
     "vitest": "4.1.10"
   }

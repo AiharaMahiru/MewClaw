@@ -1,4 +1,5 @@
 /** 无账号凭证：通过真实代理与Electron验证重启保持、退出登录和再次重启。 */
+/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS smoke runs in packaged Electron. */
 const { app, BrowserWindow } = require('electron');
 const { createServer } = require('node:http');
 const { pathToFileURL } = require('node:url');

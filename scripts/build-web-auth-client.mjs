@@ -24,3 +24,17 @@ await Promise.all(entries.map(({ sourcePath, targetPath }) => build({
   target: "es2022",
   legalComments: "none",
 })));
+
+// 外部 React 由官方 ModuleLoader 注入，避免折射库打包第二份 hooks runtime。
+await build({
+  entryPoints: [resolve(root, "packages/ui/liquid-glass/src/client.ts")],
+  outfile: resolve(root, "packages/ui/liquid-glass/client.js"),
+  bundle: true,
+  format: "cjs",
+  platform: "browser",
+  target: "es2022",
+  external: ["react", "react-dom", "react/jsx-runtime"],
+  legalComments: "eof",
+  banner: { js: 'globalThis.__ModuleLoader__.load({id:"dsh-lark-liquid-glass",factory:(require)=>{const module={exports:{}};const exports=module.exports;' },
+  footer: { js: "return module.exports;}});" },
+});

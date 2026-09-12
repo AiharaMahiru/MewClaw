@@ -1,0 +1,13 @@
+# 在候选组合中显式追加此 overlay；删除本行或 enabled:false 恢复原主题。
+- insert:
+    - id: mewclaw-liquid-glass
+      name: dsh-lark-liquid-glass
+      config:
+        enabled: true
+        defaultEnabled: true
+        refraction: true
+        displacementScale: 32
+        blurAmount: 0.12
+        saturation: 130
+        aberrationIntensity: 1
+        identityTimeoutMs: 5000

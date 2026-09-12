@@ -1,0 +1,35 @@
+{
+  "name": "dsh-lark-liquid-glass",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "基于官方主题 token 与 slots 的可卸载液态玻璃主题",
+  "exports": {
+    ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" },
+    "./client": { "types": "./lib/types/client.d.ts", "default": "./client.js" },
+    "./package.json": "./package.json"
+  },
+  "files": ["lib", "client.js", "THIRD_PARTY_LICENSES.txt"],
+  "dsh": {
+    "client": {
+      "inject": ["@deepseek-ai/dsh-client-ui-theme", "@deepseek-ai/dsh-client-ui-renderer", "@deepseek-ai/dsh-client-ui-settings-general"],
+      "platform": "web"
+    }
+  },
+  "dependencies": { "liquid-glass-react": "1.1.1" },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-brand": "0.1.5-rc.2",
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-host-webserver": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-theme": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-settings": "0.1.5-rc.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

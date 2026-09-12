@@ -24,12 +24,12 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-credentials": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-credentials": "0.1.5-rc.2",
     "dsh-mail": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",
-    "@deepseek-ai/dsh-credentials": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-credentials": "0.1.5-rc.2",
     "@types/nodemailer": "7.0.4",
     "dsh-mail": "workspace:*",
     "@types/mailparser": "3.4.6"

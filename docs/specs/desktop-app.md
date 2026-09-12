@@ -8,7 +8,7 @@
 | 里程碑 | Desktop 1 |
 | 状态 | implementing |
 | 关联 ADR | ADR-1、ADR-3、ADR-6 |
-| 依赖能力 | dsh-plugin-desktop、官方 DSH 0.1.2-rc.1 |
+| 依赖能力 | dsh-plugin-desktop、官方 DSH 0.1.5-rc.1 |
 | 提供能力 | 候选构建与验收，不新增运行时服务 |
 
 ## 1 目的与边界
@@ -23,7 +23,7 @@
 
 ## 3 配置契约
 
-Node 24，DSH 0.1.2-rc.1，桌面源码固定 a1ddcda8e701a8490c619ce411ea8a3d6daa1453。先生成锁文件再冻结。市场与 AA 为可选插件，不进入候选依赖；不向安装包注入生产凭证。Electron 为桌面必需依赖，仅进入独立桌面构建，不增加服务器运行依赖。
+Node 24，DSH 0.1.5-rc.1，桌面源码固定 a1ddcda8e701a8490c619ce411ea8a3d6daa1453。先生成锁文件再冻结。市场与 AA 为可选插件，不进入候选依赖；不向安装包注入生产凭证。Electron 为桌面必需依赖，仅进入独立桌面构建，不增加服务器运行依赖。
 
 云端 Provider Config 继承官方 WebServer Config，新增 cloudOrigin（默认 https://chat.rwr.ink，只允许无路径、无凭证的 HTTPS origin，测试允许回环 HTTP）及 cloudTimeoutMs（默认120000，范围1000至600000毫秒）。Config 装载时校验，变更需重新装载；无运行时更换上游。私有路由 /api/desktop/ 与 /api/mewclaw-desktop/ 仍由本地插件处理，其他 HTTP 与官方已注册 WebSocket 路由转发云端。
 

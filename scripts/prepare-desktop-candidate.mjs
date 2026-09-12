@@ -1,6 +1,6 @@
 /** 创建独立、无官方依赖补丁的桌面验证树，不修改上游检出或生产。 */
 import { cp, mkdir, readFile, writeFile, access } from 'node:fs/promises';
-import { resolve, isAbsolute } from 'node:path';
+import { resolve, isAbsolute, sep } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { prepareDesktopUiContract } from './desktop-ui-contract.mjs';
@@ -12,7 +12,7 @@ if (!sourceArg || !destinationArg || !isAbsolute(sourceArg) || !isAbsolute(desti
 }
 const source = resolve(sourceArg);
 const destination = resolve(destinationArg);
-if (destination === source || destination.startsWith(`${source}/`)) throw new Error('候选不得覆盖上游');
+if (destination === source || destination.startsWith(`${source}${sep}`)) throw new Error('候选不得覆盖上游');
 try { await access(destination); throw new Error('候选目录已存在，拒绝覆盖'); }
 catch (error) { if (error.code !== 'ENOENT') throw error; }
 const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: source, encoding: 'utf8' }).trim();

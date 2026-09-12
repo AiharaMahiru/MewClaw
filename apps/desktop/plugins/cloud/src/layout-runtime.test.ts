@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+/* eslint-disable @typescript-eslint/no-explicit-any -- the official client loader is intentionally dynamic. */
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { Context } from '@deepseek-ai/cordis';

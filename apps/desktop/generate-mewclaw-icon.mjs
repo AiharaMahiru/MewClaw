@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
 
 const sizes = [16, 20, 24, 28, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 128, 256];
-const candidateRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+// 脚本会被复制到候选根目录执行；从脚本自身定位候选，不能依赖当前工作目录或上游仓库层级。
+const candidateRoot = resolve(dirname(fileURLToPath(import.meta.url)));
 const brandSource = resolve(candidateRoot, 'mewclaw-brand/src/index.ts');
 const brandBuild = resolve(candidateRoot, 'mewclaw-brand/build');
 const svgOutput = resolve(brandBuild, 'favicon.svg');
