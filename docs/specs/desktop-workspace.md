@@ -1,6 +1,6 @@
 # 桌面本地工作区 SPEC
 
-> desktop.6 起，桌面主界面采用 [本地 Harness](desktop-local-harness.md)：左侧栏切换整套云端/本地会话。本 SPEC 保留旧云端桥接契约，不能据此要求打开本地目录先启用云端工作区服务；旧桥接在新本地模式禁用。
+> 当前 `1.0.0` Desktop Release 采用 [本地 Harness](desktop-local-harness.md)：左侧栏切换整套云端/本地会话。本 SPEC 保留旧云端桥接契约，不能据此要求打开本地目录先启用云端工作区服务；旧桥接在新本地模式禁用。
 
 | 元数据 | 值 |
 | --- | --- |

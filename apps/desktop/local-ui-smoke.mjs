@@ -1,10 +1,13 @@
 /** 无账号、无模型请求的 Electron 本地会话界面冒烟。 */
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { createRequire } from 'node:module';
+
+const { releaseDirectoryName } = createRequire(import.meta.url)('./release-path.cjs');
 
 const candidate = resolve(process.argv[2]);
 const mode = process.argv[3] ?? 'advanced';
@@ -21,7 +24,9 @@ await new Promise(resolve => listener.close(resolve));
 await new Promise(resolve => listener.listen(0, '127.0.0.1', resolve));
 const inspectorPort = listener.address().port;
 await new Promise(resolve => listener.close(resolve));
-const executable = dev ? join(candidate, 'node_modules/electron/dist/electron.exe') : join(candidate, 'release/desktop.6/win-unpacked/MewClaw.exe');
+const candidateVersion = JSON.parse(await readFile(join(candidate, 'package.json'), 'utf8')).version;
+const executable = dev ? join(candidate, 'node_modules/electron/dist/electron.exe')
+  : join(candidate, 'release', releaseDirectoryName(candidateVersion), 'win-unpacked', 'MewClaw.exe');
 const environment = { ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1' };
 delete environment.ELECTRON_RUN_AS_NODE;
 const child = spawn(executable, [...(directoryTest ? [`--inspect=${inspectorPort}`] : []), ...(dev ? [join(candidate, 'launcher.mjs')] : []), `--user-data-dir=${join(home, 'userdata')}`, `--remote-debugging-port=${port}`], {
@@ -92,7 +97,8 @@ try {
       if (text.includes('确认跳过')) await client.send('Runtime.evaluate', { expression: "Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='确认跳过')?.click()" });
       else if (text.includes('跳过设置')) await client.send('Runtime.evaluate', { expression: "Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='跳过设置')?.click()" });
       if (text.includes('内测声明')) await client.send('Runtime.evaluate', { expression: "Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='继续')?.click()" });
-      if (text.includes('打开本地目录') && text.includes('新建会话') && text.includes('选择工作区') && !text.includes('内测声明') && !text.includes('Failed to load plugins')) readyChecks++;
+      const hasNewSessionLabel = text.includes('新建会话') || text.includes('新会话');
+      if (text.includes('打开本地目录') && hasNewSessionLabel && text.includes('选择工作区') && !text.includes('内测声明') && !text.includes('Failed to load plugins')) readyChecks++;
       else readyChecks = 0;
       if (readyChecks >= 3) { passed = true; break; }
     }
@@ -130,7 +136,7 @@ try {
   console.log(`RENDERER_ERRORS ${rendererErrors.length}`);
   if (rendererErrors.length) throw new Error('RENDERER_ERRORS_FOUND');
   if (process.argv.includes('--switch')) {
-    await client.send('Runtime.evaluate', { expression: "document.querySelector('button[title=\"云端会话\"]').click()" });
+    await client.send('Runtime.evaluate', { expression: "(document.querySelector('button[title=\"云端模式\"],button[aria-label=\"云端模式\"]')||Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='云端'))?.click()" });
     await waitForLocation('cloud');
     console.log('LOCATION_SWITCH_OK local-to-cloud');
     await client.send('Runtime.evaluate', { expression: "void fetch('/api/mewclaw-desktop/location',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({location:'local'})})" });

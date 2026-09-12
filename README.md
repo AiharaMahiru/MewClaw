@@ -6,15 +6,15 @@
 
 ## 当前状态
 
-截至 **2026-09-12，desktop-dev 已合并 origin/desktop@554d5c7**。Web 共享依赖升级至 DSH `0.1.5-rc.2`，独立 Windows 候选继续锁定 DSH `0.1.5-rc.1` 并已重新生成 Release 包；生产和真实模型验收仍需单独执行。
+截至 **2026-09-12，desktop-dev 已合并本地 `origin/desktop@554d5c7`**。Web 与独立 Windows 候选统一使用 DSH `0.1.5-rc.2`；当前唯一候选和 Release 产物已在 Windows x64 目录模式完成验证。GitHub 443 在本轮不可达，远端 `desktop-dev` 的实时 SHA 仍需网络恢复后核验；生产和真实模型验收仍需单独执行。
 
 共享 Web 主题插件已同步：`dsh-lark-liquid-glass` 提供双色 SVG 背景、个人开关和中性玻璃材质；标题及顶部标签保持透明无框。桌面端需在自己的 Electron 候选中重新验证，不将 Web 生产配置或密钥复制到本机。
 
-- 已验证：独立桌面底座构建、Linux Electron 启动、云端登录，以及同账号桌面/Web 两轮真实续聊同步。
+- 已验证：独立桌面底座构建、Release Electron 启动、目录模式会话编辑，以及同一进程内 cloud↔local 双向切换；未以此代替真实账号或生产模型验收。
 - 已实现并验证：原生目录授权、文件工具、独立 Shell 授权/撤销、长命令心跳、二进制文件双向同步、冲突保留与可恢复删除；Auth Edge 到本机的离线 HTTP 全链路已通过。
-- 云端共享包与 Web 使用 DSH `0.1.5-rc.2`；独立桌面候选锁定 `0.1.5-rc.1`，桌面 Consumer 的 peer 范围同时兼容两者。官方包不修改，桌面客户端和云端的共享 Consumer 分别验证兼容性。
+- 云端共享包、Web 和独立桌面候选统一锁定 DSH `0.1.5-rc.2`。官方包不修改，桌面客户端和云端的共享 Consumer 分别验证兼容性。
 - 云端通过 [可选 overlay](config/desktop-workspace.patch.yml) 启用桌面桥接，默认保持关闭。Git 合并和推送不会自动切换生产。
-- 本机 Shell 以当前系统用户权限执行，cwd 不是沙箱；Shell 和同步分别原生确认。同步不复制空目录和权限位，不自动解决冲突，不重放离线写入，不自动接管其他设备。
+- 本地 Harness 当前只开放用户原生授权的目录文件能力；云端旧 workspace/Shell/同步桥接仍由独立 overlay 控制，不会因切换本地模式而静默启用。目录授权不是操作系统沙箱。
 
 ## 分支协作
 
@@ -35,11 +35,11 @@
 ```sh
 git submodule update --init --recursive
 # 在本仓库 desktop 分支根目录执行；目标候选目录必须尚不存在。
-node scripts/prepare-desktop-candidate.mjs /absolute/MewClaw/upstream/dsh-desktop /absolute/new-candidate
-cd /absolute/new-candidate
+node scripts/prepare-desktop-candidate.mjs /absolute/MewClaw/upstream/dsh-desktop D:/AI/dsh/MewClaw-desktop-candidate
+cd D:/AI/dsh/MewClaw-desktop-candidate
 npm ci --ignore-scripts --no-audit --no-fund
 npm run build
-node /absolute/MewClaw/apps/desktop/verify-workspace.mjs /absolute/new-candidate
+node /absolute/MewClaw/apps/desktop/verify-workspace.mjs D:/AI/dsh/MewClaw-desktop-candidate
 ```
 
 以上仅用于开发候选构建与测试，不生成安装包。安装生命周期默认关闭，Electron 下载和目标平台原生依赖须另行审核处理；Linux 构建通过不等于 Windows 实机通过。凭证、运行数据和候选目录不得提交 Git。
@@ -64,7 +64,7 @@ docs/       # 架构、SPEC、发布说明与验收证据
 
 ## 共享服务开发与验证
 
-需要 Node.js 24+、pnpm 10.30.3；生产构建使用部署指定的固定 Node 版本。DSH 核心依赖当前锁定为 `0.1.5-rc.1`，以锁文件为准。
+需要 Node.js 24+、pnpm 10.30.3；生产构建使用部署指定的固定 Node 版本。Web 与桌面候选的 DSH 核心依赖当前统一锁定为 `0.1.5-rc.2`，以各自锁文件为准。
 
 ```sh
 pnpm install --frozen-lockfile
@@ -100,7 +100,7 @@ pnpm verify:dsh-brand
 
 ## 关键决策速览
 
-- **仓库形态**：独立插件仓库，通过 npm 依赖 `@deepseek-ai/dsh-*`（当前核心基线 `0.1.5-rc.1`），共享服务使用 pnpm workspace + 自有 app bins 从源码启动 Cordis 组合；桌面使用独立候选 workspace。
+- **仓库形态**：独立插件仓库，通过 npm 依赖 `@deepseek-ai/dsh-*`（当前核心基线 `0.1.5-rc.2`），共享服务使用 pnpm workspace + 自有 app bins 从源码启动 Cordis 组合；桌面使用独立候选 workspace。
 - **数据面**：会话 / 运行生命周期 / 事件流全部由 DSH session log（JSONL + SQLite 查询）接管；PostgreSQL 仅保留知识库（pgvector）、cron 任务、审批待办与管理面。
 - **进程拓扑**：飞书 Gateway 与 Worker 执行面分离，Auth、Admin、浏览器和预览服务按部署组合独立运行；各入口通过 Cordis 配置装载插件。
 - **机器人模板**：映射为 DSH agent presets（每会话 isolate realm 提供隔离）；平台强制策略留在常驻 bundle 层。

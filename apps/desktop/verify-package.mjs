@@ -8,12 +8,16 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { Script } from 'node:vm';
 
+const { releaseDirectoryName } = createRequire(import.meta.url)('./release-path.cjs');
+
 const candidate = process.argv[2];
 assert.ok(candidate && isAbsolute(candidate), '需要候选绝对路径');
 const root = resolve(candidate);
 const require = createRequire(join(root, 'package.json'));
 const asar = require('@electron/asar');
-const release = resolve(root, process.argv.find(value => value.startsWith('--release-dir='))?.slice('--release-dir='.length) ?? 'release');
+const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+const release = resolve(root, process.argv.find(value => value.startsWith('--release-dir='))?.slice('--release-dir='.length)
+  ?? join('release', releaseDirectoryName(version)));
 const output = join(release, 'win-unpacked');
 const archive = join(output, 'resources', 'app.asar');
 const executable = join(output, 'MewClaw.exe');
@@ -31,11 +35,11 @@ function verifyArchive() {
   assert.equal(manifest.main, 'launcher.mjs');
   const launcher = asar.extractFile(archive, 'launcher.mjs').toString();
   assert.match(launcher, /MEWCLAW_DESKTOP_CLOUD/u);
-  for (const name of ['index.js', 'workspace-controller.js', 'workspace-client.js', 'sidebar-client.js', 'location.js', 'location-route.js', 'location-restart.js', 'local-workspaces.js', 'local-brand.js', 'cloud-model.js', 'session-boot.js', 'session-ui-state.js']) {
+  for (const name of ['index.js', 'workspace-controller.js', 'workspace-client.js', 'location-client.js', 'location.js', 'location-route.js', 'local-workspaces.js', 'local-brand.js', 'cloud-model.js', 'session-boot.js', 'session-ui-state.js']) {
     const entry = 'node_modules/dsh-lark-desktop-cloud/lib/' + name;
     const packed = asar.extractFile(archive, join(...entry.split('/')));
     assert.ok(packed.equals(readFileSync(join(root, 'mewclaw-cloud/lib', name))), '桌面工作区构建不一致：' + name);
-    if (name === 'workspace-client.js' || name === 'sidebar-client.js') new Script(packed.toString().replace('\nexport {};', ''));
+    if (name === 'workspace-client.js' || name === 'location-client.js') new Script(packed.toString().replace('\nexport {};', ''));
   }
   console.log('ASAR_ENTRYPOINTS_OK');
 }
@@ -91,7 +95,7 @@ function verifyRuntime() {
   const home = mkdtempSync(join(tmpdir(), 'mewclaw-package-smoke-'));
   try {
     verifyNativeSpawn(home);
-    runSmoke(home, 'node_modules/@deepseek-ai/dsh/lib/bin.js', ['--version'], /0\.1\.5-rc\.1/u);
+    runSmoke(home, 'node_modules/@deepseek-ai/dsh/lib/bin.js', ['--version'], /0\.1\.5-rc\.2/u);
     runSmoke(home, 'node_modules/pnpm/bin/pnpm.mjs', ['--version'], /11\.8\.0/u);
     runSmoke(home, 'node_modules/dsh-plugin-desktop/lib/packaged-runtime-smoke.js', [], /DSH_PACKAGED_RUNTIME_OK/u);
     runSmoke(home, 'node_modules/dsh-plugin-desktop/lib/desktop-cli.js',
@@ -103,7 +107,6 @@ function verifyRuntime() {
 }
 
 function verifyArtifacts() {
-  const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
   const artifacts = readdirSync(release).filter(name => name.startsWith('MewClaw-' + version + '-win-') && /\.(?:exe|zip)$/u.test(name));
   assert.equal(artifacts.length, 3, '需要安装程序、便携 EXE 与 ZIP');
   for (const name of artifacts) {

@@ -23,14 +23,16 @@ const desktopPatch = fileURLToPath(new URL('../apps/desktop/patches/cloud-layout
 execFileSync('git', ['apply', '--whitespace=error-all', desktopPatch], { cwd: destination, stdio: 'inherit' });
 await prepareDesktopUiContract(destination);
 await cp(resolve(source, 'LICENSE'), resolve(destination, 'UPSTREAM-LICENSE'));
-await cp(fileURLToPath(new URL('../apps/desktop/plugins/cloud', import.meta.url)), resolve(destination, 'mewclaw-cloud'), { recursive: true });
+await cp(fileURLToPath(new URL('../apps/desktop/plugins/cloud', import.meta.url)), resolve(destination, 'mewclaw-cloud'), {
+  recursive: true, filter: path => !path.split(/[\\/]/).includes('lib'),
+});
 await prepareDesktopBrand(destination);
 await cp(fileURLToPath(new URL('../packages/desktop/host', import.meta.url)), resolve(destination, 'mewclaw-host'), { recursive: true, filter: path => !path.split(/[\\/]/).includes('lib') });
 const hostManifestPath = resolve(destination, 'mewclaw-host/package.json');
 const hostManifest = JSON.parse(await readFile(hostManifestPath, 'utf8'));
 // 桌面与服务器各自锁定官方版本，共享 Consumer 不把服务端版本带进 Electron。
 for (const name of Object.keys(hostManifest.devDependencies ?? {})) {
-  if (name.startsWith('@deepseek-ai/dsh-')) hostManifest.devDependencies[name] = '0.1.5-rc.1';
+  if (name.startsWith('@deepseek-ai/dsh-')) hostManifest.devDependencies[name] = '0.1.5-rc.2';
 }
 await writeFile(hostManifestPath, JSON.stringify(hostManifest, null, 2) + '\n');
 const hostTsconfigPath = resolve(destination, 'mewclaw-host/tsconfig.json');
@@ -42,6 +44,7 @@ hostTsconfig.compilerOptions.types = ['node'];
 await writeFile(hostTsconfigPath, JSON.stringify(hostTsconfig, null, 2) + '\n');
 await cp(fileURLToPath(new URL('../apps/desktop/launcher.mjs', import.meta.url)), resolve(destination, 'launcher.mjs'));
 await cp(fileURLToPath(new URL('../apps/desktop/electron-builder.cjs', import.meta.url)), resolve(destination, 'electron-builder.cjs'));
+await cp(fileURLToPath(new URL('../apps/desktop/release-path.cjs', import.meta.url)), resolve(destination, 'release-path.cjs'));
 const sourceChanges = [];
 sourceChanges.push('dsh-plugin-desktop: 云端与本地统一 DSH 0.1.5 的 main/rightbar、品牌与布局服务契约');
 sourceChanges.push('原生 file 页面去掉无效 meta frame-ancestors；ProfilePatchReload 类型从公开 Profile 推导');
@@ -68,13 +71,17 @@ const profilePath = resolve(destination, 'dsh-plugin-desktop/src/profile.ts');
 const profileSource = (await readFile(profilePath, 'utf8')).replaceAll('\r\n', '\n');
 const providerLine = 'const DESKTOP_WEB_SERVER_PACKAGE = `${DESKTOP_PACKAGE_NAME}/webserver`';
 if (!profileSource.includes(providerLine)) throw new Error('桌面 WebServer 组合入口已变化');
+const asarFallbackAnchor = "export function healDesktopProfileModuleFallback(home: string, profile?: Profile): Promise<void> {\n  const heal = () => healProfilesModuleFallback({\n    installAnchor: INSTALL_ANCHOR,\n    home,\n    ...(profile === undefined ? {} : { profile }),\n  })\n";
+if (!profileSource.includes(asarFallbackAnchor)) throw new Error('桌面 ASAR fallback 入口已变化');
+const asarFallbackReplacement = "function healDesktopAsarFallback(home: string, profile: Profile | undefined): Promise<void> {\n  const runtime = process as NodeJS.Process & { pkg?: unknown };\n  const packagedAsar = /([\\\\/])app\\.asar([\\\\/]|$)/u.test(INSTALL_ANCHOR);\n  if (!packagedAsar) return healProfilesModuleFallback({\n    installAnchor: INSTALL_ANCHOR,\n    home,\n    ...(profile === undefined ? {} : { profile }),\n  });\n  const hadPkg = Object.prototype.hasOwnProperty.call(runtime, 'pkg');\n  const previousPkg = runtime.pkg;\n  runtime.pkg = true;\n  return healProfilesModuleFallback({\n    installAnchor: INSTALL_ANCHOR,\n    home,\n    ...(profile === undefined ? {} : { profile }),\n  }).finally(() => {\n    if (hadPkg) runtime.pkg = previousPkg;\n    else delete runtime.pkg;\n  });\n}\n\nexport function healDesktopProfileModuleFallback(home: string, profile?: Profile): Promise<void> {\n  const heal = () => healDesktopAsarFallback(home, profile)\n";
 await writeFile(profilePath, profileSource.replace(providerLine, "const DESKTOP_WEB_SERVER_PACKAGE = process.env.MEWCLAW_DESKTOP_CLOUD === '1'\n  ? 'dsh-lark-desktop-cloud'\n  : `${DESKTOP_PACKAGE_NAME}/webserver`")
+  .replace(asarFallbackAnchor, asarFallbackReplacement)
   .replace('  type ProfilePatchReload,\n', '')
   .replace("import { resolveDshHome }", "type ProfilePatchReload = Profile['patchReload']\nimport { resolveDshHome }"));
-sourceChanges.push('profile.ts: MewClaw 发行配置选择自有 WebServer Provider');
+sourceChanges.push('profile.ts: MewClaw 发行配置选择自有 WebServer Provider，并将 ASAR fallback 生成为物理代理');
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-// 0.1.5 新增会话上传 peer，显式锁定，避免 npm 自动选中 rc.2 混装。
-manifest.dependencies['@deepseek-ai/dsh-client-file-upload'] = '0.1.5-rc.1';
+// 0.1.5 新增会话上传 peer，显式锁定，避免 npm 自动选中其他候选版本。
+manifest.dependencies['@deepseek-ai/dsh-client-file-upload'] = '0.1.5-rc.2';
 manifest.devDependencies.lexical = '0.49.0';
 manifest.devDependencies.shiki = '4.3.1';
 manifest.devDependencies['@shikijs/langs'] = '4.3.1';
@@ -87,7 +94,7 @@ Object.assign(manifest.devDependencies, {
 });
 for (const group of ['dependencies', 'devDependencies', 'peerDependencies']) {
   for (const name of Object.keys(manifest[group] ?? {})) {
-    if (name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) manifest[group][name] = '0.1.5-rc.1';
+    if (name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) manifest[group][name] = '0.1.5-rc.2';
   }
 }
 manifest.dependencies['dsh-lark-desktop-cloud'] = '0.1.0';

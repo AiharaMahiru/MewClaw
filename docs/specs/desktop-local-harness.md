@@ -13,7 +13,7 @@
 
 ## 1 目的与边界
 
-2026-09-11 用户现场反馈本地 UI 与云端不一致。桌面官方依赖升级目标统一为 0.1.5-rc.1，使用与云端相同的 main/rightbar 布局契约，取消本地 legacy conversation/details 分支。升级仍不得修改官方包；完成编译、页面错误采集和运行时完整性验证后才交付。
+2026-09-11 用户现场反馈本地 UI 与云端不一致。桌面官方依赖统一为 0.1.5-rc.2，使用与云端相同的 main/rightbar 布局契约，取消本地 legacy conversation/details 分支。升级仍不得修改官方包；完成编译、页面错误采集和运行时完整性验证后才交付。
 
 2026-09-10 用户确认：本地 Harness 在电脑运行，继续使用云端账号和模型。左侧栏品牌下方、新建会话上方提供云端/本地切换，切换整套会话列表。打开本地目录不依赖云端 desktop-workspace。此契约取代 desktop-workspace.md 中桌面主界面的桥接切换约定；旧桥接保留供已有云端绑定使用，不迁移其会话。
 
@@ -21,17 +21,17 @@
 
 ## 2 服务契约
 
-SessionLocation 为 cloud | local。每个 Host 实例固定一个 location，HTTP 与 WebSocket 同属该实例，禁止请求期间改变路由目的地。切换保存偏好并结束 HTTP 响应后，调用 Electron app.relaunch()/app.quit()；官方 before-quit 处理器有序清理 Host 与连接。不调用不返回取消结果的 DesktopRuntime.requestRestart()。准备失败恢复偏好，旧实例始终保持原路由。
+SessionLocation 为 cloud | local。Host 进程持有可变 location，HTTP 与 WebSocket 每次请求读取当前值，禁止单个请求在处理中改变路由目的地。切换保存偏好并等待进程内能力变更完成后，返回 reload 标记，由 renderer 刷新当前页面；不调用 Electron app.relaunch()/app.quit()，也不调用 DesktopRuntime.requestRestart()。准备失败恢复偏好，当前 WebServer 继续服务。
 
 GET /api/mewclaw-desktop/location 返回 {location}。POST 只接受 {location}；必须通过本机 connection 授权与同源校验。写入失败返回 LOCATION_SAVE_FAILED；非法值返回 INVALID_LOCATION；切换期间拒绝重复操作。
 
 ## 3 配置契约
 
-模式偏好保存于 DSH_HOME 下 mewclaw-location.json，首次 cloud。配置损坏明确启动失败。cloudOrigin 继续使用既有 HTTPS 验证。目录大小、条数等限制继续使用既有 Config。
+模式偏好保存于 DSH_HOME 下 mewclaw-location.json，首次 cloud。切换保存成功后仅刷新当前 renderer，Electron 进程、WebServer 和已打开的其他窗口不重启；配置损坏明确启动失败。cloudOrigin 继续使用既有 HTTPS 验证。目录大小、条数等限制继续使用既有 Config。
 
 ## 4 事件契约
 
-本地模型输入与工具结果由官方 session 事件持久化；不隐藏注入文件内容。模式偏好仅影响下一次启动，不是模型可见输入。
+本地模型输入与工具结果由官方 session 事件持久化；不隐藏注入文件内容。模式偏好在当前进程保存后立即影响下一次页面加载，不是模型可见输入。
 
 ## 5 模型可见面
 
@@ -43,9 +43,9 @@ GET /api/mewclaw-desktop/location 返回 {location}。POST 只接受 {location}�
 
 云端会话始终使用云端 API，本地会话始终使用本机 API。模式切换不迁移、同步或合并会话。目录选择与本地日志浏览不要求云端工作区服务。
 
-模型推理仍需网络与有效云端账号。不存在已部署推理入口时明确显示模型服务不可用，不索取 Worker token 或使用网页登录态冒充上游 API Key。
+模型推理仍需网络与有效云端账号。云端模型配置与默认模型由 Auth Edge 作为唯一权威，本地桌面只通过当前账号 Cookie/CSRF 调用固定的云端推理桥接；API Key 永不同步到桌面或本机存储。不存在已部署推理入口时明确显示模型服务不可用，不索取 Worker token 或使用网页登录态冒充上游 API Key。
 
-本地适配器使用云端 Cookie/CSRF 调用 POST /auth/desktop-inference/chat/completions，model 固定 cloud-default。Edge 使用已认证 userId 解析账号私有默认模型、校验公网地址并代理 SSE；上游 API Key 仅在服务器请求期间使用，禁止重定向和透传错误正文。使用现有用户限流及 PromptAuditor；审计不可用拒绝请求。AUTH_DESKTOP_INFERENCE_TIMEOUT_MS 默认 120000，范围 1000–600000，客户端断开取消上游。
+本地会话的云端模型桥接使用云端 Cookie/CSRF 调用 POST /auth/desktop-inference/chat/completions，传输模型占位符 cloud-default。Edge 使用已认证 userId 解析账号私有默认模型和加密 API Key，校验公网地址并代理 SSE；上游 API Key 仅在服务器请求期间使用，禁止重定向和透传错误正文。使用现有用户限流及 PromptAuditor；审计不可用拒绝请求。AUTH_DESKTOP_INFERENCE_TIMEOUT_MS 默认 120000，范围 1000–600000，客户端断开取消上游。
 
 当前仅支持账号已配置的默认私有模型，不包含服务器共享模型回退、共享额度计费、动态上下文窗口或多模态。未配置私有默认模型时返回 CLOUD_DEFAULT_MODEL_REQUIRED。云端模式的原有模型选择不变。本机保存模型别名，不保存供应商密钥。
 
@@ -55,7 +55,7 @@ GET /api/mewclaw-desktop/location 返回 {location}。POST 只接受 {location}�
 
 ## 8 测试契约
 
-unit/security：非法模式、损坏偏好、写入失败、重复切换、未授权控制面；固定模式下 HTTP/WS 路由不变。文件工具覆盖越界、版本冲突、撤销。snapshot/e2e：欢迎页及会话页侧栏开关，切换列表、本地目录取消/选择、重启后会话恢复。Release 构建和真实模型验收分别报告。
+unit/security：非法模式、损坏偏好、写入失败、重复切换、未授权控制面；cloud↔local 双向切换不调用 Electron 退出/重启 API，renderer 刷新后收到新的位置 BootGraph，固定模式下 HTTP/WS 路由不变。文件工具覆盖越界、版本冲突、撤销。snapshot/e2e：欢迎页及会话页侧栏开关，切换列表、本地目录取消/选择、页面刷新后会话恢复。Release 构建和真实模型验收分别报告。
 
 ## 9 迁移映射
 
@@ -64,4 +64,4 @@ unit/security：非法模式、损坏偏好、写入失败、重复切换、未�
 ## 10 开放问题
 
 1. 新 Auth Edge 推理接口已实现并有无密钥回归，但尚未部署生产；真实账号与模型调用仍需管理员部署后验收。
-2. 真实原生目录选择、重启后旧会话重新授权与模型驱动文件读写，需要实机人工验收；Release 页面冒烟不能替代该链路。
+2. 真实原生目录选择、页面刷新后旧会话重新授权与模型驱动文件读写，需要实机人工验收；Release 页面冒烟不能替代该链路。

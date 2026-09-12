@@ -1,8 +1,8 @@
 # MewClaw 桌面开发
 
-当前发行候选版本为 `1.0.0`。左侧栏品牌下方提供云端/本地会话切换，本地 Harness、会话与文件工具在电脑运行；打开本地目录不依赖云端工作区桥接。切换有序重启 APP，两边历史分别保留。实际验收见 [验证记录](../../docs/evidence/desktop-local-harness-20260911.md)。
+当前发行候选版本为 `1.0.0`。左侧栏品牌下方提供云端/本地会话切换，本地 Harness、会话与文件工具在电脑运行；打开本地目录不依赖云端工作区桥接。切换只更新进程内位置并刷新 renderer，不重启 Electron，云端和本地历史分别保留。当前验证记录见 [HANDOFF](../../HANDOFF.md)。
 
-桌面和 Web 官方依赖统一为 `0.1.5-rc.1`。本地复用 Web 品牌插件及 main/rightbar 布局契约；冻结官方版本闭包以避免 npm 自动混入 rc.2。新增 Markdown/编辑器依赖为社区 Consumer 构建和测试使用，不通过修改官方包规避缺失依赖。
+桌面和 Web 官方依赖统一为 `0.1.5-rc.2`。本地复用 Web 品牌插件及 main/rightbar 布局契约；候选冻结官方版本闭包，避免 npm 混入其他 prerelease。新增 Markdown/编辑器依赖为社区 Consumer 构建和测试使用，不通过修改官方包规避缺失依赖。
 
 本地模式继续使用云端账号模型，当前仅支持账号私有默认模型，并需部署本轮 Auth Edge 推理接口；未部署时本地目录仍可打开，但模型推理不可用。原生目录选择只授权文件读写，本地模式禁止 Shell 和同步。退出、切换或重新登录后需重新选择目录。旧云端桥接说明见 [工作区配套说明](workspace-deployment.md)，本轮新契约及 Web 修改见 [HANDOFF](../../HANDOFF.md)。
 
@@ -38,17 +38,17 @@ node /absolute/MewClaw/apps/desktop/verify-workspace.mjs /absolute/new-candidate
 
 ## Windows 开发包
 
-在独立候选目录执行（Node 24 / Windows x64）：
+唯一候选目录为 `D:\AI\dsh\MewClaw-desktop-candidate`，在该目录执行（Node 24 / Windows x64）：
 
 ```sh
 node node_modules/electron/install.js
 node node_modules/electron-builder/cli.js --config electron-builder.cjs --win --x64 --publish never
-node /absolute/MewClaw/apps/desktop/verify-package.mjs /absolute/new-candidate
+node /absolute/MewClaw/apps/desktop/verify-package.mjs D:/AI/dsh/MewClaw-desktop-candidate
 ```
 
-本机本轮使用既有 `MewClaw-desktop-candidate`，为避开用户正在运行的旧 APP，构建命令追加 `--config.directories.output=release/desktop.6`，验包追加 `--release-dir=release/desktop.6`。无需另建候选目录。UI 冒烟入口：`node apps/desktop/local-ui-smoke.mjs <候选绝对路径> advanced --switch`，使用临时用户数据，不登录或请求真实模型。
+本机本轮只保留 `MewClaw-desktop-candidate` 一个候选目录。Release 输出目录由版本自动计算为 `release/MewClaw-1.0.0-win-x64`，不再使用 `desktop.6` 等临时目录名；验包脚本会按候选 `package.json` 自动定位该目录。UI 冒烟入口：`node apps/desktop/local-ui-smoke.mjs D:/AI/dsh/MewClaw-desktop-candidate advanced --directory --switch`，使用临时用户数据，不登录或请求真实模型。
 
-Electron 安装器会校验固定版本的下载摘要；官方连接不可用时可对该命令设置 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`。输出目录为候选下的 `release/`，包括当前用户安装程序 `*-Setup.exe`、便携启动器 `*-Portable.exe`、完整 ZIP，以及 `win-unpacked/MewClaw.exe`。`win-unpacked` 中的 EXE 必须与整个目录一起保留。
+Electron 安装器会校验固定版本的下载摘要；官方连接不可用时可对该命令设置 `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/`。输出目录为候选下按版本命名的 `release/MewClaw-1.0.0-win-x64/`，包括当前用户安装程序、便携启动器、完整 ZIP，以及 `win-unpacked/MewClaw.exe`。`win-unpacked` 中的 EXE 必须与整个目录一起保留。
 
 验证脚本检查 MewClaw 启动入口、官方运行时打包前后字节一致性、真实 Electron 的 DSH/pnpm/原生依赖和无头 CLI，最后打印产物 SHA-256。全部采用无凭证临时 DSH_HOME，不执行真实云端会话。开发包不包含代码签名。
 

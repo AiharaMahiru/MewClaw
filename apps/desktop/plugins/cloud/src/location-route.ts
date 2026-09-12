@@ -1,11 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { parseLocation, type LocationPreference } from './location.js';
 
-/** 控制面只接受本机认证请求；模式在原生重启后才生效。 */
+/** 控制面只接受本机认证请求；保存后由 renderer 刷新页面，不重启 Electron。 */
 export function locationRoute(options: {
   preference: LocationPreference;
   reject(req: IncomingMessage): number | undefined;
-  restart(): Promise<() => void>;
 }) {
   let changing = false;
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
@@ -29,17 +28,14 @@ export function locationRoute(options: {
       if (!value || Object.keys(value).some(key => key !== 'location')) throw new Error('INVALID_LOCATION');
       const location = parseLocation(value.location);
       if (location === options.preference.location) return send(200, { location });
-      if (changing) return send(409, { error: 'LOCATION_CHANGING' });
       changing = true;
       await options.preference.save(location);
-      const restart = await options.restart();
-      // 先结束控制面响应，再触发官方 before-quit 清理，避免等待自身连接。
-      res.once('finish', () => setImmediate(restart));
-      send(202, { location, restarting: true });
+      send(200, { location, reload: true });
     } catch (error) {
       if (changing) await options.preference.save(options.preference.location).catch(() => {});
-      changing = false;
       if (!res.writableEnded) send(409, { error: error instanceof Error && error.message === 'INVALID_LOCATION' ? 'INVALID_LOCATION' : 'LOCATION_SAVE_FAILED' });
+    } finally {
+      changing = false;
     }
   };
 }

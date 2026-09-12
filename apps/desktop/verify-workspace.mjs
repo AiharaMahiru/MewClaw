@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const candidate = process.argv[2];
@@ -10,7 +10,9 @@ assert.ok(candidate && isAbsolute(candidate), '需要独立候选绝对路径');
 const root = resolve(candidate);
 assert.equal(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).name, 'mewclaw-desktop-candidate');
 const desktop = dirname(fileURLToPath(import.meta.url));
-cpSync(join(desktop, 'plugins/cloud'), join(root, 'mewclaw-cloud'), { recursive: true });
+cpSync(join(desktop, 'plugins/cloud'), join(root, 'mewclaw-cloud'), {
+  recursive: true, filter: path => !path.split(sep).includes('lib'),
+});
 cpSync(resolve(desktop, '../../packages/desktop/host/src'), join(root, 'mewclaw-host/src'), { recursive: true });
 mkdirSync(join(root, 'mewclaw-workspace/src'), { recursive: true });
 // Worker 插件由 Web 的 0.1.5 构建门禁验证；桌面只复跑版本无关的 wire/broker/HTTP 桥接。
