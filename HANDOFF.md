@@ -284,3 +284,11 @@ pnpm service:status
 ```
 
 状态应显示 PostgreSQL 运行、Worker/Admin healthy、Gateway callback connected、profile 仍符合用户选择。最后由用户在飞书发送真实图片和多类文件进行验收。
+
+## 2026-09-12 DSH rc.2 升级与云端配置同步
+
+- `master` 与 `desktop` 已同步到 DSH `0.1.5-rc.2`（当前没有 `0.1.5` 正式版；npm `latest` 仍为 rc.1，rc.2 为最新发布候选）。桌面插件保留独立 Electron 依赖，通过 peer range 兼容 `0.1.2-rc.1` 与 `0.1.5-rc.2`。
+- 桌面账号、会话、模型目录、远程设置通过固定 `cloudOrigin` 代理到云端；真实 API key 只在 Auth Edge/Worker 使用，桌面仅接收 `keyConfigured` 和模型元数据。
+- 新增 `docs/specs/desktop-config-sync.md` 与 CloudProxy 路径转发测试，覆盖 `/api/dsh-web-ui-settings/describe`、`/auth/models`。
+- 源码已通过 lint、typecheck、build、Auth/Web 定向测试（152/152）、official-integrity 和 linux smoke。候选包：`/opt/dsh/incoming/R4-dsh-015-rc2-20260912/`，归档 SHA-256：`17f31414a436d60e7a00250410d1833ab585b4c3a8658d8067ce1e022d8a0346`。
+- 生产仍指向 `R3-title-nav-20260911`。切换时使用固定 Node 24.19.0，先备份 current，再原子更新 `/opt/dsh/current` 并重启六个 systemd 服务；保留 R3 作为回滚点。
