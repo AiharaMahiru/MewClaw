@@ -23,7 +23,7 @@ describe("auth pages", () => {
       expect(page).toContain('class="window-bar"');
       expect(page).toContain('class="auth-boot"');
       expect(page).toContain('sessionStorage.getItem("mewclaw.boot.v1")');
-      expect(page).toContain("backdrop-filter: blur(28px)");
+      expect(page).toContain("backdrop-filter: blur(30px)");
       expect(page).toContain("pointer-events: none");
     }
   });

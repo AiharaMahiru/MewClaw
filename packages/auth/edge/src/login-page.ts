@@ -22,11 +22,11 @@ const AUTH_STYLES = `
   --dsw-alias-label-primary-foreground: #fff;
   --dsw-alias-label-secondary: #566a70;
   --dsw-alias-label-tertiary: #71858a;
-  --dsw-alias-state-business-primary: #087f91;
+  --dsw-alias-state-business-primary: #5568c9;
   --dsw-alias-state-error-primary: #c93636;
   --dsw-alias-state-success-primary: #15805d;
-  --dsw-accent: #20b8c7;
-  --dsw-accent-strong: #009dde;
+  --dsw-accent: #7183dc;
+  --dsw-accent-strong: #5568c9;
   --dsw-shadow-lv3: 0 34px 90px rgb(13 45 53 / 17%);
   --mewclaw-mark-bg: #fff;
   --mewclaw-mark-ink: #181717;
@@ -100,10 +100,10 @@ button, input { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .4; }
 
-.auth-page { position: relative; min-height: 100dvh; display: grid; place-items: center; overflow: hidden; padding: 32px 20px; background: radial-gradient(circle at 18% 18%, rgb(32 184 199 / 16%), transparent 34%), radial-gradient(circle at 82% 78%, rgb(0 157 222 / 13%), transparent 38%), linear-gradient(145deg, #f7fafb, var(--dsw-alias-bg-base)); }
+.auth-page { position: relative; min-height: 100dvh; display: grid; place-items: center; overflow-x: hidden; overflow-y: auto; padding: 48px 20px; background: radial-gradient(circle at 14% 12%, rgb(113 131 220 / 22%), transparent 34%), radial-gradient(circle at 86% 82%, rgb(168 181 235 / 18%), transparent 38%), linear-gradient(145deg, #f5f7fc, var(--dsw-alias-bg-base)); }
 .auth-page::before { position: absolute; inset: 0; content: ""; opacity: .42; background-image: radial-gradient(rgb(16 38 44 / 12%) .65px, transparent .65px); background-size: 18px 18px; pointer-events: none; mask-image: linear-gradient(to bottom, #000, transparent 72%); }
 .auth-shell { position: relative; z-index: 1; width: min(438px, 100%); }
-.auth-card { min-width: 0; overflow: hidden; padding: 0 34px 34px; border: 1px solid rgb(255 255 255 / 72%); border-radius: 22px; background: rgb(255 255 255 / 76%); box-shadow: 0 30px 80px rgb(13 45 53 / 18%), inset 0 1px 0 rgb(255 255 255 / 80%); backdrop-filter: blur(28px) saturate(145%); -webkit-backdrop-filter: blur(28px) saturate(145%); animation: auth-window-in .42s cubic-bezier(.22,1,.36,1) both; }
+.auth-card { min-width: 0; overflow: hidden; padding: 0 34px 34px; border: 1px solid rgb(255 255 255 / 72%); border-radius: 26px; background: rgb(255 255 255 / 62%); box-shadow: 0 30px 80px rgb(44 56 105 / 18%), inset 0 1px 0 rgb(255 255 255 / 80%); backdrop-filter: blur(30px) saturate(135%); -webkit-backdrop-filter: blur(30px) saturate(135%); animation: auth-window-in .42s cubic-bezier(.22,1,.36,1) both; }
 .window-bar { height: 46px; margin: 0 -34px 24px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--dsw-alias-border-l1); background: rgb(255 255 255 / 30%); }
 .window-dot { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 .5px rgb(0 0 0 / 15%); }
 .window-dot:nth-child(1) { background: #ff5f57; }.window-dot:nth-child(2) { background: #febc2e; }.window-dot:nth-child(3) { background: #28c840; }
@@ -120,11 +120,11 @@ button:disabled { cursor: not-allowed; opacity: .4; }
 .auth-subtitle { margin: 8px 0 0; color: var(--dsw-alias-label-secondary); font-size: 14px; line-height: 22px; }
 .form-stack { display: grid; gap: 16px; margin-top: 24px; }
 .field { display: grid; gap: 8px; }
-.field label { color: #344b51; font-size: 13px; line-height: 18px; font-weight: 600; }
-.field input { width: 100%; height: 48px; padding: 0 15px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; outline: none; background: #fbfdfd; color: var(--dsw-alias-label-primary); font-size: 16px; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
+.field label { color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 18px; font-weight: 600; }
+.field input { width: 100%; height: 48px; padding: 0 15px; border: 1px solid rgb(255 255 255 / 64%); border-radius: 14px; outline: none; background: rgb(255 255 255 / 42%); color: var(--dsw-alias-label-primary); font-size: 16px; transition: border-color .18s ease, box-shadow .18s ease, background .18s ease; }
 .field input::placeholder { color: var(--dsw-alias-label-caption); }
 .field input:hover { border-color: var(--dsw-alias-border-l3); }
-.field input:focus { border-color: var(--dsw-alias-state-business-primary); background: #fff; box-shadow: 0 0 0 4px rgb(8 127 145 / 12%); }
+.field input:focus { border-color: var(--dsw-alias-state-business-primary); background: rgb(255 255 255 / 68%); box-shadow: 0 0 0 4px rgb(85 104 201 / 16%); }
 .input-wrap { position: relative; }
 .input-wrap input { padding-right: 62px; }
 .password-toggle { position: absolute; top: 2px; right: 4px; min-width: 50px; height: 44px; padding: 0 8px; border: 0; border-radius: 9px; background: transparent; color: var(--dsw-alias-state-business-primary); font-size: 12px; font-weight: 650; }
@@ -159,6 +159,10 @@ button:disabled { cursor: not-allowed; opacity: .4; }
 .status-mark { display: grid; width: 40px; height: 40px; margin: 0 auto 18px; place-items: center; border: 1px solid var(--dsw-alias-border-l3); border-radius: 14px; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-state-business-primary); font-size: 18px; font-weight: 600; }
 .status-card .auth-subtitle { margin-left: auto; margin-right: auto; max-width: 36ch; }
 .status-card .button { margin-top: 24px; }
+.eyebrow { margin: 0 0 10px; color: var(--dsw-alias-state-business-primary); font-size: 11px; line-height: 16px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+[data-tone="error"] .status-mark { border-color: color-mix(in srgb,var(--dsw-alias-state-error-primary) 36%,transparent); color: var(--dsw-alias-state-error-primary); background: color-mix(in srgb,var(--dsw-alias-state-error-primary) 10%,transparent); }
+[data-tone="success"] .status-mark { border-color: color-mix(in srgb,var(--dsw-alias-state-success-primary) 36%,transparent); color: var(--dsw-alias-state-success-primary); background: color-mix(in srgb,var(--dsw-alias-state-success-primary) 10%,transparent); }
+[data-tone="error"] .auth-title { color: var(--dsw-alias-state-error-primary); }
 .hidden { display: none !important; }
 @keyframes auth-window-in { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
@@ -182,8 +186,16 @@ html.auth-boot-seen .auth-boot { display: none; }
   :root:not([data-auth-theme="light"]) .auth-boot { background: #18181a; color: #fff; }
 }
 
+:root[data-auth-theme="dark"] .auth-page { background: radial-gradient(circle at 14% 12%, rgb(113 131 220 / 18%), transparent 34%), radial-gradient(circle at 86% 82%, rgb(76 91 154 / 22%), transparent 38%), linear-gradient(145deg, #111522, var(--dsw-alias-bg-base)); }
+:root[data-auth-theme="dark"] .auth-page::before { background-image: radial-gradient(rgb(255 255 255 / 8%) .65px, transparent .65px); }
+:root[data-auth-theme="dark"] .auth-card { border-color: rgb(224 232 255 / 18%); background: rgb(27 32 48 / 66%); box-shadow: 0 30px 80px rgb(0 0 0 / 42%), inset 0 1px 0 rgb(255 255 255 / 10%); }
+:root[data-auth-theme="dark"] .window-bar { background: rgb(255 255 255 / 5%); }
+:root[data-auth-theme="dark"] .field input { border-color: rgb(224 232 255 / 18%); background: rgb(20 24 36 / 42%); }
+:root[data-auth-theme="dark"] .field input:focus { background: rgb(30 36 56 / 68%); }
+:root[data-auth-theme="dark"] .account-note { background: rgb(20 24 36 / 42%); }
+
 @media (max-width: 520px) {
-  html, body { background: #fff; }
+  html, body { background: var(--dsw-alias-bg-base); }
   .auth-page { display: block; padding: 0; }
   .auth-shell { width: 100%; }
   .auth-card { min-height: 100dvh; padding: 28px 24px 40px; border: 0; border-radius: 0; box-shadow: none; }
@@ -316,13 +328,14 @@ const LOGIN_SCRIPT = `
   render();
 })();`;
 
-function documentPage(title: string, content: string, script = "", theme: AuthTheme = "light", pageClass = "", cardClass = ""): string {
+function documentPage(title: string, content: string, script = "", theme: AuthTheme = "system", pageClass = "", cardClass = ""): string {
   const safeTitle = escapeHtml(title);
   const scriptTag = script ? `<script>${script}</script>` : "";
   const themeAttribute = theme === "system" ? "" : ` data-auth-theme="${theme}"`;
   const pageClassAttribute = pageClass ? ` ${pageClass}` : "";
   const cardClassAttribute = cardClass ? ` ${cardClass}` : "";
-  return `<!doctype html><html lang="zh-CN"${themeAttribute}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#eef4f5"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><title>${safeTitle} - MewClaw Harness</title><script>try{if(sessionStorage.getItem("mewclaw.boot.v1"))document.documentElement.classList.add("auth-boot-seen")}catch{}</script><style>${AUTH_STYLES}</style></head><body><div class="auth-boot" aria-hidden="true"><div class="auth-boot-inner"><span class="brand-mark">${BRAND.match(/<svg[\s\S]*<\/svg>/u)?.[0] ?? ""}</span><span class="auth-boot-track"><span class="auth-boot-progress"></span></span></div></div><main class="auth-page${pageClassAttribute}"><div class="auth-shell"><section class="auth-card${cardClassAttribute}"><div class="window-bar" aria-hidden="true"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div><header class="auth-header">${BRAND}</header>${content}</section></div></main>${scriptTag}<script>(()=>{const boot=document.querySelector(".auth-boot");if(!boot)return;try{sessionStorage.setItem("mewclaw.boot.v1","1")}catch{}const remove=()=>boot.remove();boot.addEventListener("animationend",event=>{if(event.animationName==="auth-boot-away")remove()},{once:true});setTimeout(remove,1400)})()</script></body></html>`;
+  const themeColor = theme === "dark" ? "#171b27" : "#edf1f7";
+  return `<!doctype html><html lang="zh-CN"${themeAttribute}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="${themeColor}"><link rel="icon" type="image/svg+xml" href="/favicon.svg"><title>${safeTitle} - MewClaw Harness</title><script>try{if(sessionStorage.getItem("mewclaw.boot.v1"))document.documentElement.classList.add("auth-boot-seen")}catch{}</script><style>${AUTH_STYLES}</style></head><body><div class="auth-boot" aria-hidden="true"><div class="auth-boot-inner"><span class="brand-mark">${BRAND.match(/<svg[\s\S]*<\/svg>/u)?.[0] ?? ""}</span><span class="auth-boot-track"><span class="auth-boot-progress"></span></span></div></div><main class="auth-page${pageClassAttribute}"><div class="auth-shell"><section class="auth-card${cardClassAttribute}"><div class="window-bar" aria-hidden="true"><span class="window-dot"></span><span class="window-dot"></span><span class="window-dot"></span></div><header class="auth-header">${BRAND}</header>${content}</section></div></main>${scriptTag}<script>(()=>{const boot=document.querySelector(".auth-boot");if(!boot)return;try{sessionStorage.setItem("mewclaw.boot.v1","1")}catch{}const remove=()=>boot.remove();boot.addEventListener("animationend",event=>{if(event.animationName==="auth-boot-away")remove()},{once:true});setTimeout(remove,1400)})()</script></body></html>`;
 }
 
 export function loginPage(): string {
