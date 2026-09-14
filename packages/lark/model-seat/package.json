@@ -1,0 +1,21 @@
+{
+  "name": "dsh-lark-model-seat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": { ".": { "types": "./lib/types/index.d.ts", "default": "./lib/index.js" }, "./client": "./client.js", "./package.json": "./package.json", "./*": { "types": "./lib/types/*.d.ts", "default": "./lib/*.js" } },
+  "dsh": { "client": { "inject": ["@deepseek-ai/dsh-api-session-controller", "@deepseek-ai/dsh-client-ui-conversation", "@deepseek-ai/dsh-client-ui-model-selection"], "platform": "web" } },
+  "types": "lib/types/index.d.ts",
+  "files": ["lib", "client.js"],
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-api-session-controller": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-model-selection": "0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.1.5-rc.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": { "@deepseek-ai/dsh-client-ui-slots": "0.1.5-rc.2", "@types/react": "18.3.28" }
+}

@@ -40,6 +40,16 @@ describe("resolveAuthConfig", () => {
     expect(() => resolveAuthConfig({ ...base, PREVIEW_URL: "https://preview.example.test" })).toThrow("PREVIEW_URL");
   });
 
+  it("会话 TTL 与 Worker 代理体上限有独立默认值并受边界校验", () => {
+    const config = resolveAuthConfig(base);
+    expect(config.sessionTtlMs).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(config.proxyBodyLimit).toBe(300 * 1024 * 1024);
+    expect(resolveAuthConfig({ ...base, AUTH_SESSION_TTL_MS: "60000" }).sessionTtlMs).toBe(60_000);
+    expect(() => resolveAuthConfig({ ...base, AUTH_SESSION_TTL_MS: "1000" })).toThrow();
+    expect(() => resolveAuthConfig({ ...base, AUTH_PROXY_BODY_LIMIT: "1024" })).toThrow();
+    expect(() => resolveAuthConfig({ ...base, AUTH_PROXY_BODY_LIMIT: String(600 * 1024 * 1024) })).toThrow();
+  });
+
   it("要求独立的用户模型加密主密钥", () => {
     const withoutKey = { ...base, AUTH_USER_MODEL_ENCRYPTION_KEY: undefined };
     expect(() => resolveAuthConfig(withoutKey)).toThrow("AUTH_USER_MODEL_ENCRYPTION_KEY");

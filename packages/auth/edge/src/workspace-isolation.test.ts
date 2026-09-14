@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { AuthService, MemoryAuthStore, type MailSender } from "dsh-lark-auth";
 
 import { createAuthEdgeServer } from "./server.js";
+import { bindAllowedPort } from "./test-ports.js";
 import type { AuthEdgeConfig } from "./config.js";
 
 class TestMail implements MailSender {
@@ -208,5 +209,5 @@ function lastRequest(requests: Array<{ path: string; body: Record<string, unknow
 async function exists(path: string): Promise<boolean> { try { await mkdir(path, { recursive: false }); return true; } catch (error) { return (error as NodeJS.ErrnoException).code === "EEXIST"; } }
 async function collect(req: IncomingMessage): Promise<string> { const chunks: Buffer[] = []; for await (const chunk of req) chunks.push(Buffer.from(chunk)); return Buffer.concat(chunks).toString("utf8"); }
 function json(res: ServerResponse, body: unknown): void { const value = JSON.stringify(body); res.writeHead(200, { "content-type": "application/json", "content-length": Buffer.byteLength(value) }); res.end(value); }
-async function listenWorker(handler: (req: IncomingMessage, res: ServerResponse) => Promise<void>): Promise<Server & { port: number }> { const server = createServer((req, res) => { if (handleWorkerAuthBridge(req, res)) return; void handler(req, res); }); await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve)); const address = server.address(); if (!address || typeof address === "string") throw new Error("worker did not bind"); const result = Object.assign(server, { port: address.port }); servers.push({ close: () => new Promise<void>((resolve) => result.close(() => resolve())) }); return result; }
+async function listenWorker(handler: (req: IncomingMessage, res: ServerResponse) => Promise<void>): Promise<Server & { port: number }> { const server = createServer((req, res) => { if (handleWorkerAuthBridge(req, res)) return; void handler(req, res); }); await bindAllowedPort(server); const address = server.address(); if (!address || typeof address === "string") throw new Error("worker did not bind"); const result = Object.assign(server, { port: address.port }); servers.push({ close: () => new Promise<void>((resolve) => result.close(() => resolve())) }); return result; }
 function handleWorkerAuthBridge(req: IncomingMessage, res: ServerResponse): boolean { if (req.method === "POST" && req.url === "/internal/web-auth/session") { const value = JSON.stringify({ url: `http://${req.headers.host}/?token=test` }); res.writeHead(200, { "content-type": "application/json", "content-length": Buffer.byteLength(value) }); res.end(value); return true; } if (req.method === "POST" && req.url === "/internal/web-auth/scope") { req.resume(); res.writeHead(204); res.end(); return true; } if (req.method === "GET" && req.url === "/?token=test") { res.writeHead(303, { location: "/", "set-cookie": "dsh_worker=test; HttpOnly; SameSite=Strict" }); res.end(); return true; } return false; }

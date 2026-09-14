@@ -35,6 +35,9 @@ const testEnvironment = {
 const disabledWorkerEntries = [
   "browser",
   "cdg-bridge",
+  // 桌面桥接依赖完整运行时的 webServer 与 larkScopeIndex；
+  // 本隔离组合为无副作用禁用 lark-run，故同步排除（与 boot-check overlay 一致）。
+  "desktop-workspace",
   "lark-approval",
   "lark-billing",
   "lark-cron",

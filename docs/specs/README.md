@@ -33,12 +33,17 @@
 | [memory.md](memory.md) | `dsh-memory`(+mem0) | 能力缝（默认启用，可显式关闭） | M4 | implemented |
 | [webui.md](webui.md) | `@deepseek-ai/dsh-web-app` + `dsh-lark-web-bundle`；管理面为 `dsh-lark-admin` + admin-web | 官方 dsh Web 聊天面 + 独立管理控制面 | M6 | implemented |
 | [auth.md](auth.md) | `dsh-lark-auth` + `dsh-lark-auth-edge` + `apps/auth` | 多用户认证、邮箱/飞书身份、代理授权边界 | M7 | implemented |
+| [url-policy.md](url-policy.md) | `dsh-lark-url-policy` | 共享 SSRF 防护库（edge/web-private-model/browser 复用） | M7 | implemented |
+| [web-private-model.md](web-private-model.md) | `dsh-lark-web-private-model` | Web 用户私有模型适配器（capability 换路由，密钥不落盘） | M7 | implemented |
+| [deepseek-routing.md](deepseek-routing.md) | `dsh-lark-deepseek-routing` | DeepSeek 逻辑↔wire 模型路由与目录收敛 | M7 | implemented |
+| [atw-brand.md](atw-brand.md) | `dsh-lark-atw-brand` | MewClaw 品牌（公开 slots/transform/route，升级硬门禁） | 贯穿 | implemented |
+| [model-seat.md](model-seat.md) | `dsh-lark-model-seat` | composer 模型位 shadowing：思考强度滑条优先 + "更多"清单 | 后迁移 | implementing |
 | [billing.md](billing.md) | `dsh-lark-billing` | 模型计费、额度与用量分析能力缝 | M7 | implemented |
 | [preview.md](preview.md) | `dsh-preview` + `dsh-tool-preview` + `skills/lark-share` | 公共 Web/API 分享能力缝 | M9 | implemented |
 | [browser.md](browser.md) | `dsh-browser` + `dsh-tool-browser` + `skills/lark-browser` | 受控 Chromium 浏览器能力缝 | M10 | implemented |
 | [canonical-user.md](canonical-user.md) | `dsh-canonical-user` | Definition + PostgreSQL/Memory Provider | M8 | implemented |
 | [dooragent-migration.md](dooragent-migration.md) | `dsh-dooragent-migration` | Definition + Provider + Consumer + Plugin（一次性生产迁移） | M8 | implemented |
-| [dooragent-associated-data.md](dooragent-associated-data.md) | `dsh-dooragent-migration` | 关联数据迁移阶段契约 | M8 | accepted |
+| [dooragent-associated-data.md](dooragent-associated-data.md) | `dsh-dooragent-migration` | 关联数据迁移阶段契约 | M8 | implemented |
 | [linux-production-runtime.md](linux-production-runtime.md) | `dsh-linux-production-runtime` + 既有 DSH Apps | Debian 生产部署组合 + External PostgreSQL Provider + App Lifecycle | M8 | implemented |
 | [image.md](image.md) | `dsh-lark-image` + `dsh-tool-image` | Definition + Provider + Consumer | M4 | implemented |
 | [mail.md](mail.md) | `dsh-mail` + `dsh-mail-imap` + `dsh-tool-mail` | Definition + Provider + Consumer | M4 | implemented |

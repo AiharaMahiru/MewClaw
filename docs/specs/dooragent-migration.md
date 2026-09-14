@@ -6,7 +6,7 @@
 | 位置 | `packages/migration/dooragent` |
 | 角色 | Definition + Provider + Consumer + Plugin |
 | 里程碑 | M8 |
-| 状态 | implementing（ADR-13 accepted，契约评审通过后进入实现） |
+| 状态 | implemented |
 | 关联 ADR | [migration-blueprint.md ADR-13](../migration-blueprint.md#adr-13-生产替换dsh-是唯一运行架构)；[linux-production-runtime.md](linux-production-runtime.md) |
 | 依赖能力 | `ctx.auth`、`ctx.billing`、`ctx.larkSessionDirectory`、`ctx.knowledge`、`ctx.memory`；Linux 生产 Runtime |
 | 提供能力 | `ctx.dooragentMigration` |

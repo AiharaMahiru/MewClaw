@@ -8,7 +8,7 @@ import { ChromiumRuntime } from "./cdp.js";
 import { resolveBrowserConfig } from "./config.js";
 import { BrowserManager } from "./manager.js";
 import { createBrowserServer } from "./server.js";
-import { UrlPolicy } from "./url-policy.js";
+import { UrlPolicy } from "dsh-lark-url-policy";
 
 export const name = "browser-runtime";
 export const Config = z.object({});

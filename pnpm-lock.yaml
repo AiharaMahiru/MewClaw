@@ -440,6 +440,9 @@ importers:
       dsh-lark-liquid-glass:
         specifier: workspace:*
         version: link:packages/ui/liquid-glass
+      dsh-lark-model-seat:
+        specifier: workspace:*
+        version: link:packages/lark/model-seat
       dsh-lark-postgres-runtime:
         specifier: workspace:*
         version: link:infra/postgres
@@ -685,6 +688,9 @@ importers:
       dsh-lark-contracts:
         specifier: workspace:*
         version: link:../../packages/lark/contracts
+      dsh-lark-url-policy:
+        specifier: workspace:*
+        version: link:../../packages/lark/url-policy
     devDependencies:
       '@types/node':
         specifier: 24.10.1
@@ -1073,6 +1079,9 @@ importers:
       dsh-lark-liquid-glass:
         specifier: workspace:*
         version: link:../../ui/liquid-glass
+      dsh-lark-model-seat:
+        specifier: workspace:*
+        version: link:../../lark/model-seat
       dsh-lark-web-auth:
         specifier: workspace:*
         version: link:../../lark/web-auth
@@ -1635,6 +1644,15 @@ importers:
       '@deepseek-ai/dsh-credentials':
         specifier: 0.1.5-rc.2
         version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.5-rc.2(@deepseek-ai/cordis@4.0.2))
+
+  packages/lark/model-seat:
+    devDependencies:
+      '@deepseek-ai/dsh-client-ui-slots':
+        specifier: 0.1.5-rc.2
+        version: 0.1.5-rc.2(@deepseek-ai/cordis@4.0.2)
+      '@types/react':
+        specifier: 18.3.28
+        version: 18.3.28
 
   packages/lark/presets:
     dependencies:

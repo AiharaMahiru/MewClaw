@@ -15,9 +15,13 @@ export interface AuthEdgeConfig {
   databaseUrl: string;
   trustedOrigins: readonly string[];
   sessionCookieSecure: boolean;
+  /** 会话 TTL；同源驱动服务端会话过期与浏览器 Cookie Max-Age，缺省 7 天。 */
+  sessionTtlMs?: number;
   userWorkspaceRoot: string;
   adminWorkspaceRoot: string;
   requestBodyLimit: number;
+  /** 转发 Worker 的 JSON RPC 体上限；须不小于上游 /api 桥的图片聚合容量，缺省 300MiB。 */
+  proxyBodyLimit?: number;
   /** 桌面二进制同步使用独立有界体积，不扩大普通 RPC 限制。 */
   desktopBodyLimit?: number;
   /** 默认开启；显式关闭仅用于不提供模型的隔离环境。 */
@@ -46,6 +50,10 @@ export interface FeishuConfig {
 }
 
 const DEFAULT_BODY_LIMIT = 128 * 1024;
+/** 与 dsh-lark-auth 的 DEFAULT_SESSION_TTL_MS 对齐：7 天滑动会话。 */
+export const DEFAULT_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** 与官方 /api 桥 DEFAULT_MAX_REQUEST_BODY_BYTES 对齐（200MiB 图片聚合 base64 膨胀后加信封余量）。 */
+export const DEFAULT_PROXY_BODY_LIMIT = 300 * 1024 * 1024;
 export const DEFAULT_PREVIEW_URL = "http://127.0.0.1:13082";
 
 export function resolveAuthConfig(environment: Record<string, string | undefined>): AuthEdgeConfig {
@@ -94,9 +102,11 @@ export function resolveAuthConfig(environment: Record<string, string | undefined
     databaseUrl,
     trustedOrigins: origins,
     sessionCookieSecure: secure,
+    sessionTtlMs: boundedInteger(environment.AUTH_SESSION_TTL_MS, DEFAULT_SESSION_TTL_MS, 60_000, 30 * 24 * 60 * 60 * 1000),
     userWorkspaceRoot: resolve(environment.AUTH_USER_WORKSPACE_ROOT || ".workspaces/auth/users"),
     adminWorkspaceRoot: resolve(environment.AUTH_ADMIN_WORKSPACE_ROOT || ".workspaces/auth/admin"),
     requestBodyLimit: boundedInteger(environment.AUTH_BODY_LIMIT, DEFAULT_BODY_LIMIT, 1024, 4 * 1024 * 1024),
+    proxyBodyLimit: boundedInteger(environment.AUTH_PROXY_BODY_LIMIT, DEFAULT_PROXY_BODY_LIMIT, 1024 * 1024, 512 * 1024 * 1024),
     desktopBodyLimit: boundedInteger(environment.AUTH_DESKTOP_BODY_LIMIT, 8 * 1024 * 1024, 1024, 16 * 1024 * 1024),
     promptAudit: {
       enabled: auditEnabled(environment.AUTH_PROMPT_AUDIT_ENABLED),

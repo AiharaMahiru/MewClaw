@@ -6,6 +6,7 @@ import { PassThrough, type Duplex } from "node:stream";
 import { describe, expect, it } from "vitest";
 
 import { createWebSocketClientFrameObserver, createWebSocketServerFrameFilter, proxyUpgrade, requestUpstream } from "./proxy.js";
+import { bindAllowedPort } from "./test-ports.js";
 
 const SOCKET_CLOSE_TIMEOUT_MS = 1_000;
 
@@ -251,6 +252,6 @@ function waitForHandshake(stream: Duplex): Promise<void> {
   });
 }
 
-async function listen(server: Server): Promise<void> { await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve)); }
+async function listen(server: Server): Promise<void> { await bindAllowedPort(server); }
 function port(server: Server): number { const address = server.address(); if (!address || typeof address === "string") throw new Error("worker did not bind"); return address.port; }
 async function close(server: Server): Promise<void> { await new Promise<void>((resolve) => server.close(() => resolve())); }

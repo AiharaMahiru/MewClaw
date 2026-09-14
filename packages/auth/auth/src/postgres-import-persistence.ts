@@ -27,7 +27,7 @@ import type {
   PersistRunAuthorizationInput,
   PersistUserImportInput,
 } from "./import-service.js";
-import { throwIfAborted } from "./import-service.js";
+import { throwIfAborted } from "./import-validation.js";
 import { AUTH_MIGRATIONS } from "./migrations.js";
 import type {
   AuthImportPersistence,
