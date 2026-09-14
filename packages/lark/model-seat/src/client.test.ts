@@ -70,6 +70,7 @@ function makeSliderReact() {
         return [typeof initial === "function" ? (initial as () => T)() : initial, (v: T) => calls.push(v)] as [T, (v: T) => void];
       },
       useRef: () => ({ current: { getBoundingClientRect: () => ({ left: 0, width: 100 }) } }),
+      useEffect: () => {},
     },
   };
 }
@@ -283,7 +284,7 @@ describe("模型位渲染与选择", () => {
     expect(rail.props["aria-valuenow"]).toBe(1);
     expect(rail.props["aria-valuetext"]).toBe("High");
     expect(findAll(tree, byClass("mwseat-sliderTick"))).toHaveLength(2);
-    expect(findAll(tree, byClass("mwseat-sliderThumb"))[0]!.props.style).toMatchObject({ left: "100%" });
+    expect(findAll(tree, byClass("mwseat-sliderThumb"))[0]!.props.style).toMatchObject({ left: "calc(16px + (100% - 32px) * 1)" });
     expect(findAll(tree, byClass("mwseat-sliderStop")).map((s) => s.children[0])).toEqual(["Low", "High"]);
   });
 
@@ -308,6 +309,20 @@ describe("模型位渲染与选择", () => {
     } finally {
       if (prev === undefined) delete g.window; else g.window = prev;
     }
+  });
+
+  it("滑条：select 失败时清除 pending 落点（弹回仅在失败时发生）", async () => {
+    const onPick = vi.fn(async () => false);
+    const fake = makeSliderReact();
+    const slider = createEffortSlider(fake.react as never);
+    const rows = effortRows(MUSE, { provider: "deepseek-official", model: "muse-spark-1.3" });
+    const tree = slider({ rows, busy: false, onPick }) as El;
+    const stops = findAll(tree, byClass("mwseat-sliderStop"));
+    (stops[0]!.props.onClick as () => void)();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const pendingSets = fake.sets[1]!;
+    expect(pendingSets).toContain(0); // 落点 pending=0
+    expect(pendingSets[pendingSets.length - 1]).toBe(null); // 失败后清除回退
   });
 
   it("滑条：方向键与标签点击直达档位", () => {

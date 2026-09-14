@@ -39,23 +39,34 @@
   }
   function createEffortSlider(React) {
     const h = React.createElement;
+    const PAD = 16;
     return function EffortSlider(props) {
       const { rows, busy, onPick } = props;
       const [drag, setDrag] = React.useState(null);
+      const [pending, setPending] = React.useState(null);
       const trackRef = React.useRef(null);
       const n = rows.length;
       if (n === 0) return null;
       const found = rows.findIndex((r) => r.active);
       const active = found < 0 ? 0 : found;
-      const index = Math.min(n - 1, Math.max(0, drag ?? active));
-      const pct = (i) => n <= 1 ? 50 : i / (n - 1) * 100;
+      React.useEffect(() => {
+        if (pending !== null && pending === active) setPending(null);
+      }, [pending, active]);
+      const index = Math.min(n - 1, Math.max(0, drag ?? pending ?? active));
+      const frac = (i) => n <= 1 ? 0.5 : i / (n - 1);
+      const pos = (i) => `calc(${PAD}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
       const indexAt = (clientX) => {
         const rect = trackRef.current?.getBoundingClientRect();
-        if (rect === void 0 || rect.width <= 0 || n <= 1) return index;
-        return Math.min(n - 1, Math.max(0, Math.round((clientX - rect.left) / rect.width * (n - 1))));
+        if (rect === void 0 || rect.width <= PAD * 2 || n <= 1) return index;
+        const f = (clientX - rect.left - PAD) / (rect.width - PAD * 2);
+        return Math.min(n - 1, Math.max(0, Math.round(f * (n - 1))));
       };
       const commit = (i) => {
-        if (i !== active) onPick(rows[i]?.effort);
+        if (busy || i === index) return;
+        setPending(i);
+        void Promise.resolve(onPick(rows[i]?.effort)).then((ok) => {
+          if (ok === false) setPending(null);
+        });
       };
       const onPointerDown = (event) => {
         if (busy || event.button !== void 0 && event.button !== 0) return;
@@ -106,9 +117,9 @@
             onPointerDown,
             onKeyDown
           },
-          h("div", { className: "mwseat-sliderFill", style: { width: `${pct(index)}%` } }),
-          rows.map((row, i) => h("span", { key: `t:${row.key}`, className: "mwseat-sliderTick", "aria-hidden": "true", style: { left: `${pct(i)}%` } })),
-          h("span", { className: "mwseat-sliderThumb", "aria-hidden": "true", style: { left: `${pct(index)}%` } })
+          h("div", { className: "mwseat-sliderFill", "aria-hidden": "true", style: { width: pos(index) } }),
+          rows.map((row, i) => h("span", { key: `t:${row.key}`, className: "mwseat-sliderTick", "aria-hidden": "true", style: { left: pos(i) } })),
+          h("span", { className: "mwseat-sliderThumb", "aria-hidden": "true", style: { left: pos(index) } })
         ),
         h(
           "div",
@@ -119,7 +130,7 @@
             className: `mwseat-sliderStop${i === index ? " on" : ""}`,
             disabled: busy,
             ...row.description !== void 0 ? { title: row.description } : {},
-            style: { left: `${pct(i)}%`, transform: i === 0 ? "translateX(0)" : i === n - 1 ? "translateX(-100%)" : "translateX(-50%)" },
+            style: { left: pos(i), transform: i === 0 ? "translateX(0)" : i === n - 1 ? "translateX(-100%)" : "translateX(-50%)" },
             onClick: () => commit(i)
           }, row.label))
         )
@@ -264,8 +275,10 @@
       };
       const chooseEffort = (effort) => {
         const current = state.current;
-        if (current === null) return;
-        void select({ provider: current.provider, model: current.model, ...effort === void 0 ? {} : { reasoningEffort: effort } }).then(settle);
+        if (current === null) return Promise.resolve(false);
+        const p = select({ provider: current.provider, model: current.model, ...effort === void 0 ? {} : { reasoningEffort: effort } });
+        void p.then(settle);
+        return p;
       };
       const onKeyDown = (event) => {
         if (event.key !== "Escape" || !open) return;
@@ -337,15 +350,14 @@
 .mwseat-more{font-weight:500}
 .mwseat-back{display:inline-flex;align-items:center;padding:0 2px;font-size:14px}
 .mwseat-more:hover,.mwseat-back:hover{color:var(--dsw-alias-label-primary)}
-.mwseat-slider{padding:0 10px 4px;user-select:none}
-.mwseat-sliderRail{position:relative;height:24px;cursor:pointer;touch-action:none;outline:none}
-.mwseat-sliderRail::before{content:"";position:absolute;left:0;right:0;top:50%;height:4px;transform:translateY(-50%);border-radius:999px;background:var(--dsw-alias-interactive-bg-hover)}
-.mwseat-sliderRail:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary,Highlight);outline-offset:2px;border-radius:6px}
-.mwseat-sliderFill{position:absolute;left:0;top:50%;height:4px;transform:translateY(-50%);border-radius:999px;background:var(--dsw-alias-state-business-primary,#5c70c9)}
-.mwseat-sliderTick{position:absolute;top:50%;width:5px;height:5px;border-radius:50%;transform:translate(-50%,-50%);background:var(--dsw-alias-label-dimmed);pointer-events:none}
-.mwseat-sliderThumb{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;transform:translate(-50%,-50%);background:var(--dsw-alias-label-primary);box-shadow:0 1px 4px rgb(0 0 0 / 32%);pointer-events:none}
-.mwseat-sliderRail:not(.drag) .mwseat-sliderThumb,.mwseat-sliderRail:not(.drag) .mwseat-sliderFill{transition:left .12s ease,width .12s ease}
-.mwseat-sliderStops{position:relative;height:20px;margin-top:2px}
+.mwseat-slider{padding:2px 10px 6px;user-select:none}
+.mwseat-sliderRail{position:relative;height:28px;border-radius:999px;cursor:pointer;touch-action:none;outline:none;background:var(--dsw-alias-interactive-bg-hover);box-shadow:inset 0 1px 2px rgb(0 0 0 / 10%)}
+.mwseat-sliderRail:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary,Highlight);outline-offset:2px}
+.mwseat-sliderFill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--dsw-alias-state-business-primary,#5c70c9);opacity:.3;pointer-events:none}
+.mwseat-sliderTick{position:absolute;top:50%;width:4px;height:4px;border-radius:50%;transform:translate(-50%,-50%);background:var(--dsw-alias-label-dimmed);opacity:.55;pointer-events:none}
+.mwseat-sliderThumb{position:absolute;top:50%;width:20px;height:20px;border-radius:999px;transform:translate(-50%,-50%);background:var(--dsw-alias-label-primary);box-shadow:0 1px 4px rgb(0 0 0 / 30%),inset 0 1px 0 rgb(255 255 255 / 22%);pointer-events:none}
+.mwseat-sliderRail:not(.drag) .mwseat-sliderThumb,.mwseat-sliderRail:not(.drag) .mwseat-sliderFill{transition:left .14s ease,width .14s ease}
+.mwseat-sliderStops{position:relative;height:20px;margin-top:4px}
 .mwseat-sliderStop{position:absolute;border:0;background:transparent;padding:0;font:inherit;font-size:11px;line-height:18px;color:var(--dsw-alias-label-tertiary);cursor:pointer;white-space:nowrap}
 .mwseat-sliderStop.on{color:var(--dsw-alias-label-primary);font-weight:500}
 .mwseat-sliderStop:disabled{cursor:default;opacity:.6}
