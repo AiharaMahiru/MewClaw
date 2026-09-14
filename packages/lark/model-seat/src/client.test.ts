@@ -158,6 +158,16 @@ describe("composer 模型位 shadow 注册", () => {
     expect(face.directory).toBe(store);
   });
 
+  it("模块 inject 声明覆盖 directoryFor 的 ctx.remote.session 访问", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const src = readFileSync(fileURLToPath(new URL("./client.ts", import.meta.url)), "utf8");
+    const inject = src.match(/inject:\s*\[([^\]]+)\]/)?.[1] ?? "";
+    for (const dep of ["slots", "modelDirectories", "sessions", "remote.session"]) {
+      expect(inject).toContain(`"${dep}"`);
+    }
+  });
+
   it("真实 SlotCore 选举：priority:-1 在 single 槽位上恒定遮蔽官方占据", () => {
     const core = new SlotCore();
     core.register(

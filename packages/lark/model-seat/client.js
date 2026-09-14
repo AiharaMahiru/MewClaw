@@ -316,7 +316,9 @@
       const dom = require2("react-dom");
       return {
         apply: (ctx) => applyModelSeat(ctx, React, dom),
-        inject: ["slots", "modelDirectories", "sessions"]
+        // remote.session：directoryFor 内部经本模块 ambient scope 读
+        // ctx.remote.session，缺声明会被 inject 代理拒绝。
+        inject: ["slots", "modelDirectories", "sessions", "remote.session"]
       };
     }
   });
