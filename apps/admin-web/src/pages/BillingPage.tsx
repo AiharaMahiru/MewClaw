@@ -14,7 +14,7 @@ import {
   type BillingModelPrice,
   type BillingQuota,
 } from "../api.js";
-import { MetricStrip, PageHeader, RefreshButton, SectionHeading } from "../components/AdminUi.js";
+import { Card, MetricStrip, PageHeader, RefreshButton } from "../components/AdminUi.js";
 import { billingTotals } from "../admin-view-model.js";
 
 function credits(value: number): string {
@@ -46,8 +46,12 @@ function PriceEditor(props: { price: BillingModelPrice; refresh: () => Promise<v
       setBusy(false);
     }
   };
-  const field = (key: keyof BillingModelPrice, label: string, disabled = false) => <label className="price-field">{label}<input type="number" min="0" step="0.000001" value={price[key] as number} disabled={disabled} onChange={(event) => setPrice({ ...price, [key]: Number(event.target.value) })} /></label>;
-  return <form className="price-row" onSubmit={(event) => void submit(event)}><div><strong>{price.provider}</strong><span className="table-subline">{price.model}</span></div>{field("inputUsdPerMillion", "输入（未命中）")}{field("outputUsdPerMillion", "输出")}{field("cacheReadUsdPerMillion", "缓存命中")}{field("cacheWriteUsdPerMillion", "缓存写入")}{field("reasoningUsdPerMillion", "推理（随输出）", true)}<button type="submit" disabled={busy}>保存</button></form>;
+  const field = (key: keyof BillingModelPrice, label: string, disabled = false) => <label className="adm-field adm-field-sm"><span className="adm-label">{label}</span><input type="number" min="0" step="0.000001" value={price[key] as number} disabled={disabled} onChange={(event) => setPrice({ ...price, [key]: Number(event.target.value) })} /></label>;
+  return <form className="adm-price-row" onSubmit={(event) => void submit(event)}>
+    <div className="adm-price-name"><strong>{price.provider}</strong><span className="adm-sub">{price.model}</span></div>
+    {field("inputUsdPerMillion", "输入（未命中）")}{field("outputUsdPerMillion", "输出")}{field("cacheReadUsdPerMillion", "缓存命中")}{field("cacheWriteUsdPerMillion", "缓存写入")}{field("reasoningUsdPerMillion", "推理（随输出）", true)}
+    <button className="adm-btn adm-btn-sm" type="submit" disabled={busy}>保存</button>
+  </form>;
 }
 
 function QuotaPanel(props: { users: AdminUserSummary[]; onError: (message: string) => void }) {
@@ -55,6 +59,7 @@ function QuotaPanel(props: { users: AdminUserSummary[]; onError: (message: strin
   const [quota, setQuota] = useState<BillingQuota | null>(null);
   const [limit, setLimit] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [credit, setCredit] = useState("");
   const load = useCallback(async (nextUserId: string) => {
     if (!nextUserId) return;
     try {
@@ -67,7 +72,6 @@ function QuotaPanel(props: { users: AdminUserSummary[]; onError: (message: strin
   }, [props.onError]);
   useEffect(() => { void load(userId); }, [load, userId]);
   useEffect(() => { if (!userId && props.users[0]) setUserId(props.users[0].id); }, [props.users, userId]);
-  const [credit, setCredit] = useState("");
   const save = async (): Promise<void> => {
     if (!userId || !Number.isFinite(limit) || limit < 0) return props.onError("额度必须是非负美元金额");
     setBusy(true);
@@ -87,20 +91,35 @@ function QuotaPanel(props: { users: AdminUserSummary[]; onError: (message: strin
     } catch (cause) { props.onError(cause instanceof ApiError ? cause.code : "充值失败"); }
     finally { setBusy(false); }
   };
-  return <section className="quota-panel"><SectionHeading title="月度额度" meta={quota ? quota.periodStart : "选择用户"} /><div className="quota-form"><label>用户<select value={userId} onChange={(event) => setUserId(event.target.value)}>{props.users.map((user) => <option key={user.id} value={user.id}>{user.displayName} · {user.email}</option>)}</select></label><label>额度（USD）<input type="number" min="0" step="0.000001" value={limit} onChange={(event) => setLimit(Number(event.target.value))} /></label><button type="button" onClick={() => void save()} disabled={busy || !userId}>保存额度</button></div>{quota && <div className="quota-stats"><span>本月已用 <strong>{usd(quota.usedUsd)}</strong></span><span>剩余 <strong>{usd(quota.remainingUsd)}</strong></span><span>额度 <strong>{usd(quota.monthlyLimitUsd)}</strong></span></div>}
-    <div className="quota-recharge"><span className="editor-label">快速充值（在现有额度上增加）</span><div className="quota-recharge-row">
-      {[5, 10, 20, 50].map((delta) => <button key={delta} className="secondary-action recharge-button" type="button" disabled={busy || !userId} onClick={() => void recharge(delta)}>+${delta}</button>)}
-      <label className="recharge-custom"><input type="number" min="0" step="0.000001" placeholder="自定义金额" value={credit} onChange={(event) => setCredit(event.target.value)} /><button className="secondary-action" type="button" disabled={busy || !userId || !credit.trim()} onClick={() => void recharge(Number(credit))}>充值</button></label>
-    </div></div>
-  </section>;
+  return <Card title="月度额度" meta={quota ? `周期起点 ${quota.periodStart}` : "选择用户"}>
+    <form className="adm-form" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+      <label className="adm-field"><span className="adm-label">用户</span><select value={userId} onChange={(event) => setUserId(event.target.value)}>{props.users.map((user) => <option key={user.id} value={user.id}>{user.displayName} · {user.email}</option>)}</select></label>
+      <label className="adm-field adm-field-sm"><span className="adm-label">额度（USD）</span><input type="number" min="0" step="0.000001" value={limit} onChange={(event) => setLimit(Number(event.target.value))} /></label>
+      <button className="adm-btn adm-btn-primary" type="submit" disabled={busy || !userId}>保存额度</button>
+    </form>
+    {quota && <div className="adm-statgrid" style={{ marginTop: 14 }}><div><strong>{usd(quota.usedUsd)}</strong><span>本月已用</span></div><div><strong>{usd(quota.remainingUsd)}</strong><span>剩余</span></div><div><strong>{usd(quota.monthlyLimitUsd)}</strong><span>额度</span></div></div>}
+    <div className="adm-section" style={{ marginTop: 14 }}><div className="adm-section-head"><span>快速充值</span><small>在现有额度上增加</small></div>
+      <div className="adm-recharge">
+        {[5, 10, 20, 50].map((delta) => <button key={delta} className="adm-btn adm-btn-sm" type="button" disabled={busy || !userId} onClick={() => void recharge(delta)}>+${delta}</button>)}
+        <input type="number" min="0" step="0.000001" placeholder="自定义金额" value={credit} onChange={(event) => setCredit(event.target.value)} />
+        <button className="adm-btn adm-btn-sm" type="button" disabled={busy || !userId || !credit.trim()} onClick={() => void recharge(Number(credit))}>充值</button>
+      </div>
+    </div>
+  </Card>;
 }
 
 function UsageTable({ rows, users }: { rows: BillingAggregate[]; users: AdminUserSummary[] }) {
   const labels = new Map(users.map((user) => [user.id, user]));
-  return <section className="section-block"><SectionHeading title="用量明细" meta={`${rows.length} 项`} /><div className="table-scroll"><table className="data-table admin-table"><thead><tr><th>用户</th><th>模型</th><th>调用</th><th>输入</th><th>输出</th><th>费用（USD）</th></tr></thead><tbody>{rows.map((row) => {
-    const user = labels.get(row.userId);
-    return <tr key={`${row.periodStart}-${row.userId}-${row.provider}-${row.model}`}><td data-label="用户"><strong>{user?.displayName ?? "未知用户"}</strong><span className="table-subline">{user?.email ?? "账号已移除"}</span></td><td data-label="模型"><strong>{row.model}</strong><span className="table-subline">{row.provider}</span></td><td data-label="调用">{credits(row.calls)}</td><td data-label="输入">{tokens(row.inputTokens)}</td><td data-label="输出">{tokens(row.outputTokens)}</td><td data-label="费用（USD）">{usd(row.totalUsd)}</td></tr>;
-  })}{!rows.length && <tr><td className="empty" colSpan={6}>暂无用量记录</td></tr>}</tbody></table></div></section>;
+  return <Card title="用量明细" meta={`${rows.length} 项`}>
+    <div className="adm-table-scroll"><table className="adm-table"><thead><tr><th>用户</th><th>模型</th><th>调用</th><th>输入</th><th>输出</th><th>费用（USD）</th></tr></thead><tbody>{rows.map((row) => {
+      const user = labels.get(row.userId);
+      return <tr key={`${row.periodStart}-${row.userId}-${row.provider}-${row.model}`}>
+        <td><strong>{user?.displayName ?? "未知用户"}</strong><span className="adm-sub">{user?.email ?? "账号已移除"}</span></td>
+        <td><strong>{row.model}</strong><span className="adm-sub">{row.provider}</span></td>
+        <td>{credits(row.calls)}</td><td>{tokens(row.inputTokens)}</td><td>{tokens(row.outputTokens)}</td><td>{usd(row.totalUsd)}</td>
+      </tr>;
+    })}{!rows.length && <tr><td className="adm-empty" colSpan={6}>暂无用量记录</td></tr>}</tbody></table></div>
+  </Card>;
 }
 
 export function BillingPage({ onUnauthorized }: { onUnauthorized: () => void }) {
@@ -121,9 +140,9 @@ export function BillingPage({ onUnauthorized }: { onUnauthorized: () => void }) 
   }, [onUnauthorized]);
   useEffect(() => { void refresh(); }, [refresh]);
   const totals = useMemo(() => billingTotals(rows), [rows]);
-  return <section className="workspace">
-    <PageHeader eyebrow="模型计费" title="用量与额度" actions={<RefreshButton busy={loading} label="刷新计费" onClick={() => void refresh()} />} />
-    {error && <p className="notice error">{error}</p>}
+  return <>
+    <PageHeader title="用量与额度" sub="模型计费" actions={<RefreshButton busy={loading} label="刷新计费" onClick={() => void refresh()} />} />
+    {error && <p className="adm-notice adm-notice-err">{error}</p>}
     <MetricStrip label="计费摘要" items={[
       { label: "本月费用", value: usd(totals.totalUsd), detail: `${totals.models} 个模型`, tone: "warning", icon: "billing" },
       { label: "模型调用", value: credits(totals.calls), detail: `${rows.length} 个计费分组`, tone: "accent", icon: "pulse" },
@@ -132,6 +151,8 @@ export function BillingPage({ onUnauthorized }: { onUnauthorized: () => void }) 
     ]} />
     <QuotaPanel users={users} onError={setError} />
     <UsageTable rows={rows} users={users} />
-    <section className="section-block"><SectionHeading title="模型价格" meta="每百万 token · USD" /><div className="price-list">{prices.map((price) => <PriceEditor key={`${price.provider}-${price.model}`} price={price} refresh={refresh} onError={setError} />)}{!prices.length && !loading && <p className="empty">暂无模型价格</p>}</div></section>
-  </section>;
+    <Card title="模型价格" meta="每百万 token · USD">
+      <div className="adm-pricelist">{prices.map((price) => <PriceEditor key={`${price.provider}-${price.model}`} price={price} refresh={refresh} onError={setError} />)}{!prices.length && !loading && <p className="adm-empty">暂无模型价格</p>}</div>
+    </Card>
+  </>;
 }

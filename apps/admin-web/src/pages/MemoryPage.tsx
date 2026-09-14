@@ -17,7 +17,7 @@ import {
   type MemoryPart,
   type MemoryVisibility,
 } from "../api.js";
-import { FilterBar, MetricStrip, PageHeader, RefreshButton, SectionHeading } from "../components/AdminUi.js";
+import { Badge, Card, FilterBar, MetricStrip, PageHeader, RefreshButton } from "../components/AdminUi.js";
 import { Icon } from "../components/Icon.js";
 
 const VISIBILITY_TEXT: Record<MemoryVisibility, string> = {
@@ -69,6 +69,18 @@ function nodePreview(node: MemoryNode): string {
   return text.length > 160 ? `${text.slice(0, 160)}…` : text;
 }
 
+function Drawer(props: { kicker: string; title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; danger?: React.ReactNode }) {
+  return <>
+    <button className="adm-backdrop" type="button" aria-label="关闭详情面板" onClick={props.onClose} />
+    <aside className="adm-drawer" aria-label={props.title}>
+      <div className="adm-drawer-head"><div><span className="adm-drawer-kicker">{props.kicker}</span><h2 className="adm-drawer-title">{props.title}</h2></div><button className="adm-iconbtn" type="button" aria-label="关闭详情" title="关闭" onClick={props.onClose}><Icon name="close" size={16} /></button></div>
+      <div className="adm-drawer-body">{props.children}</div>
+      {props.danger && <div className="adm-drawer-danger">{props.danger}</div>}
+      {props.footer && <div className="adm-drawer-foot">{props.footer}</div>}
+    </aside>
+  </>;
+}
+
 function CubeDetail(props: {
   cube: MemoryCube;
   users: AdminUserSummary[];
@@ -83,22 +95,22 @@ function CubeDetail(props: {
   useEffect(() => { setName(cube.name); setVisibility(cube.visibility); }, [cube]);
   const owner = props.users.find((user) => user.id === cube.ownerUserId);
   const dirty = name.trim() !== cube.name || visibility !== cube.visibility;
-  return <aside className="user-editor is-open memory-editor" aria-label="记忆空间详情">
-    <div className="user-editor-head"><div><span className="editor-kicker">MEMORY CUBE</span><h2>{cube.name}</h2></div><button className="icon-button" type="button" aria-label="关闭详情" title="关闭" onClick={props.onClose}><Icon name="close" size={17} /></button></div>
-    <div className="user-editor-profile"><span className="user-avatar" aria-hidden="true"><Icon name="knowledge" size={18} /></span><div className="user-editor-identity"><strong>{cube.key}</strong><span>所有者 {owner ? `${owner.displayName} · ${owner.email}` : cube.ownerUserId}</span><div className="user-editor-badges"><span className="badge processing">{VISIBILITY_TEXT[cube.visibility]}</span><span className="badge">v{cube.revision}</span></div></div></div>
-    <div className="user-editor-form">
-      <div className="form-section"><div className="form-section-heading"><span>基本信息</span><small>乐观锁更新</small></div>
-        <label className="editor-field"><span className="editor-label">名称</span><input value={name} disabled={props.busy} onChange={(event) => setName(event.target.value)} /></label>
-        <label className="editor-field"><span className="editor-label">可见性</span><select value={visibility} disabled={props.busy} onChange={(event) => setVisibility(event.target.value as MemoryVisibility)}>{Object.entries(VISIBILITY_TEXT).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <div className="user-editor-actions"><button className="primary-action" type="button" disabled={!dirty || props.busy || !name.trim()} onClick={() => void props.onSave(cube, { ...(name.trim() !== cube.name ? { name: name.trim() } : {}), ...(visibility !== cube.visibility ? { visibility } : {}) })}><Icon name="check" size={15} /><span>保存修改</span></button><button className="secondary-action" type="button" onClick={props.onClose} disabled={props.busy}>关闭</button></div>
-      </div>
-      <div className="form-section resource-section"><div className="form-section-heading"><span>归属</span><small>只读</small></div>
-        <div className="resource-grid"><div><strong>{cube.visibility === "user_private" ? "私有" : "共享"}</strong><span>可见性</span></div><div><strong>{cube.projectKey ?? "—"}</strong><span>项目键</span></div><div><strong>{cube.agentKey ?? "—"}</strong><span>智能体键</span></div></div>
-      </div>
+  return <Drawer kicker="MEMORY CUBE" title={cube.name} onClose={props.onClose}
+    danger={<button className="adm-btn adm-btn-danger" type="button" disabled={props.busy} onClick={() => void props.onDelete(cube)}><Icon name="close" size={14} /><span>删除这个记忆空间</span></button>}
+    footer={<>创建于 {date(cube.createdAt)} · 最近更新 {date(cube.updatedAt)}</>}>
+    <div className="adm-profile">
+      <span className="adm-avatar adm-avatar-lg" aria-hidden="true"><Icon name="memory" size={18} /></span>
+      <div className="adm-profile-main"><strong>{cube.key}</strong><span>所有者 {owner ? `${owner.displayName} · ${owner.email}` : cube.ownerUserId}</span><div className="adm-profile-badges"><Badge tone="info">{VISIBILITY_TEXT[cube.visibility]}</Badge><Badge>v{cube.revision}</Badge></div></div>
     </div>
-    <div className="user-editor-danger"><button className="danger-action" type="button" disabled={props.busy} onClick={() => void props.onDelete(cube)}><Icon name="close" size={14} /><span>删除这个记忆空间</span></button></div>
-    <p className="editor-footnote">创建于 {date(cube.createdAt)} · 最近更新 {date(cube.updatedAt)}</p>
-  </aside>;
+    <div className="adm-section"><div className="adm-section-head"><span>基本信息</span><small>乐观锁更新</small></div>
+      <label className="adm-field"><span className="adm-label">名称</span><input value={name} disabled={props.busy} onChange={(event) => setName(event.target.value)} /></label>
+      <label className="adm-field"><span className="adm-label">可见性</span><select value={visibility} disabled={props.busy} onChange={(event) => setVisibility(event.target.value as MemoryVisibility)}>{Object.entries(VISIBILITY_TEXT).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <div className="adm-actions"><button className="adm-btn adm-btn-primary" type="button" disabled={!dirty || props.busy || !name.trim()} onClick={() => void props.onSave(cube, { ...(name.trim() !== cube.name ? { name: name.trim() } : {}), ...(visibility !== cube.visibility ? { visibility } : {}) })}><Icon name="check" size={14} /><span>保存修改</span></button></div>
+    </div>
+    <div className="adm-section"><div className="adm-section-head"><span>归属</span><small>只读</small></div>
+      <div className="adm-statgrid"><div><strong>{cube.visibility === "user_private" ? "私有" : "共享"}</strong><span>可见性</span></div><div><strong>{cube.projectKey ?? "—"}</strong><span>项目键</span></div><div><strong>{cube.agentKey ?? "—"}</strong><span>智能体键</span></div></div>
+    </div>
+  </Drawer>;
 }
 
 function NodeDetail(props: { nodeId: string; onClose: () => void; onDelete: (nodeId: string) => Promise<void>; busy: boolean }) {
@@ -114,25 +126,24 @@ function NodeDetail(props: { nodeId: string; onClose: () => void; onDelete: (nod
     }).catch((cause: unknown) => { if (!cancelled) setError(errorText(cause, "节点读取失败")); });
     return () => { cancelled = true; };
   }, [props.nodeId]);
-  return <aside className="user-editor is-open memory-editor" aria-label="记忆节点详情">
-    <div className="user-editor-head"><div><span className="editor-kicker">MEMORY NODE</span><h2>{node ? KIND_TEXT[node.kind] : "节点详情"}</h2></div><button className="icon-button" type="button" aria-label="关闭详情" title="关闭" onClick={props.onClose}><Icon name="close" size={17} /></button></div>
-    {error && <p className="notice error">{error}</p>}
-    {!node && !error && <div className="panel-state"><span>正在读取节点…</span></div>}
+  return <Drawer kicker="MEMORY NODE" title={node ? KIND_TEXT[node.kind] : "节点详情"} onClose={props.onClose}
+    danger={node ? <button className="adm-btn adm-btn-danger" type="button" disabled={props.busy} onClick={() => void props.onDelete(node.id)}><Icon name="close" size={14} /><span>删除这个节点</span></button> : undefined}
+    footer={node ? <>创建于 {date(node.createdAt)} · 最近更新 {date(node.updatedAt)}</> : undefined}>
+    {error && <p className="adm-notice adm-notice-err">{error}</p>}
+    {!node && !error && <div className="adm-state"><span className="adm-spinner" /><span>正在读取节点…</span></div>}
     {node && <>
-      <div className="memory-node-body">
-        {node.parts.map((part, index) => <p className="memory-part" key={index}>{partText(part)}</p>)}
-        <dl className="memory-node-meta">
-          <div><dt>置信度</dt><dd>{node.confidence ?? "—"}</dd></div>
-          <div><dt>状态</dt><dd>{node.status === "active" ? "活跃" : "已归档"}</dd></div>
-          <div><dt>来源</dt><dd>{node.source ? node.source.kind : "—"}</dd></div>
-          <div><dt>修订</dt><dd>v{node.revision}</dd></div>
-        </dl>
-        {edges.length > 0 && <div className="memory-edge-list"><span className="editor-label">关联边</span>{edges.map((edge) => <div className="memory-edge" key={edge.id}><span className="badge">{RELATION_TEXT[edge.relation]}</span><code>{edge.fromId === node.id ? edge.toId : edge.fromId}</code></div>)}</div>}
-      </div>
-      <div className="user-editor-danger"><button className="danger-action" type="button" disabled={props.busy} onClick={() => void props.onDelete(node.id)}><Icon name="close" size={14} /><span>删除这个节点</span></button></div>
-      <p className="editor-footnote">创建于 {date(node.createdAt)} · 最近更新 {date(node.updatedAt)}</p>
+      <div className="adm-memparts">{node.parts.map((part, index) => <p className="adm-mempart" key={index}>{partText(part)}</p>)}</div>
+      <dl className="adm-usage" style={{ marginTop: 14 }}>
+        <div><dt>置信度</dt><dd>{node.confidence ?? "—"}</dd></div>
+        <div><dt>状态</dt><dd>{node.status === "active" ? "活跃" : "已归档"}</dd></div>
+        <div><dt>来源</dt><dd>{node.source ? node.source.kind : "—"}</dd></div>
+        <div><dt>修订</dt><dd>v{node.revision}</dd></div>
+      </dl>
+      {edges.length > 0 && <div className="adm-section" style={{ marginTop: 14 }}><div className="adm-section-head"><span>关联边</span></div>
+        {edges.map((edge) => <div className="adm-identity" key={edge.id}><Badge>{RELATION_TEXT[edge.relation]}</Badge><code>{edge.fromId === node.id ? edge.toId : edge.fromId}</code></div>)}
+      </div>}
     </>}
-  </aside>;
+  </Drawer>;
 }
 
 export function MemoryPage({ onUnauthorized }: { onUnauthorized: () => void }) {
@@ -256,56 +267,53 @@ export function MemoryPage({ onUnauthorized }: { onUnauthorized: () => void }) {
   const privateCount = cubes.filter((cube) => cube.visibility === "user_private").length;
   const sharedCount = cubes.length - privateCount;
 
-  return <section className="workspace">
-    <PageHeader eyebrow="记忆与检索" title="记忆管理" actions={<RefreshButton busy={loading} label="刷新记忆" onClick={() => void refresh()} />} />
-    {error && <p className="notice error">{error}</p>}
-    {notice && <p className="notice success"><Icon name="check" size={14} />{notice}</p>}
+  return <>
+    <PageHeader title="记忆管理" sub="记忆空间与节点检索" actions={<RefreshButton busy={loading} label="刷新记忆" onClick={() => void refresh()} />} />
+    {error && <p className="adm-notice adm-notice-err">{error}</p>}
+    {notice && <p className="adm-notice adm-notice-ok"><Icon name="check" size={14} />{notice}</p>}
     <MetricStrip label="记忆摘要" items={[
-      { label: "记忆空间", value: String(cubes.length), detail: "全部 cube", tone: "accent", icon: "knowledge" },
+      { label: "记忆空间", value: String(cubes.length), detail: "全部 cube", tone: "accent", icon: "memory" },
       { label: "私有空间", value: String(privateCount), detail: "user_private", icon: "shield" },
       { label: "共享空间", value: String(sharedCount), detail: "项目/智能体/租户", tone: "success", icon: "users" },
       { label: "检索结果", value: searchResults ? String(searchResults.length) : "—", detail: searchQuery.trim() ? `「${searchQuery.trim()}」` : "尚未检索", tone: "warning", icon: "search" },
     ]} />
-    <form className="control-form memory-search-form" onSubmit={(event) => void runSearch(event)}>
-      <label>语义检索<input value={searchQuery} placeholder="输入自然语言查询，检索全部可访问记忆" onChange={(event) => setSearchQuery(event.target.value)} /></label>
-      <button type="submit" disabled={busy || !searchQuery.trim()}><Icon name="search" size={14} /><span>检索</span></button>
-    </form>
-    {searchResults !== null && <section className="section-block"><SectionHeading title="检索结果" meta={`${searchResults.length} 个节点`} actions={<button type="button" onClick={() => { setSearchResults(null); setSelectedNodeId(""); }}>清除结果</button>} />
-      <div className="table-scroll"><table className="data-table admin-table"><thead><tr><th>内容</th><th>类型</th><th>状态</th><th>置信度</th><th>更新时间</th></tr></thead>
+    <Card title="语义检索" meta="全部可访问记忆">
+      <form className="adm-form" onSubmit={(event) => void runSearch(event)}>
+        <label className="adm-field"><span className="adm-label">查询</span><input value={searchQuery} placeholder="输入自然语言查询，检索全部可访问记忆" onChange={(event) => setSearchQuery(event.target.value)} /></label>
+        <button className="adm-btn adm-btn-primary" type="submit" disabled={busy || !searchQuery.trim()}><Icon name="search" size={14} /><span>检索</span></button>
+      </form>
+    </Card>
+    {searchResults !== null && <Card title="检索结果" meta={`${searchResults.length} 个节点`} actions={<button className="adm-btn adm-btn-sm" type="button" onClick={() => { setSearchResults(null); setSelectedNodeId(""); }}>清除结果</button>}>
+      <div className="adm-table-scroll"><table className="adm-table"><thead><tr><th>内容</th><th>类型</th><th>状态</th><th>置信度</th><th>更新时间</th></tr></thead>
         <tbody>{searchResults.map((node) => <tr key={node.id} className={node.id === selectedNodeId ? "is-selected" : ""} onClick={() => setSelectedNodeId(node.id)}>
-          <td data-label="内容"><span className="memory-preview">{nodePreview(node)}</span><span className="table-subline">{node.id}</span></td>
-          <td data-label="类型"><span className="badge">{KIND_TEXT[node.kind]}</span></td>
-          <td data-label="状态"><span className={`badge ${node.status === "active" ? "active" : "disabled"}`}>{node.status === "active" ? "活跃" : "已归档"}</span></td>
-          <td data-label="置信度">{node.confidence ?? "—"}</td>
-          <td data-label="更新时间">{date(node.updatedAt)}</td>
-        </tr>)}{!searchResults.length && <tr><td className="empty" colSpan={5}>没有命中的记忆节点</td></tr>}</tbody>
+          <td><span className="adm-mempreview">{nodePreview(node)}</span><span className="adm-sub">{node.id}</span></td>
+          <td><Badge>{KIND_TEXT[node.kind]}</Badge></td>
+          <td><Badge tone={node.status === "active" ? "ok" : "err"}>{node.status === "active" ? "活跃" : "已归档"}</Badge></td>
+          <td>{node.confidence ?? "—"}</td>
+          <td>{date(node.updatedAt)}</td>
+        </tr>)}{!searchResults.length && <tr><td className="adm-empty" colSpan={5}>没有命中的记忆节点</td></tr>}</tbody>
       </table></div>
-    </section>}
+    </Card>}
     <FilterBar query={query} onQuery={setQuery} placeholder="搜索空间名、键或所有者" selected={filter} onSelect={setFilter} resultCount={visible.length} options={[
       { id: "all", label: "全部" }, { id: "user_private", label: "用户私有" }, { id: "project_shared", label: "项目" }, { id: "tenant_shared", label: "租户" },
     ]} />
-    <div className="user-management-grid">
-      <section className="section-block user-list-panel"><SectionHeading title="记忆空间" meta={`${visible.length} 项`} />
-        <div className="table-scroll"><table className="data-table admin-table user-table"><thead><tr><th>名称</th><th>所有者</th><th>可见性</th><th>修订</th><th>更新时间</th><th aria-label="查看" /></tr></thead>
-          <tbody>{visible.map((cube) => {
-            const owner = userLabels.get(cube.ownerUserId);
-            return <tr key={cube.id} className={cube.id === selectedCubeId ? "is-selected" : ""} onDoubleClick={() => void openCube(cube.id)}>
-              <td data-label="名称"><strong>{cube.name}</strong><span className="table-subline">{cube.key}</span></td>
-              <td data-label="所有者"><strong>{owner?.displayName ?? "未知"}</strong><span className="table-subline">{owner?.email ?? cube.ownerUserId}</span></td>
-              <td data-label="可见性"><span className={`badge ${cube.visibility === "user_private" ? "pending" : "completed"}`}>{VISIBILITY_TEXT[cube.visibility]}</span></td>
-              <td data-label="修订">v{cube.revision}</td>
-              <td data-label="更新时间">{date(cube.updatedAt)}</td>
-              <td data-label="查看"><button className="table-edit-button" type="button" aria-label={`查看 ${cube.name}`} title="查看详情" onClick={() => void openCube(cube.id)}><Icon name="edit" size={14} /><span>详情</span></button></td>
-            </tr>;
-          })}{!visible.length && !loading && <tr><td className="empty" colSpan={6}>没有符合条件的记忆空间</td></tr>}{loading && <tr><td className="empty loading-row" colSpan={6}><span className="loading-spinner" />正在读取记忆空间</td></tr>}</tbody>
-        </table></div>
-      </section>
-      {(selectedCube || selectedNodeId) && <button className="editor-backdrop" type="button" aria-label="关闭详情面板" onClick={() => { setSelectedCube(null); setSelectedCubeId(""); setSelectedNodeId(""); }} />}
-      {selectedNodeId ? <NodeDetail nodeId={selectedNodeId} busy={busy} onClose={() => setSelectedNodeId("")} onDelete={removeNode} />
-        : selectedCube ? <CubeDetail cube={selectedCube} users={users} busy={busy} onClose={() => { setSelectedCube(null); setSelectedCubeId(""); }}
-          onSave={saveCube}
-          onDelete={removeCube} />
-        : null}
-    </div>
-  </section>;
+    <Card title="记忆空间" meta={`${visible.length} 项`}>
+      <div className="adm-table-scroll"><table className="adm-table"><thead><tr><th>名称</th><th>所有者</th><th>可见性</th><th>修订</th><th>更新时间</th><th aria-label="查看" /></tr></thead>
+        <tbody>{visible.map((cube) => {
+          const owner = userLabels.get(cube.ownerUserId);
+          return <tr key={cube.id} className={cube.id === selectedCubeId ? "is-selected" : ""} onDoubleClick={() => void openCube(cube.id)}>
+            <td><strong>{cube.name}</strong><span className="adm-sub">{cube.key}</span></td>
+            <td><strong>{owner?.displayName ?? "未知"}</strong><span className="adm-sub">{owner?.email ?? cube.ownerUserId}</span></td>
+            <td><Badge tone={cube.visibility === "user_private" ? "warn" : "ok"}>{VISIBILITY_TEXT[cube.visibility]}</Badge></td>
+            <td>v{cube.revision}</td>
+            <td>{date(cube.updatedAt)}</td>
+            <td><button className="adm-btn adm-btn-sm" type="button" aria-label={`查看 ${cube.name}`} title="查看详情" onClick={() => void openCube(cube.id)}><Icon name="edit" size={13} /><span>详情</span></button></td>
+          </tr>;
+        })}{!visible.length && !loading && <tr><td className="adm-empty" colSpan={6}>没有符合条件的记忆空间</td></tr>}{loading && <tr><td className="adm-empty" colSpan={6}><span className="adm-spinner" /> 正在读取记忆空间</td></tr>}</tbody>
+      </table></div>
+    </Card>
+    {selectedNodeId ? <NodeDetail nodeId={selectedNodeId} busy={busy} onClose={() => setSelectedNodeId("")} onDelete={removeNode} />
+      : selectedCube ? <CubeDetail cube={selectedCube} users={users} busy={busy} onClose={() => { setSelectedCube(null); setSelectedCubeId(""); }} onSave={saveCube} onDelete={removeCube} />
+      : null}
+  </>;
 }

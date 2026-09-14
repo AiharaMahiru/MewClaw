@@ -12,7 +12,7 @@ import {
   type AdminRole,
   type AdminUserSummary,
 } from "../api.js";
-import { FilterBar, MetricStrip, PageHeader, SectionHeading } from "../components/AdminUi.js";
+import { Badge, Card, FilterBar, MetricStrip, PageHeader, RefreshButton } from "../components/AdminUi.js";
 import { Icon } from "../components/Icon.js";
 import { filterUsers, type UserFilter } from "../admin-view-model.js";
 
@@ -25,6 +25,10 @@ function date(value: string): string {
 
 function statusLabel(status: AdminUserSummary["status"]): string {
   return status === "active" ? "正常" : status === "disabled" ? "已停用" : "待验证";
+}
+
+function statusTone(status: AdminUserSummary["status"]): "ok" | "warn" | "err" | undefined {
+  return status === "active" ? "ok" : status === "pending" ? "warn" : "err";
 }
 
 function modeLabel(mode: AdminUserSummary["defaultMode"]): string {
@@ -45,7 +49,7 @@ function actionError(cause: unknown): string {
   return cause.code;
 }
 
-function IdentitySection(props: { user: AdminUserSummary; saving: boolean; onError: (message: string) => void; onChanged: () => void }) {
+function IdentitySection(props: { user: AdminUserSummary; onError: (message: string) => void; onChanged: () => void }) {
   const [identities, setIdentities] = useState<AdminIdentity[] | null>(null);
   const [busy, setBusy] = useState("");
 
@@ -77,45 +81,35 @@ function IdentitySection(props: { user: AdminUserSummary; saving: boolean; onErr
     }
   };
 
-  return <div className="form-section"><div className="form-section-heading"><span>身份绑定</span><small>飞书登录凭据</small></div>
-    {identities === null && <div className="pending-field"><span className="loading-spinner" /><span>正在读取身份绑定…</span></div>}
-    {identities !== null && !identities.length && <div className="pending-field"><span className="status-dot idle" /><span>没有绑定的外部身份</span></div>}
-    {identities !== null && identities.map((identity) => <div className="identity-row" key={identity.subject}>
-      <span className="badge processing">飞书</span>
-      <span className="identity-meta"><code>{identity.subject}</code>{identity.unionId && <span className="table-subline">union {identity.unionId}</span>}<span className="table-subline">绑定于 {date(identity.createdAt)}</span></span>
-      <button className="table-edit-button" type="button" disabled={props.saving || Boolean(busy)} onClick={() => void unlink(identity)}>{busy === identity.subject ? "解绑中" : "解绑"}</button>
+  return <div className="adm-section"><div className="adm-section-head"><span>身份绑定</span><small>飞书登录凭据</small></div>
+    {identities === null && <div className="adm-state"><span className="adm-spinner" /><span>正在读取身份绑定…</span></div>}
+    {identities !== null && !identities.length && <div className="adm-state"><span>没有绑定的外部身份</span></div>}
+    {identities !== null && identities.map((identity) => <div className="adm-identity" key={identity.subject}>
+      <Badge tone="info">飞书</Badge>
+      <span className="adm-identity-main"><code>{identity.subject}</code>{identity.unionId && <span className="adm-sub">union {identity.unionId}</span>}<span className="adm-sub">绑定于 {date(identity.createdAt)}</span></span>
+      <button className="adm-btn adm-btn-sm" type="button" disabled={Boolean(busy)} onClick={() => void unlink(identity)}>{busy === identity.subject ? "解绑中" : "解绑"}</button>
     </div>)}
   </div>;
 }
 
-function UserProfile({ user }: { user: AdminUserSummary }) {
-  return <div className="user-editor-profile">
-    <span className={`user-avatar ${user.role}`} aria-hidden="true">{user.displayName.slice(0, 1).toUpperCase()}</span>
-    <div className="user-editor-identity"><strong>{user.displayName}</strong><span>{user.email}</span><div className="user-editor-badges"><span className={`badge ${user.role}`}>{user.role === "admin" ? "管理员" : "成员"}</span><span className={`badge ${user.status}`}>{statusLabel(user.status)}</span></div></div>
-  </div>;
-}
-
-function UserEditor(props: {
-  user: AdminUserSummary | null;
+function UserDrawer(props: {
+  user: AdminUserSummary;
   onClose: () => void;
   onSave: (user: AdminUserSummary, patch: UserPatch) => Promise<void>;
   onRevoke: (user: AdminUserSummary) => Promise<void>;
   onIdentitiesChanged: () => void;
   onError: (message: string) => void;
 }) {
-  const [role, setRole] = useState<AdminRole>(props.user?.role ?? "user");
-  const [status, setStatus] = useState<"active" | "disabled">(props.user?.status === "disabled" ? "disabled" : "active");
+  const user = props.user;
+  const [role, setRole] = useState<AdminRole>(user.role);
+  const [status, setStatus] = useState<"active" | "disabled">(user.status === "disabled" ? "disabled" : "active");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!props.user) return;
-    setRole(props.user.role);
-    setStatus(props.user.status === "disabled" ? "disabled" : "active");
-  }, [props.user]);
+    setRole(user.role);
+    setStatus(user.status === "disabled" ? "disabled" : "active");
+  }, [user]);
 
-  if (!props.user) return <aside className="user-editor user-editor-empty"><div className="editor-empty-icon"><Icon name="edit" size={18} /></div><strong>选择一个账号</strong><span>从列表打开权限表单</span></aside>;
-
-  const user = props.user;
   const effectiveMode: AdminMode = role === "admin" ? "full" : "lightweight";
   const changed = role !== user.role || (user.status !== "pending" && status !== user.status) || effectiveMode !== user.defaultMode;
   const submit = async (event: FormEvent): Promise<void> => {
@@ -145,45 +139,38 @@ function UserEditor(props: {
     }
   };
 
-  return <aside className="user-editor is-open" aria-label="编辑用户">
-    <div className="user-editor-head"><div><span className="editor-kicker">ACCOUNT PROFILE</span><h2>账号设置</h2></div><button className="icon-button" type="button" aria-label="关闭编辑面板" title="关闭" onClick={props.onClose}><Icon name="close" size={17} /></button></div>
-    <UserProfile user={user} />
-    <form className="user-editor-form" onSubmit={(event) => void submit(event)}>
-      <div className="form-section"><div className="form-section-heading"><span>身份与权限</span><small>仅管理员可修改</small></div>
-        <div className="editor-field"><span className="editor-label">邮箱地址</span><div className="readonly-field">{user.email}<Icon name="shield" size={14} /></div></div>
-        <fieldset className="role-field"><legend className="editor-label">角色</legend><div className="role-options">
-          <button className={`role-option ${role === "user" ? "selected" : ""}`} type="button" disabled={user.status === "pending" || saving} onClick={() => setRole("user")}><span className="role-option-icon"><Icon name="users" size={15} /></span><span><strong>成员</strong><small>轻量工作区</small></span>{role === "user" && <Icon name="check" size={15} />}</button>
-          <button className={`role-option ${role === "admin" ? "selected" : ""}`} type="button" disabled={user.status === "pending" || saving} onClick={() => setRole("admin")}><span className="role-option-icon"><Icon name="shield" size={15} /></span><span><strong>管理员</strong><small>Full / OCI</small></span>{role === "admin" && <Icon name="check" size={15} />}</button>
-        </div></fieldset>
+  return <>
+    <button className="adm-backdrop" type="button" aria-label="关闭编辑面板" onClick={props.onClose} />
+    <aside className="adm-drawer" aria-label="编辑用户">
+      <div className="adm-drawer-head"><div><span className="adm-drawer-kicker">ACCOUNT</span><h2 className="adm-drawer-title">账号设置</h2></div><button className="adm-iconbtn" type="button" aria-label="关闭" title="关闭" onClick={props.onClose}><Icon name="close" size={16} /></button></div>
+      <div className="adm-drawer-body">
+        <div className="adm-profile">
+          <span className="adm-avatar adm-avatar-lg" aria-hidden="true">{user.displayName.slice(0, 1)}</span>
+          <div className="adm-profile-main"><strong>{user.displayName}</strong><span>{user.email}</span><div className="adm-profile-badges"><Badge tone={user.role === "admin" ? "info" : undefined}>{user.role === "admin" ? "管理员" : "成员"}</Badge><Badge tone={statusTone(user.status)}>{statusLabel(user.status)}</Badge></div></div>
+        </div>
+        <form className="adm-drawer-body" style={{ padding: 0 }} onSubmit={(event) => void submit(event)}>
+          <div className="adm-section"><div className="adm-section-head"><span>身份与权限</span><small>仅管理员可修改</small></div>
+            <div className="adm-field"><span className="adm-label">邮箱地址</span><div className="adm-readonly">{user.email}<Icon name="shield" size={13} /></div></div>
+            <div className="adm-field"><span className="adm-label">角色</span><div className="adm-choices">
+              <button className={`adm-choice ${role === "user" ? "is-on" : ""}`} type="button" disabled={user.status === "pending" || saving} onClick={() => setRole("user")}><Icon name="users" size={15} /><span className="adm-choice-main"><strong>成员</strong><small>轻量工作区</small></span>{role === "user" && <Icon name="check" size={14} />}</button>
+              <button className={`adm-choice ${role === "admin" ? "is-on" : ""}`} type="button" disabled={user.status === "pending" || saving} onClick={() => setRole("admin")}><Icon name="shield" size={15} /><span className="adm-choice-main"><strong>管理员</strong><small>Full / OCI</small></span>{role === "admin" && <Icon name="check" size={14} />}</button>
+            </div></div>
+          </div>
+          <div className="adm-section"><div className="adm-section-head"><span>访问状态</span><small>会话即时生效</small></div>
+            {user.status === "pending" ? <div className="adm-state"><span>待完成邮箱验证，暂不可编辑状态</span></div> : <label className="adm-field"><span className="adm-label">账号状态</span><select value={status} disabled={saving} onChange={(event) => setStatus(event.target.value as "active" | "disabled")}><option value="active">正常 · 允许登录</option><option value="disabled">已停用 · 拒绝登录</option></select></label>}
+            <div className="adm-field"><span className="adm-label">默认运行模式</span><div className="adm-readonly">{modeLabel(effectiveMode)}<span className="adm-sub">由角色自动决定</span></div></div>
+          </div>
+          <div className="adm-section"><div className="adm-section-head"><span>资源概览</span><small>只读</small></div>
+            <div className="adm-statgrid"><div><strong>{user.sessionCount}</strong><span>登录会话</span></div><div><strong>{user.workspaceCount}</strong><span>工作区</span></div><div><strong>{user.identityCount}</strong><span>身份绑定</span></div></div>
+          </div>
+          <IdentitySection user={user} onError={props.onError} onChanged={props.onIdentitiesChanged} />
+          <div className="adm-actions"><button className="adm-btn adm-btn-primary" type="submit" disabled={!changed || saving}><Icon name="check" size={14} /><span>{saving ? "保存中" : "保存修改"}</span></button><button className="adm-btn" type="button" onClick={props.onClose} disabled={saving}>取消</button></div>
+        </form>
       </div>
-      <div className="form-section"><div className="form-section-heading"><span>访问状态</span><small>会话即时生效</small></div>
-        {user.status === "pending" ? <div className="pending-field"><span className="status-dot idle" /><span>待完成邮箱验证，暂不可编辑状态</span></div> : <label className="editor-field"><span className="editor-label">账号状态</span><select value={status} disabled={saving} onChange={(event) => setStatus(event.target.value as "active" | "disabled")}><option value="active">正常 · 允许登录</option><option value="disabled">已停用 · 拒绝登录</option></select></label>}
-        <div className="mode-field"><span className="editor-label">默认运行模式</span><div className={`mode-display ${effectiveMode}`}><span className="mode-indicator" /><strong>{modeLabel(effectiveMode)}</strong><span>由角色自动决定</span></div></div>
-      </div>
-      <div className="form-section resource-section"><div className="form-section-heading"><span>资源概览</span><small>只读</small></div><div className="resource-grid"><div><strong>{user.sessionCount}</strong><span>登录会话</span></div><div><strong>{user.workspaceCount}</strong><span>工作区</span></div><div><strong>{user.identityCount}</strong><span>身份绑定</span></div></div></div>
-      <IdentitySection user={user} saving={saving} onError={props.onError} onChanged={props.onIdentitiesChanged} />
-      <div className="user-editor-actions"><button className="primary-action" type="submit" disabled={!changed || saving}><Icon name="check" size={15} /><span>{saving ? "保存中" : "保存修改"}</span></button><button className="secondary-action" type="button" onClick={props.onClose} disabled={saving}>取消</button></div>
-    </form>
-    <div className="user-editor-danger"><button className="danger-action" type="button" disabled={!user.sessionCount || saving} onClick={() => void revoke()}><Icon name="sessions" size={14} /><span>{user.sessionCount ? `终止 ${user.sessionCount} 个登录会话` : "暂无活跃会话"}</span></button></div>
-    <p className="editor-footnote">创建于 {date(user.createdAt)} · 最近更新 {date(user.updatedAt)}</p>
-  </aside>;
-}
-
-function UsersTable(props: { users: AdminUserSummary[]; loading: boolean; selectedId: string; onEdit: (user: AdminUserSummary) => void }) {
-  return <section className="section-block user-list-panel">
-    <SectionHeading title="账号目录" meta={`${props.users.length} 个结果`} />
-    <div className="table-scroll"><table className="data-table admin-table user-table"><thead><tr><th>用户</th><th>角色</th><th>状态</th><th>默认模式</th><th>资源</th><th>创建时间</th><th aria-label="编辑" /></tr></thead>
-      <tbody>{props.users.map((user) => <tr className={user.id === props.selectedId ? "is-selected" : ""} key={user.id} onDoubleClick={() => props.onEdit(user)}>
-        <td data-label="用户"><span className="table-user-cell"><span className={`user-avatar mini ${user.role}`}>{user.displayName.slice(0, 1).toUpperCase()}</span><span><strong>{user.displayName}</strong><span className="table-subline">{user.email}</span></span></span></td>
-        <td data-label="角色"><span className={`badge ${user.role}`}>{user.role === "admin" ? "管理员" : "成员"}</span></td>
-        <td data-label="状态"><span className={`badge ${user.status}`}>{statusLabel(user.status)}</span></td>
-        <td data-label="默认模式"><span className="mode-cell"><span className={`mode-indicator ${user.defaultMode}`} />{modeLabel(user.defaultMode)}</span></td>
-        <td data-label="资源"><span className="resource-count">{user.sessionCount} 会话</span><span className="table-subline">{user.workspaceCount} 工作区 · {user.identityCount} 身份</span></td>
-        <td data-label="创建时间">{date(user.createdAt)}</td>
-        <td data-label="编辑"><button className="table-edit-button" type="button" aria-label={`编辑 ${user.displayName}`} title="编辑账号" onClick={() => props.onEdit(user)}><Icon name="edit" size={14} /><span>编辑</span></button></td>
-      </tr>)}{!props.users.length && !props.loading && <tr><td className="empty" colSpan={7}>没有符合条件的用户</td></tr>}{props.loading && <tr><td className="empty loading-row" colSpan={7}><span className="loading-spinner" />正在读取账号目录</td></tr>}</tbody>
-    </table></div>
-  </section>;
+      <div className="adm-drawer-danger"><button className="adm-btn adm-btn-danger" type="button" disabled={!user.sessionCount || saving} onClick={() => void revoke()}><Icon name="sessions" size={14} /><span>{user.sessionCount ? `终止 ${user.sessionCount} 个登录会话` : "暂无活跃会话"}</span></button></div>
+      <div className="adm-drawer-foot">创建于 {date(user.createdAt)} · 最近更新 {date(user.updatedAt)}</div>
+    </aside>
+  </>;
 }
 
 export function UsersPage({ onUnauthorized }: { onUnauthorized: () => void }) {
@@ -201,7 +188,7 @@ export function UsersPage({ onUnauthorized }: { onUnauthorized: () => void }) {
     try {
       const next = (await fetchAdminUsers()).users;
       setUsers(next);
-      setSelectedId((current) => current && next.some((user) => user.id === current) ? current : next[0]?.id ?? "");
+      setSelectedId((current) => current && next.some((user) => user.id === current) ? current : "");
       setError("");
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) onUnauthorized();
@@ -252,25 +239,33 @@ export function UsersPage({ onUnauthorized }: { onUnauthorized: () => void }) {
     }
   };
 
-  return <section className="workspace users-workspace">
-    <PageHeader eyebrow="账号与权限 / DIRECTORY" title="用户管理" actions={<button className="refresh-button" type="button" onClick={() => void refresh()} disabled={loading || saving}><Icon name="refresh" size={14} /><span>{loading ? "读取中" : "刷新目录"}</span></button>} />
-    {error && <p className="notice error">{error}</p>}
-    {notice && <p className="notice success"><Icon name="check" size={14} />{notice}</p>}
+  return <>
+    <PageHeader title="用户管理" sub="账号目录与权限" actions={<RefreshButton busy={loading || saving} label="刷新目录" onClick={() => void refresh()} />} />
+    {error && <p className="adm-notice adm-notice-err">{error}</p>}
+    {notice && <p className="adm-notice adm-notice-ok"><Icon name="check" size={14} />{notice}</p>}
     <MetricStrip label="用户摘要" items={[
       { label: "全部账号", value: String(users.length), detail: `${active} 个正常`, tone: "accent", icon: "users" },
       { label: "管理员", value: String(admins), detail: "Full / OCI", tone: "success", icon: "shield" },
       { label: "待验证", value: String(pending), detail: "尚未完成邮箱验证", tone: "warning", icon: "pulse" },
       { label: "工作区", value: String(resources), detail: "用户资源总数", icon: "workspace" },
     ]} />
-    <div className="user-directory-toolbar"><div><span className="toolbar-kicker">ACCOUNT DIRECTORY</span><strong>账号目录</strong><span>搜索、筛选并编辑权限</span></div><span className="toolbar-selection">{selected ? `当前编辑：${selected.displayName}` : "未选择账号"}</span></div>
     <FilterBar query={query} onQuery={setQuery} placeholder="搜索姓名或邮箱" selected={filter} onSelect={(value) => setFilter(value as UserFilter)} resultCount={visible.length} options={[
       { id: "all", label: "全部" }, { id: "active", label: "正常" },
       { id: "pending", label: "待验证" }, { id: "disabled", label: "已停用" },
     ]} />
-    <div className="user-management-grid">
-      <UsersTable users={visible} loading={loading} selectedId={selectedId} onEdit={(user) => { setSelectedId(user.id); setNotice(""); }} />
-      {selected && <button className="editor-backdrop" type="button" aria-label="关闭编辑面板" onClick={() => setSelectedId("")} />}
-      <UserEditor user={selected} onClose={() => setSelectedId("")} onSave={saveUser} onRevoke={revokeUserSessions} onIdentitiesChanged={() => void refresh()} onError={setError} />
-    </div>
-  </section>;
+    <Card title="账号目录" meta={`${visible.length} 个结果`}>
+      <div className="adm-table-scroll"><table className="adm-table"><thead><tr><th>用户</th><th>角色</th><th>状态</th><th>默认模式</th><th>资源</th><th>创建时间</th><th aria-label="编辑" /></tr></thead>
+        <tbody>{visible.map((user) => <tr className={user.id === selectedId ? "is-selected" : ""} key={user.id} onDoubleClick={() => setSelectedId(user.id)}>
+          <td><span className="adm-row" style={{ border: 0, padding: 0 }}><span className="adm-avatar adm-avatar-sm">{user.displayName.slice(0, 1)}</span><span className="adm-row-main"><strong>{user.displayName}</strong><small>{user.email}</small></span></span></td>
+          <td><Badge tone={user.role === "admin" ? "info" : undefined}>{user.role === "admin" ? "管理员" : "成员"}</Badge></td>
+          <td><Badge tone={statusTone(user.status)}>{statusLabel(user.status)}</Badge></td>
+          <td>{modeLabel(user.defaultMode)}</td>
+          <td><strong>{user.sessionCount} 会话</strong><span className="adm-sub">{user.workspaceCount} 工作区 · {user.identityCount} 身份</span></td>
+          <td>{date(user.createdAt)}</td>
+          <td><button className="adm-btn adm-btn-sm" type="button" aria-label={`编辑 ${user.displayName}`} onClick={() => { setSelectedId(user.id); setNotice(""); }}><Icon name="edit" size={13} /><span>编辑</span></button></td>
+        </tr>)}{!visible.length && !loading && <tr><td className="adm-empty" colSpan={7}>没有符合条件的用户</td></tr>}{loading && <tr><td className="adm-empty" colSpan={7}><span className="adm-spinner" /> 正在读取账号目录</td></tr>}</tbody>
+      </table></div>
+    </Card>
+    {selected && <UserDrawer user={selected} onClose={() => setSelectedId("")} onSave={saveUser} onRevoke={revokeUserSessions} onIdentitiesChanged={() => void refresh()} onError={setError} />}
+  </>;
 }
