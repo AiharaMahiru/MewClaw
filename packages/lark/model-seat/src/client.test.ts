@@ -366,6 +366,9 @@ describe("模型位渲染与选择", () => {
     const groupRule = SEAT_CSS.match(/\.mwseat-groupTitle\{[^}]*\}/u)![0];
     expect(groupRule).toContain("background:transparent");
     expect(groupRule).not.toContain("--dsw-specific-menu");
+    // 滚动链：menu 定高 → body 可缩 → list 滚动（清单被裁而无法滚动即回归）
+    expect(SEAT_CSS.match(/\.mwseat-body\{[^}]*\}/u)![0]).toContain("min-height:0");
+    expect(SEAT_CSS.match(/\.mwseat-list\{[^}]*\}/u)![0]).toContain("overflow-y:auto");
     const rows = findAll(tree, byClass("mwseat-row"));
     expect(rows).toHaveLength(3);
     expect(rows[0]!.props.className).toContain("on");

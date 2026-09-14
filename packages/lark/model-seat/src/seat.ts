@@ -384,7 +384,12 @@ export const SEAT_CSS = `
 .mwseat-effort{color:var(--dsw-alias-label-tertiary);font-weight:400;white-space:nowrap}
 .mwseat-chev{display:inline-flex;color:var(--dsw-alias-label-tertiary);transition:transform .15s ease}
 .mwseat-chev.open{transform:rotate(180deg)}
-.mwseat-menu{position:fixed;z-index:1100;display:flex;flex-direction:column;min-width:220px;max-width:min(360px,calc(100vw - 24px));max-height:min(340px,calc(100vh - 96px));padding:4px;border-radius:16px;background:var(--dsw-specific-menu);box-shadow:var(--dsw-elevation-prominent);color:var(--dsw-alias-label-primary);overflow:hidden;font-size:13px}
+.mwseat-menu{position:fixed;z-index:1100;display:flex;flex-direction:column;min-width:220px;max-width:min(360px,calc(100vw - 24px));max-height:min(340px,calc(100vh - 96px));padding:4px;border-radius:16px;background:color-mix(in srgb,var(--dsw-specific-menu) 72%,transparent);-webkit-backdrop-filter:blur(20px) saturate(140%);backdrop-filter:blur(20px) saturate(140%);box-shadow:var(--dsw-elevation-prominent);color:var(--dsw-alias-label-primary);overflow:hidden;font-size:13px}
+/* 玻璃模式下降幅更深：保留 24px 模糊，填充降到更透。 */
+html[data-mew-glass="on"] .mwseat-menu[role="dialog"]{background-color:rgb(248 250 255 / 40%)}
+html[data-mew-glass="on"][data-mew-glass-scheme="dark"] .mwseat-menu[role="dialog"]{background-color:rgb(24 28 42 / 36%)}
+/* 滚动链：menu(flex 列,定高) → body(flex 列,可缩) → list(滚动区)。 */
+.mwseat-body{display:flex;flex-direction:column;min-height:0}
 .mwseat-head{display:flex;align-items:center;gap:6px;padding:8px 8px 6px}
 .mwseat-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:500;line-height:18px;color:var(--dsw-alias-label-tertiary)}
 .mwseat-more,.mwseat-back{border:0;background:transparent;padding:0;font:inherit;font-size:12px;line-height:18px;cursor:pointer;color:var(--dsw-alias-label-secondary)}
@@ -405,7 +410,7 @@ export const SEAT_CSS = `
 .mwseat-sliderValue{display:flex;align-items:baseline;justify-content:center;gap:6px;height:20px;margin-top:5px;font-size:12px;line-height:18px}
 .mwseat-sliderValueName{color:var(--dsw-alias-state-business-primary,var(--dsw-alias-label-primary));font-weight:600}
 .mwseat-sliderValuePos{color:var(--dsw-alias-label-dimmed);font-size:11px}
-.mwseat-list{overflow-y:auto;min-height:0;padding:0 0 2px}
+.mwseat-list{flex:0 1 auto;overflow-y:auto;min-height:0;padding:0 0 2px}
 /* liquid-glass 的 panels 选择器命中 [role="menu"]；清单只是 dialog 内内容区，
    压平第二层面板避免叠出两层圆角半透明背景。 */
 .mwseat-menu .mwseat-list[role="menu"]{background:transparent;background-color:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:0;padding:0;scroll-padding:0}
