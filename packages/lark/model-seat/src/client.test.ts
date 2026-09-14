@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { SlotCore } from "@deepseek-ai/dsh-client-ui-slots";
 
 import { applyModelSeat } from "./client.js";
 import {
@@ -155,6 +156,21 @@ describe("composer 模型位 shadow 注册", () => {
     const face = inject("sess-1");
     expect(face.available).toBe(true);
     expect(face.directory).toBe(store);
+  });
+
+  it("真实 SlotCore 选举：priority:-1 在 single 槽位上恒定遮蔽官方占据", () => {
+    const core = new SlotCore();
+    core.register(
+      { name: "root", children: { "conversation.input.model": { kind: "single", scope: "session" } } },
+      () => "shell",
+    );
+    // 与官方注册等价的占据（无 priority → 0）。
+    core.register({ name: "conversation.input.model", inject: () => ({}) }, () => "official");
+    core.register({ name: "conversation.input.model", priority: -1, inject: () => ({}) }, () => "ours");
+    const winners = core.entriesOfSlot("conversation.input.model");
+    expect(winners).toHaveLength(1);
+    expect(winners[0]!.component({} as never)).toBe("ours");
+    expect(core.entries("conversation.input.model")).toHaveLength(2);
   });
 
   it("子代理会话判定为不可用并 fail-closed", async () => {
