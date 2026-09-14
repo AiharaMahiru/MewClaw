@@ -40,6 +40,7 @@
   function createEffortSlider(React) {
     const h = React.createElement;
     const PAD = 16;
+    const HALF = 11;
     return function EffortSlider(props) {
       const { rows, busy, onPick } = props;
       const [drag, setDrag] = React.useState(null);
@@ -55,6 +56,7 @@
       const index = Math.min(n - 1, Math.max(0, drag ?? pending ?? active));
       const frac = (i) => n <= 1 ? 0.5 : i / (n - 1);
       const pos = (i) => `calc(${PAD}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
+      const fill = (i) => `calc(${PAD + HALF}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
       const indexAt = (clientX) => {
         const rect = trackRef.current?.getBoundingClientRect();
         if (rect === void 0 || rect.width <= PAD * 2 || n <= 1) return index;
@@ -117,7 +119,7 @@
             onPointerDown,
             onKeyDown
           },
-          h("div", { className: "mwseat-sliderFill", "aria-hidden": "true", style: { width: pos(index) } }),
+          h("div", { className: "mwseat-sliderFill", "aria-hidden": "true", style: { width: fill(index) } }),
           rows.map((row, i) => h("span", { key: `t:${row.key}`, className: `mwseat-sliderTick${i <= index ? " on" : ""}`, "aria-hidden": "true", style: { left: pos(i) } })),
           h("span", { className: "mwseat-sliderThumb", "aria-hidden": "true", style: { left: pos(index) } })
         ),

@@ -103,8 +103,9 @@ export type SeatSliderComponent = (props: SeatSliderProps) => ReactNode;
  */
 export function createEffortSlider(React: SeatReactApi): SeatSliderComponent {
   const h = React.createElement;
-  /** 拇指中心行程的内边距（px），与 CSS 胶囊轨道一致。 */
+  /** 拇指中心行程的内边距（px）与拇指半径，与 CSS 胶囊轨道一致。 */
   const PAD = 16;
+  const HALF = 11;
   return function EffortSlider(props: SeatSliderProps): ReactNode {
     const { rows, busy, onPick } = props;
     const [drag, setDrag] = React.useState<number | null>(null);
@@ -121,6 +122,8 @@ export function createEffortSlider(React: SeatReactApi): SeatSliderComponent {
     const frac = (i: number) => (n <= 1 ? 0.5 : i / (n - 1));
     /** 胶囊内行程：拇指中心从 PAD 到 width-PAD，用 calc 混算 px 与百分比。 */
     const pos = (i: number) => `calc(${PAD}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
+    /** 填充延到拇指右缘，蓝色整段盖住白色拇指而不是在中心被截断。 */
+    const fill = (i: number) => `calc(${PAD + HALF}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
     const indexAt = (clientX: number): number => {
       const rect = trackRef.current?.getBoundingClientRect();
       if (rect === undefined || rect.width <= PAD * 2 || n <= 1) return index;
@@ -179,7 +182,7 @@ export function createEffortSlider(React: SeatReactApi): SeatSliderComponent {
         onPointerDown,
         onKeyDown,
       },
-        h("div", { className: "mwseat-sliderFill", "aria-hidden": "true", style: { width: pos(index) } }),
+        h("div", { className: "mwseat-sliderFill", "aria-hidden": "true", style: { width: fill(index) } }),
         rows.map((row, i) => h("span", { key: `t:${row.key}`, className: `mwseat-sliderTick${i <= index ? " on" : ""}`, "aria-hidden": "true", style: { left: pos(i) } })),
         h("span", { className: "mwseat-sliderThumb", "aria-hidden": "true", style: { left: pos(index) } })),
       h("div", { className: "mwseat-sliderStops" },

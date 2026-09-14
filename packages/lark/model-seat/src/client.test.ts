@@ -287,6 +287,8 @@ describe("模型位渲染与选择", () => {
     expect(ticks).toHaveLength(2);
     expect(ticks.map((t) => String(t.props.className).includes("on"))).toEqual([true, true]); // 已越过档位的刻度点亮
     expect(findAll(tree, byClass("mwseat-sliderThumb"))[0]!.props.style).toMatchObject({ left: "calc(16px + (100% - 32px) * 1)" });
+    // 填充延伸到拇指右缘（中心 + 半径 11px），整段盖住白色拇指
+    expect(findAll(tree, byClass("mwseat-sliderFill"))[0]!.props.style).toMatchObject({ width: "calc(27px + (100% - 32px) * 1)" });
     expect(findAll(tree, byClass("mwseat-sliderStop")).map((s) => s.children[0])).toEqual(["Low", "High"]);
   });
 
