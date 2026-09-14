@@ -485,7 +485,7 @@ upstream、宿主端口或内部认证头。未知、过期和已撤销 ID 统�
 
 ## 7 配置与凭证
 
-可校验配置至少包括：`listenHost`、`listenPort`、`workerBaseUrl`、`workerTokenEnv`、`adminBaseUrl`、`adminTokenEnv`、`databaseUrlEnv`、`credentialRollbackKeyEnv`、`credentialRollbackPath`、`approvalTtlMs`（60 秒至 60 分钟，默认 15 分钟）、`sessionCookieSecure`、`trustedOrigins`、`userWorkspaceRoot`、`adminWorkspaceRoot`、`feishu`（app id/secret/redirect URI 的凭证引用）、`mail`（SMTP provider/凭证引用）、请求体和限流上限。生产缺失凭证 fail loud；测试通过内存 store/fake mail/fake OAuth，不读 `.env`。
+可校验配置至少包括：`listenHost`、`listenPort`、`workerBaseUrl`、`workerTokenEnv`、`adminBaseUrl`、`adminTokenEnv`、`databaseUrlEnv`、`credentialRollbackKeyEnv`、`credentialRollbackPath`、`approvalTtlMs`（60 秒至 60 分钟，默认 15 分钟）、`sessionTtlMs`（1 分钟至 30 天，默认 7 天；同源驱动服务端滑动会话过期与会话 Cookie `Max-Age`，登录态须跨浏览器重启持久化）、`sessionCookieSecure`、`trustedOrigins`、`userWorkspaceRoot`、`adminWorkspaceRoot`、`feishu`（app id/secret/redirect URI 的凭证引用）、`mail`（SMTP provider/凭证引用）、请求体和限流上限。请求体上限按路径分级：认证端点与 Admin/计费代理走 `requestBodyLimit`（默认 128KiB）；转发 Worker 的 `/api/*` RPC、`/sidebar/api/*`、`/git/*` 走独立的 `proxyBodyLimit`（1MiB 至 512MiB，默认 300MiB），且不得小于上游 `/api` 桥为官方图片附件聚合容量设计的上限——否则浏览器多图提示词在授权前被 413 截断。生产缺失凭证 fail loud；测试通过内存 store/fake mail/fake OAuth，不读 `.env`。
 
 `credentialRollbackKeyEnv` 只能引用独立的 32-byte AES-256-GCM 密钥（hex 或 base64url），不得复用数据库 URL、Worker/Admin Token 或其他服务凭证。`credentialRollbackPath` 必须是专用绝对目录；Auth Provider 创建目录为 `0700`、文件为 `0600`，以临时文件加 fsync 和原子链接方式落盘。回滚载荷全量加密，文件名仅为 `snapshotRef` 摘要；缺失、无效或与数据库凭证引用相同的配置在建立数据库连接前 fail loud。Provider dispose 时清零内存密钥并关闭持久化资源。
 
@@ -495,12 +495,13 @@ upstream、宿主端口或内部认证头。未知、过期和已撤销 ID 统�
 ## 8 测试契约
 
 - 密码：scrypt 随机盐、恒定时间比较、弱密码拒绝、错误信息不泄露账户存在性。
-- 会话：HttpOnly/SameSite/Secure、滚动过期、撤销、重置密码撤销旧会话、token 只存摘要。
+- 会话：HttpOnly/SameSite/Secure、`Max-Age` 与会话 TTL 对齐、滚动过期、撤销、重置密码撤销旧会话、token 只存摘要。
 - CSRF/Origin/Host：跨站 POST、缺失/错误 token、伪造 Host、未认证 `/api` 与 WebSocket 全拒绝。
 - OAuth：state 一次性/过期/绑定用户、identity 冲突、未验证邮箱不自动合并、token 不落盘。
 - 飞书配对原子性：分别在 token 消费、identity、飞书 session 资源与 Web session 持久化点注入故障，断言全部写入回滚且 token 仍可在有效期内重试；identity/session 归属冲突不得消费 token；同一 token 并发确认恰好一次成功且只生成一个 Web session，内存与 PostgreSQL Provider 结果一致。
 - 资源：用户 A 不能读取/提示/取消/删除用户 B 的 session/workspace；`session.list`/`workspace.list` 过滤；普通用户可选择当前 Worker 暴露的系统 preset，但不能越过自己的根目录、加载用户 preset 根或写入管理员配置；管理员策略可审计。
 - 工作区创建契约：使用真实 `workspace/create` 与嵌套 `args.request.path` 重放普通用户根内目录、根外目录、符号链接越界及管理员目录；合法请求不得新增顶层 `path`，越界请求必须在代理转发前拒绝。
+- 请求体分级：超过 `requestBodyLimit` 的合法 `session/prompt` RPC 必须经 `proxyBodyLimit` 放行并转发 Worker；同等体积的认证端点请求仍返回 413；超过 `proxyBodyLimit` 的请求 fail closed。
 - 迁移能力：`dsh-native` 与 DoorAgent 专属 scrypt v1 合成向量的正确/错误密码验证、参数/长度/大小写/canonical 拒绝矩阵；显式角色映射不得触发首用户自动管理员逻辑；邮箱 merge 不覆盖既有密码；DoorAgent identity 输入 fail closed。
 - 管理员恢复：非 `dsh-native` 凭证拒绝且不改变账户；恢复事务同时更新 `admin/full/active`、凭证和旧会话撤销，其他账户保留并产生脱敏审计。
 - 原子性：凭证、外部映射或强制审计任一步失败时用户写入全部回滚；相同 source 摘要并发重放幂等，不同摘要 fail closed；事务中途取消在 COMMIT 前回滚。

@@ -129,6 +129,7 @@
     "dsh-lark-gateway": "workspace:*",
     "dsh-lark-gateway-bundle": "workspace:*",
     "dsh-lark-image": "workspace:*",
+    "dsh-lark-model-seat": "workspace:*",
     "dsh-lark-postgres-runtime": "workspace:*",
     "dsh-lark-presets": "workspace:*",
     "dsh-lark-run": "workspace:*",

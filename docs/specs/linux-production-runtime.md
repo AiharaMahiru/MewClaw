@@ -305,6 +305,9 @@ Linux PostgreSQL 是外部协议 Provider，不新增 `ctx.postgres`。Windows `
 - commit 后先用实际 binary 执行 `-t -c /www/server/nginx/conf/nginx.conf`，并复核 master PID
   的命令行仍包含同一 binary/config；通过后仅向该 PID 发送 `HUP`，不调用 systemd reload；
 - reload 失败立即恢复旧 vhost；DoorAgent 在验收期保持只读、可回切但不可与 DSH 双写。
+- vhost 的 `client_max_body_size`（当前 `320m`）必须不小于 Auth Edge 的 Worker 代理体上限：
+  官方 Web 客户端的多图提示词以 base64 JSON 内联提交，nginx 默认 `1m` 会在入口截断为 413；
+  外层上限只放行流量，逐路径强制仍由 Auth Edge 的 `requestBodyLimit`/`proxyBodyLimit` 承担。
 
 ### 6.5 快照、恢复与 cutoverEpoch
 

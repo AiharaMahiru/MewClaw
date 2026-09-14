@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { AuthService, MemoryAuthStore, type MailSender } from "dsh-lark-auth";
 
 import type { AuthEdgeConfig } from "./config.js";
+import { bindAllowedPort, listenAllowedEdge } from "./test-ports.js";
 import { createAuthEdgeServer } from "./server.js";
 
 class FakeMail implements MailSender {
@@ -170,7 +171,7 @@ async function listen(handler: (req: IncomingMessage, res: ServerResponse) => un
 async function listenEdge(workerPort: number, previewPort: number): Promise<{ edge: ReturnType<typeof createAuthEdgeServer>; base: string; port: number }> {
   const config = edgeConfig(workerPort, previewPort);
   const edge = createAuthEdgeServer({ config, service: new AuthService({ store: new MemoryAuthStore(), mail: new FakeMail() }) });
-  await edge.listen();
+  await listenAllowedEdge(edge, config);
   const address = edge.server.address();
   if (!address || typeof address === "string") throw new Error("edge did not bind");
   cleanup.push(() => edge.close());
@@ -224,7 +225,7 @@ async function collect(stream: AsyncIterable<unknown>): Promise<string> {
 }
 
 async function bind(server: Server): Promise<void> {
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await bindAllowedPort(server);
 }
 
 async function close(server: Server): Promise<void> {

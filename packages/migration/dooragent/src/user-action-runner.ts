@@ -3,14 +3,26 @@ import type {
   AuthImportActionDefinition,
   AuthImportActionLease,
   AuthImportActionResult,
-  AuthImportContext,
   AuthImportOutboxLease,
-  AuthImportOutboxReceipt,
   AuthUserImportResult,
 } from "dsh-lark-auth";
 
-import { canonicalJson, digestCanonical } from "./canonical-json.js";
 import { DoorAgentMigrationError, throwIfAborted } from "./errors.js";
+import {
+  approvalInvalid,
+  buildUserActionManifest,
+  candidate,
+  itemContext,
+  leaseInput,
+  manifestContext,
+  normalizeTarget,
+  planInvalid,
+  revokeApproval,
+  runBusy,
+  validateActionLease,
+  validateOutbox,
+  validTimestamp,
+} from "./user-action-helpers.js";
 import { resultUsers, resultWorkspaces } from "./user-action-report.js";
 import type { WorkspaceMigrationProvider, WorkspaceMigrationResult } from "./workspace-provider.js";
 import type {
@@ -27,8 +39,14 @@ import type {
   MigrationUserResultEvent,
 } from "./types.js";
 
-const MAX_OPAQUE_TEXT = 256;
-const REASON_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
+export {
+  buildUserActionManifest,
+  buildUserActionManifest as buildMigrationActionManifest,
+} from "./user-action-helpers.js";
+export {
+  acknowledgeUserActionRun,
+  resumeUserActionAcknowledgements,
+} from "./user-action-ack.js";
 
 export interface UserActionRunOptions {
   batchSize: number;
@@ -65,34 +83,6 @@ interface ActionExecutionState {
   targetUsers: Map<string, string>;
   workspaceResults: Map<string, WorkspaceMigrationResult>;
 }
-
-export function buildUserActionManifest(plan: MigrationPlan): AuthImportActionDefinition[] {
-  let sequence = 0;
-  const actions = plan.users.flatMap((planned) => {
-    if (planned.decision === "reject"
-      || plan.policy.includeAssociatedData && planned.decision === "merge") return [];
-    sequence += 1;
-    return [action(plan.runId, {
-      operation: "apply-user" as const,
-      sequence,
-      source: planned.source,
-      payloadDigest: planned.candidateDigest,
-    })];
-  });
-  const workspaceActions = plan.workspaces.flatMap((planned) => {
-    if (planned.decision === "reject") return [];
-    sequence += 1;
-    return [action(plan.runId, {
-      operation: "claim-resource" as const,
-      sequence,
-      source: planned.source,
-      payloadDigest: planned.candidateDigest,
-    })];
-  });
-  return [...actions, ...workspaceActions];
-}
-
-export const buildMigrationActionManifest = buildUserActionManifest;
 
 export async function authorizeUserActionRun(input: UserActionRunInput): Promise<void> {
   const result = await input.auth.authorizeImportRun({
@@ -212,108 +202,6 @@ function bindTargetUser(state: ActionExecutionState, sourceUserId: string, targe
   const existing = state.targetUsers.get(sourceUserId);
   if (existing && existing !== targetUserId) throw new DoorAgentMigrationError("PLAN_STALE");
   state.targetUsers.set(sourceUserId, targetUserId);
-}
-
-export async function acknowledgeUserActionRun(
-  input: UserActionRunInput,
-  outbox: readonly AuthImportOutboxLease[],
-  onAcknowledged: (sequence: number, receiptKind: "user" | "object") => void,
-): Promise<void> {
-  const definitions = actionDefinitions(input.plan);
-  let expected = 1;
-  for (const event of [...outbox].sort((left, right) => left.sequence - right.sequence)) {
-    const definition = definitions.get(event.actionId);
-    if (!definition || event.sequence !== expected) runBusy();
-    await deliverAndAcknowledge(input, event, definitions);
-    onAcknowledged(event.sequence, definition.operation === "apply-user" ? "user" : "object");
-    expected += 1;
-  }
-}
-
-export async function resumeUserActionAcknowledgements(input: {
-  run: UserActionRunInput;
-  acknowledgedSequence: number;
-  actionCount: number;
-  onAcknowledged(sequence: number, receiptKind: "user" | "object"): void;
-}): Promise<void> {
-  const definitions = actionDefinitions(input.run.plan);
-  let current = await recoverAcknowledgedReceipts(input, definitions);
-  while (current < input.actionCount) {
-    input.run.options.renewLease();
-    throwIfAborted(input.run.signal);
-    const leased = await input.run.auth.leaseImportOutbox(leaseInput(input.run));
-    if (leased.length === 0) runBusy();
-    for (const event of [...leased].sort((left, right) => left.sequence - right.sequence)) {
-      const definition = definitions.get(event.actionId);
-      if (!definition || event.sequence !== current + 1) runBusy();
-      validateOutbox(event, definition);
-      await deliverAndAcknowledge(input.run, event, definitions);
-      input.onAcknowledged(event.sequence, definition.operation === "apply-user" ? "user" : "object");
-      current = event.sequence;
-    }
-  }
-}
-
-async function recoverAcknowledgedReceipts(
-  input: Parameters<typeof resumeUserActionAcknowledgements>[0],
-  definitions: ReadonlyMap<string, AuthImportActionDefinition>,
-): Promise<number> {
-  let current = input.acknowledgedSequence;
-  while (current < input.actionCount) {
-    input.run.options.renewLease();
-    throwIfAborted(input.run.signal);
-    const receipts = await input.run.auth.listImportOutboxReceipts({
-      ...manifestContext(input.run),
-      cutoverEpochId: input.run.approval.cutoverEpochId,
-      afterSequence: current,
-      limit: input.run.options.batchSize,
-    });
-    if (receipts.length === 0) return current;
-    for (const receipt of receipts) {
-      const definition = definitions.get(receipt.actionId);
-      if (!definition || receipt.sequence !== current + 1) runBusy();
-      validateOutbox(receipt, definition);
-      if (receipt.acknowledgedAt === null) return current;
-      if (!validTimestamp(receipt.acknowledgedAt)) planInvalid();
-      input.onAcknowledged(receipt.sequence, definition.operation === "apply-user" ? "user" : "object");
-      current = receipt.sequence;
-    }
-  }
-  return current;
-}
-
-async function deliverAndAcknowledge(
-  input: UserActionRunInput,
-  event: AuthImportOutboxLease,
-  definitions: ReadonlyMap<string, AuthImportActionDefinition>,
-): Promise<void> {
-  const definition = definitions.get(event.actionId);
-  if (!definition) planInvalid();
-  validateOutbox(event, definition);
-  input.options.renewLease();
-  if (definition.operation === "apply-user") {
-    const resultEvent = userResultEvent(input, event, definition);
-    // receipt 先于 Cordis 投递，确保进程在任意外部 ack 前已有可恢复审计事实。
-    input.options.saveUserResultReceipt(resultEvent);
-    await input.options.deliverUserResult(resultEvent);
-  } else {
-    input.options.saveObjectResultReceipt(objectResultEvent(input, event, definition));
-  }
-  await acknowledgeEvent(input, event);
-}
-
-async function acknowledgeEvent(
-  input: UserActionRunInput,
-  event: AuthImportOutboxLease,
-): Promise<void> {
-  input.options.renewLease();
-  throwIfAborted(input.signal);
-  await input.auth.ackImportOutbox({
-    ...manifestContext(input),
-    cutoverEpochId: input.approval.cutoverEpochId,
-    eventId: event.eventId,
-    leaseToken: event.leaseToken,
-  });
 }
 
 async function processActionLeases(
@@ -506,156 +394,4 @@ async function collectResultOutbox(
     }
   }
   return [...events.values()].sort((left, right) => left.sequence - right.sequence);
-}
-
-function validateActionLease(
-  lease: AuthImportActionLease,
-  definition: AuthImportActionDefinition,
-): void {
-  const value = { actionId: lease.actionId, operation: lease.operation, sequence: lease.sequence,
-    source: lease.source, payloadDigest: lease.payloadDigest };
-  if (canonicalJson(value) !== canonicalJson(definition) || !bounded(lease.leaseToken)) planInvalid();
-}
-
-function validateOutbox(
-  event: AuthImportOutboxLease | AuthImportOutboxReceipt,
-  definition: AuthImportActionDefinition,
-): void {
-  if (event.actionId !== definition.actionId || event.sequence !== definition.sequence
-    || !bounded(event.eventId) || !validTimestamp(event.occurredAt)
-    || event.result.operation !== definition.operation) planInvalid();
-  if ("leaseToken" in event && !bounded(event.leaseToken)) planInvalid();
-}
-
-function actionDefinitions(plan: MigrationPlan): Map<string, AuthImportActionDefinition> {
-  return new Map(buildUserActionManifest(plan).map((definition) => [definition.actionId, definition]));
-}
-
-function action(planRunId: string, body: Omit<AuthImportActionDefinition, "actionId">): AuthImportActionDefinition {
-  return { ...body, actionId: digestCanonical({ runId: planRunId, ...body }) };
-}
-
-function userResultEvent(
-  input: UserActionRunInput,
-  event: AuthImportOutboxLease,
-  definition: AuthImportActionDefinition,
-): MigrationUserResultEvent {
-  if (event.result.operation !== "apply-user") planInvalid();
-  return {
-    eventId: event.eventId,
-    runId: input.plan.runId,
-    planId: input.plan.planId,
-    cutoverEpochId: input.approval.cutoverEpochId,
-    snapshotDigest: input.plan.snapshotDigest,
-    sequence: event.sequence,
-    occurredAt: event.occurredAt,
-    ignorable: false,
-    source: definition.source as MigrationPlanUser["source"],
-    targetUserId: normalizeTarget(event.result.targetUserId),
-    result: event.result.result,
-    reasonCode: sanitizeReason(event.result.reasonCode),
-  };
-}
-
-function objectResultEvent(
-  input: UserActionRunInput,
-  event: AuthImportOutboxLease,
-  definition: AuthImportActionDefinition,
-): MigrationObjectResultEvent {
-  if (event.result.operation !== "claim-resource") planInvalid();
-  return {
-    eventId: event.eventId,
-    runId: input.plan.runId,
-    planId: input.plan.planId,
-    cutoverEpochId: input.approval.cutoverEpochId,
-    snapshotDigest: input.plan.snapshotDigest,
-    sequence: event.sequence,
-    occurredAt: event.occurredAt,
-    ignorable: false,
-    source: definition.source as MigrationPlan["workspaces"][number]["source"],
-    targetUserId: normalizeTarget(event.result.targetUserId),
-    targetResourceId: normalizeTarget(event.result.targetResourceId),
-    result: event.result.result,
-    reasonCode: sanitizeReason(event.result.reasonCode),
-  };
-}
-
-function leaseInput(input: UserActionRunInput) {
-  return {
-    ...manifestContext(input),
-    cutoverEpochId: input.approval.cutoverEpochId,
-    limit: input.options.batchSize,
-    leaseMs: input.options.leaseMs,
-  };
-}
-
-function manifestContext(input: UserActionRunInput): AuthImportContext {
-  return itemContext(input, {
-    sourceSystem: "dooragent",
-    sourceType: "manifest",
-    sourceId: input.plan.snapshotDigest,
-    sourceDigest: input.plan.snapshotDigest,
-  });
-}
-
-function itemContext(
-  input: UserActionRunInput,
-  source: AuthImportContext["source"],
-): AuthImportContext {
-  return { ...input.actor, runId: input.plan.runId, planId: input.plan.planId,
-    snapshotDigest: input.plan.snapshotDigest, source, ...(input.signal ? { signal: input.signal } : {}) };
-}
-
-function candidate(record: DoorAgentUserRecord, plan: MigrationPlan) {
-  return {
-    email: record.email,
-    displayName: record.displayName,
-    role: record.role,
-    defaultMode: record.role === "admin" ? "full" as const : "lightweight" as const,
-    status: record.status,
-    ...(plan.policy.allowCredentialReuse ? { passwordEncoded: record.passwordEncoded } : {}),
-  };
-}
-
-async function revokeApproval(
-  auth: AuthCapability,
-  context: AuthImportContext,
-  approvalRef: string,
-): Promise<void> {
-  try {
-    await auth.revokeImportApproval({ ...context, approvalRef });
-  } catch {
-    // 原错误优先；批准仍由服务端 TTL 和一次性消费语义 fail closed。
-  }
-}
-
-function normalizeTarget(value: string | null): string | null {
-  if (value === null) return null;
-  if (!bounded(value) || /\s/.test(value)) planInvalid();
-  return value;
-}
-
-function sanitizeReason(value: string | null): string | null {
-  if (value === null) return null;
-  return REASON_CODE.test(value) ? value : "AUTH_REJECTED";
-}
-
-function bounded(value: string): boolean {
-  return typeof value === "string" && value.length > 0 && value.length <= MAX_OPAQUE_TEXT;
-}
-
-function validTimestamp(value: string): boolean {
-  return typeof value === "string" && Number.isFinite(Date.parse(value));
-}
-
-function approvalInvalid(): never {
-  throw new DoorAgentMigrationError("APPROVAL_INVALID");
-}
-
-function planInvalid(): never {
-  throw new DoorAgentMigrationError("PLAN_INVALID");
-}
-
-function runBusy(): never {
-  throw new DoorAgentMigrationError("RUN_BUSY");
 }

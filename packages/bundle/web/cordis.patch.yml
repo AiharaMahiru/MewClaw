@@ -95,3 +95,6 @@
         tokenEnv: WORKER_TOKEN
     - id: atw-brand
       name: dsh-lark-atw-brand
+    # composer 模型位：思考强度滑条优先、「更多」进模型清单；priority:-1 遮蔽官方占据。
+    - id: model-seat
+      name: dsh-lark-model-seat

@@ -16,6 +16,10 @@
 - 云端通过 [可选 overlay](config/desktop-workspace.patch.yml) 启用桌面桥接，默认保持关闭。Git 合并和推送不会自动切换生产。
 - 本地 Harness 当前只开放用户原生授权的目录文件能力；云端旧 workspace/Shell/同步桥接仍由独立 overlay 控制，不会因切换本地模式而静默启用。目录授权不是操作系统沙箱。
 
+DSH 核心及官方插件锁定 `0.1.5-rc.2`（2026-09 自 rc.1 升级，见 [升级说明](docs/dsh-0.1.5-upgrade.md)）。lightweight 不再裁剪执行能力，保留模式 ID 并复用官方 standard；Scope、目录授权、审批及 OCI 边界不变。
+
+截至 **2026-09-14，生产基线为 `R25-model-seat-scroll-20260914`**（含模型选择器 effort 滑条遮蔽、Auth Edge 会话持久化与代理体上限、文档/尺寸门禁收口）。本机生产入口 `/opt/dsh/current` 指向 `releases/R25-model-seat-scroll-20260914`；Git 分支后续提交不等于生产已发布。
+
 ## 分支协作
 
 - [`master`](https://github.com/AiharaMahiru/MewClaw/tree/master)：Web、共享插件和云端服务。

@@ -117,6 +117,7 @@ export async function startAuthApp(options: StartAuthAppOptions): Promise<AuthAp
       mail: dependencies.createMailSender(config.mail),
       resetBaseUrl: `${config.publicOrigin}/auth/reset`,
       userModelEncryptionKey: config.userModelEncryptionKey,
+      ...(config.sessionTtlMs !== undefined ? { sessionTtlMs: config.sessionTtlMs } : {}),
     });
     if (config.promptAudit?.enabled && !options.bootCheck) auditModel = await dependencies.createAuditModel();
     const promptAuditor = auditModel && config.promptAudit ? createPromptAuditor(auditModel, config.promptAudit) : undefined;

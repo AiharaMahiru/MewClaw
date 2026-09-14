@@ -10,6 +10,7 @@ const entries = [
   ["packages/desktop/workspace/src/client.ts", "packages/desktop/workspace/client.js"],
   ["packages/lark/web-auth/src/client.ts", "packages/lark/web-auth/client.js"],
   ["packages/lark/atw-brand/src/client.ts", "packages/lark/atw-brand/client.js"],
+  ["packages/lark/model-seat/src/client.ts", "packages/lark/model-seat/client.js"],
 ].map(([source, target]) => ({
   sourcePath: resolve(root, source),
   targetPath: resolve(root, target),

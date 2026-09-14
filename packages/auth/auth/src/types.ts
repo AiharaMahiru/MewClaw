@@ -333,6 +333,12 @@ export interface AuthServiceOptions {
   userModelEncryptionKey?: string;
 }
 
+export interface RequestMetadata {
+  requestId: string;
+  ip?: string;
+  userAgent?: string;
+}
+
 export interface SessionResult {
   user: AuthUser;
   session: AuthSession;

@@ -12,7 +12,7 @@ import { makeBotId, makeConversationId, makeDeploymentId, makeTenantId, makeUser
 import { ChromiumRuntime } from "./cdp.js";
 import type { BrowserConfig } from "./config.js";
 import { BrowserManager } from "./manager.js";
-import { UrlPolicy, UrlPolicyError } from "./url-policy.js";
+import { UrlPolicy, UrlPolicyError } from "dsh-lark-url-policy";
 import { fileOperation, testing as cdgPaths } from "dsh-tool-cdg";
 
 const run = process.env.DSH_BROWSER_E2E === "1" ? describe : describe.skip;

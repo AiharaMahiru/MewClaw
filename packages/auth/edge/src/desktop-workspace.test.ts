@@ -1,11 +1,12 @@
 import { createServer, type Server } from 'node:http';
 import { afterEach, expect, it } from 'vitest';
 import { proxyDesktopWorkspace } from './desktop-workspace.js';
+import { bindAllowedPort } from './test-ports.js';
 const servers: Server[] = [];
 afterEach(async () => { for (const server of servers.splice(0)) { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); } });
 async function listen(server: Server): Promise<string> {
-  servers.push(server); await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
-  return `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  servers.push(server); const port = await bindAllowedPort(server);
+  return `http://127.0.0.1:${port}`;
 }
 it('账号与云端根来自认证存储，伪造 Scope 与跨账号在转发前拒绝', async () => {
   const requests: unknown[] = [];

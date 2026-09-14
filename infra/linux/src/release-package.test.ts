@@ -25,7 +25,7 @@ describe("linux release packaging", () => {
   it("隔离 full boot-check 的 OCI profile 标记且禁止打开浏览器", async () => {
     const validator = await readFile("scripts/validate-linux-release.mjs", "utf8");
     expect(validator).toContain('{ unsetEnv: ["DSH_SANDBOX_IMAGE"] }');
-    expect(validator.match(/"--no-open"/gu)).toHaveLength(2);
+    expect(validator.match(/"--no-open"/gu)).toHaveLength(3);
   });
 
   it("stages a clean workspace copy without node_modules, dist, env, or caches", async () => {
