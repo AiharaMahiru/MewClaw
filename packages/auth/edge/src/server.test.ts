@@ -7,6 +7,7 @@ import { AuthService, MemoryAuthStore, type MailSender } from "dsh-lark-auth";
 import { createAuthEdgeServer } from "./server.js";
 import type { AuthEdgeConfig } from "./config.js";
 import { OAUTH_STATE_COOKIE } from "./cookies.js";
+import { bindAllowedPort, listenAllowedEdge } from "./test-ports.js";
 
 class FakeMail implements MailSender {
   readonly verification: string[] = [];
@@ -200,6 +201,8 @@ describe("AuthEdgeServer", () => {
     expect(register.status).toBe(202);
     const verified = await fetch(`${base}/auth/verify`, { method: "POST", headers: { origin: base, cookie: landingCookie, "x-csrf-token": csrf, "content-type": "application/json" }, body: JSON.stringify({ email: "admin@example.com", code: mail.verification[0] }) });
     expect(verified.status).toBe(200);
+    // 登录态必须跨浏览器重启持久化：会话 Cookie 携带与 7 天滑动 TTL 对齐的 Max-Age。
+    expect(verified.headers.getSetCookie().some((value) => value.startsWith("dsh_session=") && value.includes("Max-Age=604800"))).toBe(true);
     const sessionCookie = cookies(verified).join("; ");
     const rpc = await fetch(`${base}/api/commands/list`, { method: "POST", headers: { origin: base, cookie: sessionCookie, "content-type": "application/json" }, body: JSON.stringify({ method: "commands/list", payload: { args: { agentId: "missing" } } }) });
     expect(rpc.status).toBe(200);
@@ -210,6 +213,8 @@ describe("AuthEdgeServer", () => {
     const adminHome = await fetch(`${base}/`, { headers: { cookie: sessionCookie } });
     expect(adminHome.status).toBe(200);
     expect(adminHome.headers.get("cache-control")).toBe("private, no-store");
+    // 服务端会话滑动续期，首页加载时 Cookie Max-Age 同步滚动。
+    expect(adminHome.headers.getSetCookie().some((value) => value.startsWith("dsh_session=") && value.includes("Max-Age=604800"))).toBe(true);
     const adminHtml = await adminHome.text();
     expect(adminHtml).toContain("remoteAdminSettings:true");
     expect(adminHtml).not.toContain("ownsHost");
@@ -1049,6 +1054,27 @@ it('桌面桥接在真实 Auth Edge 上遵守登录、CSRF、所有权与退出�
   expect(forwarded).toBe(1);
 });
 
+it('Worker 代理体上限独立于认证端点限制，大图片 RPC 可转发', async () => {
+  let forwarded = 0;
+  const worker = await listen((req, res) => { void collect(req).then(() => { if (req.url?.startsWith('/api/')) forwarded++; json(res, 200, { ok: true }); }); });
+  const mail = new FakeMail();
+  const service = new AuthService({ store: new MemoryAuthStore(), mail });
+  await service.register('proxy-limit@example.com', 'correct horse battery staple', 'Proxy', { requestId: 'test' });
+  const user = await verifyLatest(service, mail, 'proxy-limit@example.com');
+  await service.saveResource({ resourceType: 'session', resourceId: 'proxy-own', userId: user!.user.id, resourcePath: null, createdAt: new Date().toISOString() });
+  const conf = config(worker.port); const edge = createAuthEdgeServer({ config: conf, service });
+  const base = await listenEdge(edge, conf); servers.push({ close: () => edge.close() });
+  const headers = { origin: base, cookie: `dsh_session=${user!.token}; dsh_csrf=fixture`, 'x-csrf-token': 'fixture', 'content-type': 'application/json' };
+  // 超过 requestBodyLimit（128KiB）的 session/prompt JSON 仍应经代理上限放行到 Worker。
+  const largePrompt = JSON.stringify({ rpcId: 'proxy-rpc', method: 'session/prompt', payload: { args: { request: { sessionId: 'proxy-own', text: 'x'.repeat(200 * 1024) } } } });
+  expect((await fetch(base + '/api/session/prompt', { method: 'POST', headers, body: largePrompt })).status).toBe(200);
+  expect(forwarded).toBe(1);
+  // 认证端点维持小 JSON 上限，超限请求 fail-closed 413。
+  const oversized = JSON.stringify({ email: 'a@b.c', code: 'x'.repeat(200 * 1024) });
+  expect((await fetch(base + '/auth/verify', { method: 'POST', headers, body: oversized })).status).toBe(413);
+  expect(forwarded).toBe(1);
+});
+
 function config(workerPort: number): AuthEdgeConfig {
   return {
     host: "127.0.0.1",
@@ -1092,10 +1118,8 @@ function parseBootManifest(html: string): {
 }
 
 async function listenEdge(edge: ReturnType<typeof createAuthEdgeServer>, config: AuthEdgeConfig): Promise<string> {
-  await edge.listen();
-  const address = edge.server.address();
-  if (!address || typeof address === "string") throw new Error("edge test server did not bind");
-  const base = `http://127.0.0.1:${address.port}`;
+  const port = await listenAllowedEdge(edge, config);
+  const base = `http://127.0.0.1:${port}`;
   config.publicOrigin = base;
   config.trustedOrigins = [base];
   return base;
@@ -1106,10 +1130,8 @@ async function listen(handler: (req: IncomingMessage, res: ServerResponse) => vo
     if (handleWorkerAuthBridge(req, res, onScope)) return;
     handler(req, res);
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-  if (!address || typeof address === "string") throw new Error("test server did not bind");
-  const result = Object.assign(server, { port: address.port });
+  const port = await bindAllowedPort(server);
+  const result = Object.assign(server, { port });
   servers.push({ close: () => new Promise<void>((resolve) => result.close(() => resolve())) });
   return result;
 }

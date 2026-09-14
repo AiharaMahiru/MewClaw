@@ -8,6 +8,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { AuthService, MemoryAuthStore } from "dsh-lark-auth";
 import { createAuthEdgeServer } from "./server.js";
+import { bindAllowedPort, listenAllowedEdge } from "./test-ports.js";
 import type { AuthEdgeConfig } from "./config.js";
 
 // 使用已锁定Gateway依赖的真实ws，不自造帧解析器或心跳实现。
@@ -57,7 +58,7 @@ describe("真实HTTP/WebSocket选项回传与持续连接", () => {
       ws.on("pong", () => { pongs++; });
       ws.once("message", () => send({ type: "ready", clientId: "client-live", host: { home: workspace } }));
     }));
-    await new Promise<void>(resolve => worker.listen(0, "127.0.0.1", resolve));
+    await bindAllowedPort(worker);
     const workerAddress = worker.address();
     if (!workerAddress || typeof workerAddress === "string") throw new Error("worker address");
     const config = {
@@ -69,7 +70,7 @@ describe("真实HTTP/WebSocket选项回传与持续连接", () => {
       promptAudit: { enabled: true, timeoutMs: 1000, maxConcurrent: 2 },
     } satisfies AuthEdgeConfig;
     const edge = createAuthEdgeServer({ config, service, promptAuditor: { audit: async () => { throw new Error("选项结果不应调用提示词审计"); } } });
-    await edge.listen();
+    await listenAllowedEdge(edge, config);
     const address = edge.server.address();
     if (!address || typeof address === "string") throw new Error("edge address");
     const base = `http://127.0.0.1:${address.port}`;

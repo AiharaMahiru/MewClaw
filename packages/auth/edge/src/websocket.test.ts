@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AuthService, MemoryAuthStore, type MailSender } from "dsh-lark-auth";
 
 import { createAuthEdgeServer } from "./server.js";
+import { bindAllowedPort, listenAllowedEdge } from "./test-ports.js";
 import type { AuthEdgeConfig } from "./config.js";
 
 const SOCKET_CLOSE_TIMEOUT_MS = 1_000;
@@ -46,7 +47,7 @@ describe("AuthEdgeServer WebSocket isolation", () => {
 
     const config = edgeConfig(workerPort(worker));
     const edge = createAuthEdgeServer({ config, service });
-    await edge.listen();
+    await listenAllowedEdge(edge, config);
     const edgeAddress = edge.server.address();
     if (!edgeAddress || typeof edgeAddress === "string") throw new Error("edge server did not bind");
     const origin = `http://127.0.0.1:${edgeAddress.port}`;
@@ -94,7 +95,7 @@ describe("AuthEdgeServer WebSocket isolation", () => {
 
     const config = edgeConfig(workerPort(worker));
     const edge = createAuthEdgeServer({ config, service });
-    await edge.listen();
+    await listenAllowedEdge(edge, config);
     const edgeAddress = edge.server.address();
     if (!edgeAddress || typeof edgeAddress === "string") throw new Error("edge server did not bind");
     const origin = `http://127.0.0.1:${edgeAddress.port}`;
@@ -141,7 +142,7 @@ describe("AuthEdgeServer WebSocket isolation", () => {
 
     const config = edgeConfig(workerPort(worker));
     const edge = createAuthEdgeServer({ config, service });
-    await edge.listen();
+    await listenAllowedEdge(edge, config);
     const edgeAddress = edge.server.address();
     if (!edgeAddress || typeof edgeAddress === "string") throw new Error("edge server did not bind");
     const origin = `http://127.0.0.1:${edgeAddress.port}`;
@@ -180,7 +181,7 @@ describe("AuthEdgeServer WebSocket isolation", () => {
     await listen(worker);
     const config = edgeConfig(workerPort(worker));
     const edge = createAuthEdgeServer({ config, service });
-    await edge.listen();
+    await listenAllowedEdge(edge, config);
     const address = edge.server.address();
     if (!address || typeof address === "string") throw new Error("edge server did not bind");
     const origin = `http://127.0.0.1:${address.port}`;
@@ -233,7 +234,7 @@ describe("AuthEdgeServer WebSocket isolation", () => {
     await listen(worker);
     const config = edgeConfig(workerPort(worker));
     const edge = createAuthEdgeServer({ config, service });
-    await edge.listen();
+    await listenAllowedEdge(edge, config);
     const address = edge.server.address();
     if (!address || typeof address === "string") throw new Error("edge server did not bind");
     const origin = `http://127.0.0.1:${address.port}`;
@@ -278,7 +279,7 @@ function workerAuthBridge(req: IncomingMessage, res: ServerResponse): void {
   res.end();
 }
 
-async function listen(server: Server): Promise<void> { await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve)); }
+async function listen(server: Server): Promise<void> { await bindAllowedPort(server); }
 function workerPort(server: Server): number { const address = server.address(); if (!address || typeof address === "string") throw new Error("worker server did not bind"); return address.port; }
 async function close(server: Server): Promise<void> { await new Promise<void>((resolve) => server.close(() => resolve())); }
 
