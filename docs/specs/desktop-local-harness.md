@@ -23,11 +23,13 @@
 
 SessionLocation 为 cloud | local。Host 进程持有可变 location，HTTP 与 WebSocket 每次请求读取当前值，禁止单个请求在处理中改变路由目的地。切换保存偏好并等待进程内能力变更完成后，返回 reload 标记，由 renderer 刷新当前页面；不调用 Electron app.relaunch()/app.quit()，也不调用 DesktopRuntime.requestRestart()。准备失败恢复偏好，当前 WebServer 继续服务。
 
+刷新以无缝过渡面呈现：旧 renderer 先写入切换意图（目标位置与当前页面计算背景/前景色）并在当前页盖同色覆盖层，再触发整页重载；新文档解析期由注入 BootGraph 前置脚本的自包含运行时重建同一过渡面，#root 出现内容后淡出。全程窗口无白闪，Electron 进程、会话分区与其他窗口不变。意图仅存于 sessionStorage，读取即清除；无 BootGraph 页面（如登录页）负责清除遗留意图。过渡面是增强行为，缺失或失败不得阻断启动。
+
 GET /api/mewclaw-desktop/location 返回 {location}。POST 只接受 {location}；必须通过本机 connection 授权与同源校验。写入失败返回 LOCATION_SAVE_FAILED；非法值返回 INVALID_LOCATION；切换期间拒绝重复操作。
 
 ## 3 配置契约
 
-模式偏好保存于 DSH_HOME 下 mewclaw-location.json，首次 cloud。切换保存成功后仅刷新当前 renderer，Electron 进程、WebServer 和已打开的其他窗口不重启；配置损坏明确启动失败。cloudOrigin 继续使用既有 HTTPS 验证。目录大小、条数等限制继续使用既有 Config。
+模式偏好保存于 DSH_HOME 下 mewclaw-location.json，首次 cloud。切换保存成功后仅刷新当前 renderer（重载在过渡面遮蔽下完成），Electron 进程、WebServer 和已打开的其他窗口不重启；配置损坏明确启动失败。cloudOrigin 继续使用既有 HTTPS 验证。目录大小、条数等限制继续使用既有 Config。
 
 ## 4 事件契约
 
@@ -43,6 +45,8 @@ GET /api/mewclaw-desktop/location 返回 {location}。POST 只接受 {location}�
 
 云端会话始终使用云端 API，本地会话始终使用本机 API。模式切换不迁移、同步或合并会话。目录选择与本地日志浏览不要求云端工作区服务。
 
+切换只改变会话列表、会话与工作区；账号级配置（`/auth/models` 账号模型管理、`dsh-web-ui-settings` 远程偏好）在两种模式下读写同一份云端状态，localStorage 界面偏好同源共享。`/api/settings`、`/api/llm`、`/api/credentials` 属 Harness 作用域，本机模式下管理本机 Harness，不转发云端（云端的同名面指向共享部署配置，且官方已从云端 BootGraph 剔除设置面板）。
+
 模型推理仍需网络与有效云端账号。云端模型配置与默认模型由 Auth Edge 作为唯一权威，本地桌面只通过当前账号 Cookie/CSRF 调用固定的云端推理桥接；API Key 永不同步到桌面或本机存储。不存在已部署推理入口时明确显示模型服务不可用，不索取 Worker token 或使用网页登录态冒充上游 API Key。
 
 本地会话的云端模型桥接使用云端 Cookie/CSRF 调用 POST /auth/desktop-inference/chat/completions，传输模型占位符 cloud-default。Edge 使用已认证 userId 解析账号私有默认模型和加密 API Key，校验公网地址并代理 SSE；上游 API Key 仅在服务器请求期间使用，禁止重定向和透传错误正文。使用现有用户限流及 PromptAuditor；审计不可用拒绝请求。AUTH_DESKTOP_INFERENCE_TIMEOUT_MS 默认 120000，范围 1000–600000，客户端断开取消上游。
@@ -55,11 +59,13 @@ GET /api/mewclaw-desktop/location 返回 {location}。POST 只接受 {location}�
 
 ## 8 测试契约
 
-unit/security：非法模式、损坏偏好、写入失败、重复切换、未授权控制面；cloud↔local 双向切换不调用 Electron 退出/重启 API，renderer 刷新后收到新的位置 BootGraph，固定模式下 HTTP/WS 路由不变。文件工具覆盖越界、版本冲突、撤销。snapshot/e2e：欢迎页及会话页侧栏开关，切换列表、本地目录取消/选择、页面刷新后会话恢复。Release 构建和真实模型验收分别报告。
+unit/security：非法模式、损坏偏好、写入失败、重复切换、未授权控制面；cloud↔local 双向切换不调用 Electron 退出/重启 API，renderer 刷新后收到新的位置 BootGraph，固定模式下 HTTP/WS 路由不变。过渡面 unit：无意图静默、有意图解析期铺开且 #root 就绪后淡出、意图损坏/非法颜色回落默认、登录页清除遗留意图。文件工具覆盖越界、版本冲突、撤销。snapshot/e2e：欢迎页及会话页侧栏开关，切换列表、本地目录取消/选择、页面刷新后会话恢复。Release 构建和真实模型验收分别报告。
 
 ## 9 迁移映射
 
 旧会话标题栏切换改为侧栏全局会话位置切换；本地模式不再调用云端 bind/poll/result。云端既有会话原地保留。本机本轮只改 desktop-dev；服务端推理接口另行交接，不合并整条桌面分支到 master。
+
+行为变化（2026-09-14）：位置切换的 renderer 刷新由裸 location.reload() 改为过渡面遮蔽的无缝重载；服务端契约（POST 返回 reload 标记）与页面生命周期不变，仅消除切换期间的白闪。
 
 ## 10 开放问题
 

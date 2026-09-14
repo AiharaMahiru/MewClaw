@@ -1,5 +1,6 @@
 /** 组合公开 WebBootGraph：云端模块保持原样，追加本地桌面客户端。 */
 import { createHash } from 'node:crypto';
+import { SWITCH_FLAG_KEY } from './switch-splash.js';
 
 export const DESKTOP_CLIENT_PATH = '/_dsh/desktop/mewclaw-client.js';
 export const BOOT_REPORT_PATH = '/_dsh/desktop/renderer-boot';
@@ -46,8 +47,10 @@ export function desktopCloudHtml(html: string, client: { revision: string; injec
   }
   const safeParameters = JSON.stringify(parameters).replaceAll('<', '\\u003c');
   const restore = `globalThis.__MEWCLAW_DESKTOP_WORKSPACE__=true;(()=>{const p=new URLSearchParams(${safeParameters});const u=new URL(location.href);for(const [k,v] of p)u.searchParams.set(k,v);history.replaceState(null,'',u);})();`;
+  // 无 BootGraph 的页面（登录等）不经过位置运行时，遗留的切换意图在这里清除。
+  const clearSwitchFlag = start < 0 ? `try{sessionStorage.removeItem(${JSON.stringify(SWITCH_FLAG_KEY)})}catch{};` : '';
   const loginHealth = start < 0 ? `addEventListener('DOMContentLoaded',()=>{if(document.querySelector('#email')&&document.querySelector('#password')&&document.querySelector('form'))void fetch('${BOOT_REPORT_PATH}',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({status:'healthy'})}).catch(()=>{});},{once:true});` : '';
   // 将真实认证页面主体标为可见内容根；不添加空节点绕过桌面看门狗。
   if (start < 0 && html.includes('<main class="auth-page">')) html = html.replace('<main class="auth-page">', '<main id="root" class="auth-page">');
-  return html.replace('</head>', `<script>${restore}${loginHealth}</script></head>`);
+  return html.replace('</head>', `<script>${restore}${clearSwitchFlag}${loginHealth}</script></head>`);
 }

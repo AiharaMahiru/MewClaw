@@ -35,6 +35,9 @@ describe('桌面启动清单组合', () => {
     const result = desktopCloudHtml('<html><head></head><body></body></html>', client, '</script>');
     expect(result).toContain("document.querySelector('#email')");
     expect(result).toContain('\\u003c/script>');
+    // 无 BootGraph 页面清除遗留切换意图；正常 BootGraph 页面由过渡面运行时读取。
+    expect(result).toContain('mewclaw.location-switch');
+    expect(desktopCloudHtml(html, client, '')).not.toContain('sessionStorage.removeItem');
   });
   it('重复桌面模块拒绝装载', () => {
     const once = desktopCloudHtml(html, client, '');

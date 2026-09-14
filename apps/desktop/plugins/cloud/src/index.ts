@@ -30,7 +30,11 @@ export function isLocalDesktopPath(raw: string): boolean {
   return path.startsWith('/api/desktop/') || path.startsWith('/api/mewclaw-desktop/') || path.startsWith('/_dsh/desktop/');
 }
 
-/** 本地 Harness 仍把账号级配置/模型元数据交给云端，密钥只在云端解密使用。 */
+/** 本地 Harness 仍把账号级配置/模型元数据交给云端，密钥只在云端解密使用。
+ * 注意边界：只同步"账号作用域"的面（Auth Edge 管理的 /auth/models、按账号的
+ * dsh-web-ui-settings）。/api/settings、/api/llm、/api/credentials 是 Harness
+ * 作用域——在云端它们指向共享部署的管理配置而非账号配置，且官方在云端已把
+ * 设置面板从 BootGraph 剔除；本机模式下它们管理本机 Harness，必须留在本机。 */
 export function isCloudSynchronizedPath(raw: string): boolean {
   const path = new URL(raw, 'http://127.0.0.1').pathname;
   return path === '/api/dsh-web-ui-settings/describe'

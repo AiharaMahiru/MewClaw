@@ -48,6 +48,9 @@ it('通过官方 sidebar.footer.action 提供本地目录入口并启动 workspa
     expect(ctx.uiWorkspace.startSession).toHaveBeenCalledWith('local-workspace');
     await React.act(async () => buttons[0]!.click());
     expect(requests.at(-1)).toEqual(['/api/mewclaw-desktop/location', { location: 'cloud' }]);
+    // 切换意图写入 sessionStorage 并立即盖同色过渡面，再由整页重载应用新 BootGraph。
+    expect(sessionStorage.getItem('mewclaw.location-switch')).toContain('"to":"cloud"');
+    expect(document.getElementById('mewclaw-location-splash')).not.toBeNull();
     expect(reload).toHaveBeenCalledOnce();
   } finally { await React.act(async () => root.unmount()); element.remove(); }
 });

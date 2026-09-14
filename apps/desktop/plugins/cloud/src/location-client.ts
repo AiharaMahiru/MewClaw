@@ -51,7 +51,21 @@ global.__ModuleLoader__.load({ id: 'dsh-lark-desktop-location-client', factory: 
       setBusy(true); setError('');
       try {
         await request('/api/mewclaw-desktop/location', { location: target });
-        // 只刷新当前 renderer，让新的 BootGraph/位置状态生效；Electron 进程保持运行。
+        // 预存切换意图并在当前页盖同色过渡面；整页重载后由注入运行时延续同一过渡面。
+        // 键名与 switch-splash.ts 的 SWITCH_FLAG_KEY 保持同一字面量（本文件按静态脚本分发，不能引入模块依赖）。
+        let bg = '';
+        let ink = '';
+        try { const style = getComputedStyle(document.body); bg = style.backgroundColor; ink = style.color; } catch { /* 样式不可读时由新页面用默认色 */ }
+        try { sessionStorage.setItem('mewclaw.location-switch', JSON.stringify({ to: target, bg, ink })); } catch { /* 意图缺失时新页面直接启动 */ }
+        const overlay = document.createElement('div');
+        overlay.id = 'mewclaw-location-splash';
+        overlay.setAttribute('style', `position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:${bg || '#17181c'};color:${ink || '#e8eaef'};font:13px/1.6 system-ui,"Segoe UI",sans-serif;`);
+        const label = document.createElement('div');
+        label.textContent = target === 'local' ? '正在切换到本地工作区' : '正在切换到云端工作区';
+        overlay.appendChild(label);
+        document.body.appendChild(overlay);
+        // 重载被阻断的极小概率下移除覆盖层，避免页面被永久盖住。
+        setTimeout(() => overlay.remove(), 15000);
         globalThis.location.reload();
       }
       catch (cause) { setError(cause instanceof Error ? cause.message : '切换失败，请重试。'); setBusy(false); }

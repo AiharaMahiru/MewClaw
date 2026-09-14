@@ -1,6 +1,7 @@
 /** 扩展官方 rc.2 BootGraph，保留侧栏、布局和主题 Consumer。 */
 import { createHash } from 'node:crypto';
 import { sessionUiStateScript } from './session-ui-state.js';
+import { SWITCH_SPLASH_SOURCE } from './switch-splash.js';
 import type { SessionLocation } from './location.js';
 
 const SIDEBAR = '@deepseek-ai/dsh-client-ui-sidebar';
@@ -48,6 +49,6 @@ export function sessionLocationHtml(html: string, options: {
   }
   graph.rev = createHash('sha256').update(JSON.stringify(graph)).digest('hex').slice(0, 16);
   // 复用官方 boot script 的 CSP nonce，不额外注入无 nonce 的脚本。
-  const state = `globalThis.__MEWCLAW_SESSION_LOCATION__=${JSON.stringify(options.location)};${sessionUiStateScript(options.location)}`;
+  const state = `globalThis.__MEWCLAW_SESSION_LOCATION__=${JSON.stringify(options.location)};${sessionUiStateScript(options.location)}${SWITCH_SPLASH_SOURCE}`;
   return html.slice(0, start) + state + prefix + JSON.stringify(graph).replaceAll('<', '\\u003c') + ';' + html.slice(end);
 }

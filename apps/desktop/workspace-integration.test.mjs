@@ -31,7 +31,8 @@ it('Edge所有权校验→Worker桥接→本机授权目录写入→结果→切
   const remote = await NodeSyncDirectory.create(remoteRoot, { maxBytes: 1024, maxEntries: 20, maxTotalBytes: 8192 });
   const states = new Map();
   const broker = new WorkspaceBroker({ read: id => states.get(id), write: async (id, state) => { states.set(id, state); } },
-    { requestTimeoutMs: 5000, heartbeatTimeoutMs: 10000, maxBindings: 10 });
+    // 并行 jsdom 环境下拉起真实 pwsh 可能超过 5s，超时只是脚手架上限而非断言。
+    { requestTimeoutMs: 12000, heartbeatTimeoutMs: 10000, maxBindings: 10 });
   const worker = createServer(workspaceRoute({ broker, token: 'test-worker-token', isBusy: () => false,
     sync: (_id, path, operation, signal) => { expect(path).toBe(remoteRoot); return executeSync(remote, operation, signal); } }));
   const workerBaseUrl = await listen(worker);

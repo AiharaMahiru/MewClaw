@@ -60,7 +60,7 @@ describe('真实 Cordis Provider 注册', () => {
     }
   });
 
-  it('本地模式只把云端 Web UI settings 转发到远端', async () => {
+  it('本地模式只把账号作用域的配置面转发到云端', async () => {
     const seen: string[] = [];
     const upstream = createServer((req, res) => { seen.push(req.url ?? ''); res.end('cloud-settings'); });
     await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
@@ -81,11 +81,26 @@ describe('真实 Cordis Provider 注册', () => {
       expect(isCloudSynchronizedPath('/auth/models')).toBe(true);
       expect(isCloudSynchronizedPath('/auth/models/00000000-0000-4000-8000-000000000001')).toBe(true);
       expect(isCloudSynchronizedPath('/auth/models/00000000-0000-4000-8000-000000000001/default')).toBe(true);
+      // Harness 作用域的配置面留在本机：云端指向共享部署文档而非账号配置。
+      expect(isCloudSynchronizedPath('/api/settings/describe')).toBe(false);
+      expect(isCloudSynchronizedPath('/api/settings/mutate')).toBe(false);
+      expect(isCloudSynchronizedPath('/api/llm/listProviders')).toBe(false);
+      expect(isCloudSynchronizedPath('/api/credentials/set')).toBe(false);
+      expect(isCloudSynchronizedPath('/api/session/modelCatalog')).toBe(false);
       expect(await (await fetch(`${base}/api/dsh-web-ui-settings/describe`)).text()).toBe('cloud-settings');
       expect(await (await fetch(`${base}/auth/models`)).text()).toBe('cloud-settings');
       expect(await (await fetch(`${base}/auth/models/00000000-0000-4000-8000-000000000001/default`, {
         method: 'POST', headers: { origin: base, 'content-type': 'application/json' }, body: '{}',
       })).text()).toBe('cloud-settings');
+      expect(await (await fetch(`${base}/api/settings/describe`, {
+        method: 'POST', headers: { origin: base, 'content-type': 'application/json' }, body: '{}',
+      })).text()).toBe('local');
+      expect(await (await fetch(`${base}/api/llm/listProviders`, {
+        method: 'POST', headers: { origin: base, 'content-type': 'application/json' }, body: '{}',
+      })).text()).toBe('local');
+      expect(await (await fetch(`${base}/api/credentials/describe`, {
+        method: 'POST', headers: { origin: base, 'content-type': 'application/json' }, body: '{}',
+      })).text()).toBe('local');
       expect(await (await fetch(`${base}/api/session/test`)).text()).toBe('local');
       expect(seen).toEqual(['/api/dsh-web-ui-settings/describe', '/auth/models', '/auth/models/00000000-0000-4000-8000-000000000001/default']);
       fallback();

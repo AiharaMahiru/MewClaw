@@ -8,6 +8,7 @@ it.each(['local', 'cloud'] as const)('保留官方侧栏并只追加一个位置
   expect(output).toContain('@deepseek-ai/dsh-client-ui-sidebar');
   expect(output).toContain(`__MEWCLAW_SESSION_LOCATION__="${location}"`);
   expect(output).toContain('dsh-lark-desktop-location-client');
+  expect(output).toContain('mewclaw.location-switch');
   expect(output).toContain(location === 'cloud' ? 'dsh-lark-desktop-workspace-client' : '"id":"dsh-lark-desktop-location-client"');
 });
 
