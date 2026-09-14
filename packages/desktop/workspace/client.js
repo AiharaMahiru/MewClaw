@@ -4,6 +4,8 @@
   var globals = globalThis;
   globals.__ModuleLoader__.load({ id: "dsh-lark-desktop-workspace", factory: (require2) => {
     const React = require2("react");
+    const LABEL_STYLE = { display: "inline-flex", alignItems: "center", gap: "4px", maxWidth: "180px", height: "22px", padding: "0 2px 0 0", borderRadius: "6px", background: "var(--dsw-alias-fill-tsp-secondary)", color: "var(--dsw-alias-label-secondary)", fontSize: "12px", lineHeight: "22px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+    const ICON_STYLE = { opacity: 0.7, flex: "none", fontSize: "14px" };
     function Location({ sessionId }) {
       const [text, setText] = React.useState("\u2601\uFE0F \u4E91\u7AEF");
       React.useEffect(() => {
@@ -37,7 +39,11 @@
           clearTimeout(timer);
         };
       }, [sessionId]);
-      return React.createElement("span", { role: "status", title: "\u672C\u673A\u76EE\u5F55\u3001Shell \u548C\u540C\u6B65\u6388\u6743\u53EA\u80FD\u5728\u684C\u9762\u5BA2\u6237\u7AEF\u7BA1\u7406\u3002" }, text);
+      return React.createElement(
+        "span",
+        { role: "status", title: "\u672C\u673A\u76EE\u5F55\u3001Shell \u548C\u540C\u6B65\u6388\u6743\u53EA\u80FD\u5728\u684C\u9762\u5BA2\u6237\u7AEF\u7BA1\u7406\u3002", style: LABEL_STYLE },
+        text.startsWith("\u2601\uFE0F") ? [React.createElement("span", { key: "icon", style: ICON_STYLE }, "\u2601\uFE0F"), text.slice(2).trimStart()] : text
+      );
     }
     return { inject: ["slots"], apply(ctx) {
       if (globals.__MEWCLAW_DESKTOP_WORKSPACE__) return;

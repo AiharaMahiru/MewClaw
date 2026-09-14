@@ -6,6 +6,8 @@ import type * as ReactType from 'react';
 const globals = globalThis as unknown as { __MEWCLAW_WORKSPACE_ENABLED__?: boolean; __MEWCLAW_DESKTOP_WORKSPACE__?: boolean; __ModuleLoader__: { load(input: unknown): void } };
 globals.__ModuleLoader__.load({ id: 'dsh-lark-desktop-workspace', factory: (require: (id: string) => unknown) => {
   const React = require('react') as typeof ReactType;
+  const LABEL_STYLE = { display: 'inline-flex', alignItems: 'center', gap: '4px', maxWidth: '180px', height: '22px', padding: '0 2px 0 0', borderRadius: '6px', background: 'var(--dsw-alias-fill-tsp-secondary)', color: 'var(--dsw-alias-label-secondary)', fontSize: '12px', lineHeight: '22px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as const;
+  const ICON_STYLE = { opacity: 0.7, flex: 'none', fontSize: '14px' } as const;
   function Location({ sessionId }: { sessionId: string }) {
     const [text, setText] = React.useState('☁️ 云端');
     React.useEffect(() => {
@@ -26,7 +28,10 @@ globals.__ModuleLoader__.load({ id: 'dsh-lark-desktop-workspace', factory: (requ
       setText('☁️ 云端'); void refresh();
       return () => { abort.abort(); clearTimeout(timer); };
     }, [sessionId]);
-    return React.createElement('span', { role: 'status', title: '本机目录、Shell 和同步授权只能在桌面客户端管理。' }, text);
+    return React.createElement('span', { role: 'status', title: '本机目录、Shell 和同步授权只能在桌面客户端管理。', style: LABEL_STYLE },
+      text.startsWith('☁️')
+        ? [React.createElement('span', { key: 'icon', style: ICON_STYLE }, '☁️'), text.slice(2).trimStart()]
+        : text);
   }
   return { inject: ['slots'], apply(ctx: Context) {
     if (globals.__MEWCLAW_DESKTOP_WORKSPACE__) return;
