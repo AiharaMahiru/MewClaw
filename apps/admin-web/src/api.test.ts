@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   ApiError,
+  addBillingCredit,
+  fetchAdminIdentities,
   fetchBillingPrices,
   fetchBillingQuota,
   fetchBillingSummary,
@@ -9,11 +11,16 @@ import {
   fetchAdminUsers,
   fetchConversation,
   fetchDashboard,
+  fetchMemoryCubes,
+  fetchMemoryNode,
   fetchRuns,
   getToken,
+  searchMemory,
   setToken,
   revokeAdminUserSessions,
+  unlinkAdminIdentity,
   updateAdminUser,
+  updateMemoryCube,
 } from "./api.js";
 
 function memoryStorage(): Storage {
@@ -133,5 +140,76 @@ describe("admin-web API client", () => {
     await expect(fetchBillingQuota("u1")).resolves.toMatchObject({ monthlyLimitUsd: 10, usedUsd: 0.25 });
     await expect(fetchBillingPrices()).resolves.toMatchObject({ prices: [{ inputUsdPerMillion: 0.22 }] });
     await expect(fetchBillingSummary()).resolves.toMatchObject({ rows: [{ totalUsd: 0.000002 }] });
+  });
+
+  it("decodes memory cube lists and rejects wrong ops", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ op: "cube_list", cubes: [{
+      id: "c1", key: "default", name: "主记忆", visibility: "user_private", ownerUserId: "u1",
+      revision: 3, createdAt: "2026-09-01", updatedAt: "2026-09-02",
+    }] }), { status: 200 })));
+    await expect(fetchMemoryCubes()).resolves.toEqual({ cubes: [expect.objectContaining({ key: "default", visibility: "user_private" })] });
+
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ op: "read", cubes: [] }), { status: 200 })));
+    await expect(fetchMemoryCubes()).rejects.toEqual(new ApiError(502, "INVALID_RESPONSE"));
+  });
+
+  it("sends search queries and cube patches to the memory proxy", async () => {
+    vi.stubGlobal("document", { cookie: "dsh_csrf=csrf-token" });
+    const request = vi.fn(async (...args: Parameters<typeof fetch>) => {
+      const path = String(args[0]);
+      if (path.includes("/search")) return new Response(JSON.stringify({ op: "search", nodes: [{
+        id: "n1", cubeId: "c1", kind: "preference", parts: [{ modality: "text", text: "喜欢简洁回复" }],
+        revision: 1, status: "active", createdAt: "2026-09-01", updatedAt: "2026-09-01",
+      }], edges: [] }), { status: 200 });
+      return new Response(JSON.stringify({ op: "cube_updated" }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", request);
+
+    await expect(searchMemory("简洁")).resolves.toMatchObject({ nodes: [{ kind: "preference" }] });
+    expect(String(request.mock.calls[0]?.[0])).toBe("/api/admin/memory/search?q=%E7%AE%80%E6%B4%81");
+    await expect(updateMemoryCube("c1", { name: "改名" }, 3)).resolves.toEqual({ op: "cube_updated" });
+    const patchCall = request.mock.calls[1];
+    expect(patchCall?.[0]).toBe("/api/admin/memory/cubes/c1");
+    expect(JSON.parse(String(patchCall?.[1]?.body))).toEqual({ patch: { name: "改名" }, expectedRevision: 3 });
+  });
+
+  it("reads a memory node and validates the node shape", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ op: "read", node: {
+      id: "n1", cubeId: "c1", kind: "fact", parts: [{ modality: "text", text: "事实" }],
+      revision: 2, status: "active", createdAt: "2026-09-01", updatedAt: "2026-09-02",
+    }, edges: [] }), { status: 200 })));
+    await expect(fetchMemoryNode("n1")).resolves.toMatchObject({ node: { id: "n1", kind: "fact" } });
+
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ op: "read", node: { id: "n1" }, edges: [] }), { status: 200 })));
+    await expect(fetchMemoryNode("n1")).rejects.toEqual(new ApiError(502, "INVALID_RESPONSE"));
+  });
+
+  it("decodes admin identities and sends unlink requests to the edge", async () => {
+    vi.stubGlobal("document", { cookie: "dsh_csrf=csrf-token" });
+    const request = vi.fn(async (...args: Parameters<typeof fetch>) => {
+      if (args[1]?.method === "DELETE") return new Response(JSON.stringify({ ok: true, identity: { provider: "feishu", subject: "ou_x", unionId: null, createdAt: "2026-01-01" } }), { status: 200 });
+      return new Response(JSON.stringify({ identities: [{
+        provider: "feishu", subject: "ou_x", unionId: "un_1", createdAt: "2026-01-01",
+        user: { id: "u1", email: "u@example.com", displayName: "User", role: "user" },
+      }] }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", request);
+
+    await expect(fetchAdminIdentities()).resolves.toMatchObject({ identities: [{ provider: "feishu", user: { id: "u1" } }] });
+    await unlinkAdminIdentity("u1", "ou_x");
+    expect(request.mock.calls[1]?.[0]).toBe("/auth/admin/identities");
+    expect(JSON.parse(String(request.mock.calls[1]?.[1]?.body))).toEqual({ provider: "feishu", subject: "ou_x", userId: "u1" });
+  });
+
+  it("adds credit on top of the freshly fetched monthly limit", async () => {
+    const quota = { scope: { tenantId: "t", botId: "b", deploymentId: "d", userId: "u1" }, periodStart: "2026-09-01", monthlyLimitUsd: 10, usedUsd: 9.5, remainingUsd: 0.5 };
+    const request = vi.fn(async (...args: Parameters<typeof fetch>) => {
+      if (args[1]?.method === "PUT") return new Response(JSON.stringify({ ...quota, monthlyLimitUsd: 20, remainingUsd: 10.5 }), { status: 200 });
+      return new Response(JSON.stringify(quota), { status: 200 });
+    });
+    vi.stubGlobal("fetch", request);
+
+    await expect(addBillingCredit("u1", 10)).resolves.toMatchObject({ monthlyLimitUsd: 20 });
+    expect(JSON.parse(String(request.mock.calls[1]?.[1]?.body))).toEqual({ userId: "u1", monthlyLimitUsd: 20 });
   });
 });

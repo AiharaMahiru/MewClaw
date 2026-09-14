@@ -2,6 +2,7 @@
 
 import {
   decodeConversation,
+  decodeAdminIdentities,
   decodeAdminSessions,
   decodeAdminSummary,
   decodeAdminUserEnvelope,
@@ -15,6 +16,11 @@ import {
   decodeDashboard,
   decodeDocument,
   decodeKnowledgeSnapshot,
+  decodeMemoryCubeList,
+  decodeMemoryCubeRead,
+  decodeMemoryMutation,
+  decodeMemoryNodeRead,
+  decodeMemorySearch,
   decodeRun,
   decodeRuns,
   DEFAULT_ADMIN_RUN_QUERY,
@@ -182,6 +188,66 @@ export interface BillingQuota {
   monthlyLimitUsd: number;
   usedUsd: number;
   remainingUsd: number;
+}
+
+export type MemoryVisibility = "user_private" | "project_shared" | "agent_shared" | "deployment_shared" | "tenant_shared";
+export type MemoryNodeKind = "preference" | "fact" | "goal" | "profile" | "episode" | "tool_trace" | "image" | "document" | "other";
+export type MemoryEdgeRelation = "supports" | "contradicts" | "derived_from" | "related_to" | "part_of";
+
+export type MemoryPart =
+  | { modality: "text"; text: string }
+  | { modality: "image"; uri: string; alt?: string; sha256?: string }
+  | { modality: "tool_trace"; tool: string; input?: unknown; output?: unknown; ok?: boolean }
+  | { modality: "persona"; trait: string; value: string; confidence?: number };
+
+export interface MemorySource {
+  kind: "conversation" | "feedback" | "tool" | "import" | "system";
+  reference?: string;
+}
+
+export interface MemoryNode {
+  id: string;
+  cubeId: string;
+  kind: MemoryNodeKind;
+  parts: MemoryPart[];
+  metadata?: Record<string, unknown>;
+  confidence?: number;
+  source?: MemorySource;
+  revision: number;
+  status: "active" | "archived";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MemoryEdge {
+  id: string;
+  cubeId: string;
+  fromId: string;
+  toId: string;
+  relation: MemoryEdgeRelation;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface MemoryCube {
+  id: string;
+  key: string;
+  name: string;
+  visibility: MemoryVisibility;
+  projectKey?: string;
+  agentKey?: string;
+  ownerUserId: string;
+  revision: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminIdentity {
+  provider: "feishu";
+  subject: string;
+  unionId: string | null;
+  createdAt: string;
+  user: { id: string; email: string; displayName: string; role: AdminRole };
 }
 
 export class ApiError extends Error {
@@ -377,4 +443,67 @@ export function documentAction(
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+// ── 图记忆管理（/api/admin/memory，与后端 memory.execute 契约对齐）──
+
+export function fetchMemoryCubes(): Promise<{ cubes: MemoryCube[] }> {
+  return apiFetch("/api/admin/memory/cubes", decodeMemoryCubeList);
+}
+
+export function fetchMemoryCube(cubeId: string): Promise<{ cube?: MemoryCube }> {
+  return apiFetch(`/api/admin/memory/cubes/${encodeURIComponent(cubeId)}`, decodeMemoryCubeRead);
+}
+
+export function updateMemoryCube(cubeId: string, patch: { name?: string; visibility?: MemoryVisibility }, expectedRevision: number): Promise<{ op: string }> {
+  return apiFetch(`/api/admin/memory/cubes/${encodeURIComponent(cubeId)}`, decodeMemoryMutation, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ patch, expectedRevision }),
+  });
+}
+
+export function deleteMemoryCube(cubeId: string): Promise<{ op: string }> {
+  return apiFetch(`/api/admin/memory/cubes/${encodeURIComponent(cubeId)}`, decodeMemoryMutation, { method: "DELETE" });
+}
+
+export function searchMemory(query: string, limit = 50): Promise<{ nodes: MemoryNode[]; edges: MemoryEdge[] }> {
+  const params = new URLSearchParams({ q: query });
+  return apiFetch(`/api/admin/memory/search?${params}`, decodeMemorySearch).then((result) => ({
+    nodes: result.nodes.slice(0, limit),
+    edges: result.edges,
+  }));
+}
+
+export function fetchMemoryNode(nodeId: string): Promise<{ node?: MemoryNode; edges: MemoryEdge[] }> {
+  return apiFetch(`/api/admin/memory/nodes/${encodeURIComponent(nodeId)}`, decodeMemoryNodeRead);
+}
+
+export function deleteMemoryNode(nodeId: string): Promise<{ op: string }> {
+  return apiFetch("/api/admin/memory/command", decodeMemoryMutation, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ op: "delete", id: nodeId }),
+  });
+}
+
+// ── 身份绑定（edge 侧 /auth/admin/identities，cookie 鉴权）──
+
+export function fetchAdminIdentities(): Promise<{ identities: AdminIdentity[] }> {
+  return apiFetch("/auth/admin/identities", decodeAdminIdentities);
+}
+
+export function unlinkAdminIdentity(userId: string, subject: string): Promise<unknown> {
+  return apiFetch("/auth/admin/identities", (value) => value, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ provider: "feishu", subject, userId }),
+  });
+}
+
+// ── 计费充值：在现有月限额上增量调整 ──
+
+export async function addBillingCredit(userId: string, deltaUsd: number): Promise<BillingQuota> {
+  const quota = await fetchBillingQuota(userId);
+  return updateBillingQuota(userId, Number((quota.monthlyLimitUsd + deltaUsd).toFixed(6)));
 }

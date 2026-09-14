@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 
 import {
   ApiError,
+  addBillingCredit,
   fetchAdminUsers,
   fetchBillingPrices,
   fetchBillingQuota,
@@ -66,6 +67,7 @@ function QuotaPanel(props: { users: AdminUserSummary[]; onError: (message: strin
   }, [props.onError]);
   useEffect(() => { void load(userId); }, [load, userId]);
   useEffect(() => { if (!userId && props.users[0]) setUserId(props.users[0].id); }, [props.users, userId]);
+  const [credit, setCredit] = useState("");
   const save = async (): Promise<void> => {
     if (!userId || !Number.isFinite(limit) || limit < 0) return props.onError("额度必须是非负美元金额");
     setBusy(true);
@@ -73,7 +75,24 @@ function QuotaPanel(props: { users: AdminUserSummary[]; onError: (message: strin
     catch (cause) { props.onError(cause instanceof ApiError ? cause.code : "额度保存失败"); }
     finally { setBusy(false); }
   };
-  return <section className="quota-panel"><SectionHeading title="月度额度" meta={quota ? quota.periodStart : "选择用户"} /><div className="quota-form"><label>用户<select value={userId} onChange={(event) => setUserId(event.target.value)}>{props.users.map((user) => <option key={user.id} value={user.id}>{user.displayName} · {user.email}</option>)}</select></label><label>额度（USD）<input type="number" min="0" step="0.000001" value={limit} onChange={(event) => setLimit(Number(event.target.value))} /></label><button type="button" onClick={() => void save()} disabled={busy || !userId}>保存额度</button></div>{quota && <div className="quota-stats"><span>本月已用 <strong>{usd(quota.usedUsd)}</strong></span><span>剩余 <strong>{usd(quota.remainingUsd)}</strong></span><span>额度 <strong>{usd(quota.monthlyLimitUsd)}</strong></span></div>}</section>;
+  const recharge = async (delta: number): Promise<void> => {
+    if (!userId) return;
+    if (!Number.isFinite(delta) || delta <= 0) return props.onError("充值金额必须是正数");
+    setBusy(true);
+    try {
+      const next = await addBillingCredit(userId, delta);
+      setQuota(next);
+      setLimit(next.monthlyLimitUsd);
+      setCredit("");
+    } catch (cause) { props.onError(cause instanceof ApiError ? cause.code : "充值失败"); }
+    finally { setBusy(false); }
+  };
+  return <section className="quota-panel"><SectionHeading title="月度额度" meta={quota ? quota.periodStart : "选择用户"} /><div className="quota-form"><label>用户<select value={userId} onChange={(event) => setUserId(event.target.value)}>{props.users.map((user) => <option key={user.id} value={user.id}>{user.displayName} · {user.email}</option>)}</select></label><label>额度（USD）<input type="number" min="0" step="0.000001" value={limit} onChange={(event) => setLimit(Number(event.target.value))} /></label><button type="button" onClick={() => void save()} disabled={busy || !userId}>保存额度</button></div>{quota && <div className="quota-stats"><span>本月已用 <strong>{usd(quota.usedUsd)}</strong></span><span>剩余 <strong>{usd(quota.remainingUsd)}</strong></span><span>额度 <strong>{usd(quota.monthlyLimitUsd)}</strong></span></div>}
+    <div className="quota-recharge"><span className="editor-label">快速充值（在现有额度上增加）</span><div className="quota-recharge-row">
+      {[5, 10, 20, 50].map((delta) => <button key={delta} className="secondary-action recharge-button" type="button" disabled={busy || !userId} onClick={() => void recharge(delta)}>+${delta}</button>)}
+      <label className="recharge-custom"><input type="number" min="0" step="0.000001" placeholder="自定义金额" value={credit} onChange={(event) => setCredit(event.target.value)} /><button className="secondary-action" type="button" disabled={busy || !userId || !credit.trim()} onClick={() => void recharge(Number(credit))}>充值</button></label>
+    </div></div>
+  </section>;
 }
 
 function UsageTable({ rows, users }: { rows: BillingAggregate[]; users: AdminUserSummary[] }) {

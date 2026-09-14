@@ -7,6 +7,7 @@ import { BillingPage } from "./pages/BillingPage.js";
 import { ConversationsPage } from "./pages/ConversationsPage.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
 import { KnowledgePage } from "./pages/KnowledgePage.js";
+import { MemoryPage } from "./pages/MemoryPage.js";
 import { SessionsPage } from "./pages/SessionsPage.js";
 import { UsersPage } from "./pages/UsersPage.js";
 import { pathForRoute, routeFromPath, type AppRoute } from "./route.js";
@@ -18,6 +19,7 @@ const NAVIGATION: Array<{ route: AppRoute; label: string; group: string; icon: I
   { route: "billing", label: "用量与额度", group: "管理", icon: "billing" },
   { route: "conversations", label: "运行观察", group: "运行", icon: "activity" },
   { route: "knowledge", label: "知识库", group: "运行", icon: "knowledge" },
+  { route: "memory", label: "记忆", group: "运行", icon: "memory" },
 ];
 
 function Page({ route, onUnauthorized }: { route: AppRoute; onUnauthorized: () => void }) {
@@ -26,6 +28,7 @@ function Page({ route, onUnauthorized }: { route: AppRoute; onUnauthorized: () =
   if (route === "billing") return <BillingPage onUnauthorized={onUnauthorized} />;
   if (route === "conversations") return <ConversationsPage onUnauthorized={onUnauthorized} />;
   if (route === "knowledge") return <KnowledgePage onUnauthorized={onUnauthorized} />;
+  if (route === "memory") return <MemoryPage onUnauthorized={onUnauthorized} />;
   return <DashboardPage onUnauthorized={onUnauthorized} />;
 }
 

@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 
 import {
   ApiError,
+  fetchAdminIdentities,
   fetchAdminUsers,
   revokeAdminUserSessions,
+  unlinkAdminIdentity,
   updateAdminUser,
+  type AdminIdentity,
   type AdminMode,
   type AdminRole,
   type AdminUserSummary,
@@ -36,7 +39,53 @@ function actionError(cause: unknown): string {
   if (cause.code === "USER_NOT_FOUND") return "账号已不存在，请刷新列表";
   if (cause.code === "INVALID_RESPONSE") return "操作已提交，但返回数据异常，请刷新列表";
   if (cause.code === "INTERNAL_ERROR") return "服务暂时不可用，请稍后重试";
+  if (cause.code === "IDENTITY_LAST_LOGIN_METHOD") return "这是该账号最后的登录方式，无法解绑";
+  if (cause.code === "IDENTITY_NOT_FOUND") return "身份绑定已不存在，请刷新列表";
+  if (cause.code === "ADMIN_REQUIRED") return "需要管理员权限";
   return cause.code;
+}
+
+function IdentitySection(props: { user: AdminUserSummary; saving: boolean; onError: (message: string) => void; onChanged: () => void }) {
+  const [identities, setIdentities] = useState<AdminIdentity[] | null>(null);
+  const [busy, setBusy] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const result = await fetchAdminIdentities();
+      setIdentities(result.identities.filter((identity) => identity.user.id === props.user.id));
+    } catch (cause) {
+      props.onError(actionError(cause));
+      setIdentities([]);
+    }
+  }, [props.user.id, props.onError]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const unlink = async (identity: AdminIdentity): Promise<void> => {
+    if (busy || !window.confirm(`解绑飞书身份 ${identity.subject}？`)) return;
+    setBusy(identity.subject);
+    props.onError("");
+    try {
+      await unlinkAdminIdentity(props.user.id, identity.subject);
+      await load();
+      props.onChanged();
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 401) throw cause;
+      props.onError(actionError(cause));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  return <div className="form-section"><div className="form-section-heading"><span>身份绑定</span><small>飞书登录凭据</small></div>
+    {identities === null && <div className="pending-field"><span className="loading-spinner" /><span>正在读取身份绑定…</span></div>}
+    {identities !== null && !identities.length && <div className="pending-field"><span className="status-dot idle" /><span>没有绑定的外部身份</span></div>}
+    {identities !== null && identities.map((identity) => <div className="identity-row" key={identity.subject}>
+      <span className="badge processing">飞书</span>
+      <span className="identity-meta"><code>{identity.subject}</code>{identity.unionId && <span className="table-subline">union {identity.unionId}</span>}<span className="table-subline">绑定于 {date(identity.createdAt)}</span></span>
+      <button className="table-edit-button" type="button" disabled={props.saving || Boolean(busy)} onClick={() => void unlink(identity)}>{busy === identity.subject ? "解绑中" : "解绑"}</button>
+    </div>)}
+  </div>;
 }
 
 function UserProfile({ user }: { user: AdminUserSummary }) {
@@ -51,6 +100,7 @@ function UserEditor(props: {
   onClose: () => void;
   onSave: (user: AdminUserSummary, patch: UserPatch) => Promise<void>;
   onRevoke: (user: AdminUserSummary) => Promise<void>;
+  onIdentitiesChanged: () => void;
   onError: (message: string) => void;
 }) {
   const [role, setRole] = useState<AdminRole>(props.user?.role ?? "user");
@@ -111,6 +161,7 @@ function UserEditor(props: {
         <div className="mode-field"><span className="editor-label">默认运行模式</span><div className={`mode-display ${effectiveMode}`}><span className="mode-indicator" /><strong>{modeLabel(effectiveMode)}</strong><span>由角色自动决定</span></div></div>
       </div>
       <div className="form-section resource-section"><div className="form-section-heading"><span>资源概览</span><small>只读</small></div><div className="resource-grid"><div><strong>{user.sessionCount}</strong><span>登录会话</span></div><div><strong>{user.workspaceCount}</strong><span>工作区</span></div><div><strong>{user.identityCount}</strong><span>身份绑定</span></div></div></div>
+      <IdentitySection user={user} saving={saving} onError={props.onError} onChanged={props.onIdentitiesChanged} />
       <div className="user-editor-actions"><button className="primary-action" type="submit" disabled={!changed || saving}><Icon name="check" size={15} /><span>{saving ? "保存中" : "保存修改"}</span></button><button className="secondary-action" type="button" onClick={props.onClose} disabled={saving}>取消</button></div>
     </form>
     <div className="user-editor-danger"><button className="danger-action" type="button" disabled={!user.sessionCount || saving} onClick={() => void revoke()}><Icon name="sessions" size={14} /><span>{user.sessionCount ? `终止 ${user.sessionCount} 个登录会话` : "暂无活跃会话"}</span></button></div>
@@ -219,7 +270,7 @@ export function UsersPage({ onUnauthorized }: { onUnauthorized: () => void }) {
     <div className="user-management-grid">
       <UsersTable users={visible} loading={loading} selectedId={selectedId} onEdit={(user) => { setSelectedId(user.id); setNotice(""); }} />
       {selected && <button className="editor-backdrop" type="button" aria-label="关闭编辑面板" onClick={() => setSelectedId("")} />}
-      <UserEditor user={selected} onClose={() => setSelectedId("")} onSave={saveUser} onRevoke={revokeUserSessions} onError={setError} />
+      <UserEditor user={selected} onClose={() => setSelectedId("")} onSave={saveUser} onRevoke={revokeUserSessions} onIdentitiesChanged={() => void refresh()} onError={setError} />
     </div>
   </section>;
 }
