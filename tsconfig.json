@@ -24,6 +24,8 @@
     { "path": "packages/memory/tool-memory" },
     { "path": "packages/lark/admin" },
     { "path": "packages/lark/atw-brand" },
+    { "path": "packages/lark/model-seat" },
+    { "path": "packages/lark/model-seat/tsconfig.client.json" },
     { "path": "packages/lark/contracts" },
     { "path": "packages/lark/url-policy" },
     { "path": "packages/lark/lark" },

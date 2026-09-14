@@ -279,6 +279,16 @@ describe("官方 dsh Web 组合", () => {
     for (const slot of ["conversation.hero.brand.mark", "sidebar.brand.mark", "sidebar.brand.name"]) expect(client).toContain(slot);
   });
 
+  it("模型位 shadow 以 priority:-1 注册并经 web patch 组合", async () => {
+    const rows = overlayRows("packages/bundle/web/cordis.patch.yml");
+    expect(rows).toContainEqual(expect.objectContaining({ id: "model-seat", name: "dsh-lark-model-seat" }));
+    const client = await readFile(repositoryPath("packages/lark/model-seat/src/client.ts"), "utf8");
+    expect(client).toContain('"conversation.input.model"');
+    expect(client).toContain("priority: -1");
+    const seat = await readFile(repositoryPath("packages/lark/model-seat/src/seat.ts"), "utf8");
+    expect(seat).not.toContain("node_modules/");
+  });
+
   it("MewClaw Host 半部通过公开 WebServer 扩展点提供静态品牌", async () => {
     const host = await readFile(repositoryPath("packages/lark/atw-brand/src/index.ts"), "utf8");
     expect(host).toContain("ctx.webServer.tapIndex");

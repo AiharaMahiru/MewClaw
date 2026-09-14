@@ -36,6 +36,7 @@
 | [web-private-model.md](web-private-model.md) | `dsh-lark-web-private-model` | Web 用户私有模型适配器（capability 换路由，密钥不落盘） | M7 | implemented |
 | [deepseek-routing.md](deepseek-routing.md) | `dsh-lark-deepseek-routing` | DeepSeek 逻辑↔wire 模型路由与目录收敛 | M7 | implemented |
 | [atw-brand.md](atw-brand.md) | `dsh-lark-atw-brand` | MewClaw 品牌（公开 slots/transform/route，升级硬门禁） | 贯穿 | implemented |
+| [model-seat.md](model-seat.md) | `dsh-lark-model-seat` | composer 模型位 shadowing：思考强度滑条优先 + "更多"清单 | 后迁移 | implementing |
 | [billing.md](billing.md) | `dsh-lark-billing` | 模型计费、额度与用量分析能力缝 | M7 | implemented |
 | [preview.md](preview.md) | `dsh-preview` + `dsh-tool-preview` + `skills/lark-share` | 公共 Web/API 分享能力缝 | M9 | implemented |
 | [browser.md](browser.md) | `dsh-browser` + `dsh-tool-browser` + `skills/lark-browser` | 受控 Chromium 浏览器能力缝 | M10 | implemented |
