@@ -685,6 +685,9 @@ importers:
       dsh-lark-contracts:
         specifier: workspace:*
         version: link:../../packages/lark/contracts
+      dsh-lark-url-policy:
+        specifier: workspace:*
+        version: link:../../packages/lark/url-policy
     devDependencies:
       '@types/node':
         specifier: 24.10.1

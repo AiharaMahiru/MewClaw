@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomBytes } from "node:crypto";
 
 import {
   generateOpaqueToken,
@@ -11,7 +11,25 @@ import {
 } from "./crypto.js";
 import { normalizeReturnPath } from "./policy.js";
 import { inspectImportCredential } from "./credential-policy.js";
+import {
+  adminSessionSummary,
+  assertFeishuIdentityConsistency,
+  assertUnreachable,
+  generateVerificationCode,
+  hashVerificationCode,
+  isUniqueViolation,
+  isoAfter,
+  mailDeliveryError,
+  normalizeDisplayName,
+  normalizeFeishuOpenId,
+  normalizeFeishuProfile,
+  normalizeFeishuSessionId,
+  normalizeVerificationCode,
+  normalizedFeishuEmail,
+  nowIso,
+} from "./service-helpers.js";
 import { UserModelCrypto } from "./user-model-crypto.js";
+import { UserModelProfiles } from "./user-model-profiles.js";
 import { FeishuBotService } from "./feishu-bots.js";
 import type {
   AuthServiceOptions,
@@ -20,7 +38,6 @@ import type {
   AuthStore,
   AuthUser,
   AuthUserModelProfilePublic,
-  AuthUserModelProfileRecord,
   AdminAccountRecoveryResult,
   AdminSessionSummary,
   AdminUserSessionRevokeResult,
@@ -32,6 +49,7 @@ import type {
   FeishuProfile,
   OAuthLoginResult,
   PromoteAndPurgeUsersResult,
+  RequestMetadata,
   SessionResult,
   UserModelProfileDraft,
   UserModelProfilePatch,
@@ -40,18 +58,13 @@ import type {
   UserModelRuntimeRouteRef,
 } from "./types.js";
 
+export type { RequestMetadata } from "./types.js";
+
 const DEFAULT_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_EMAIL_TOKEN_TTL_MS = 30 * 60 * 1000;
 const DEFAULT_OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 const DEFAULT_PAIRING_TOKEN_TTL_MS = 5 * 60 * 1000;
 const MIGRATION_OPERATOR_SESSION_TTL_MS = 10 * 60 * 1000;
-const VERIFICATION_CODE_LENGTH = 6;
-
-export interface RequestMetadata {
-  requestId: string;
-  ip?: string;
-  userAgent?: string;
-}
 
 export interface RegistrationResult {
   accepted: true;
@@ -86,7 +99,7 @@ export class AuthService {
   readonly #oauthStateTtlMs: number;
   readonly #pairingTokenTtlMs: number;
   readonly #resetBaseUrl: string;
-  readonly #userModelCrypto: UserModelCrypto | undefined;
+  readonly #modelProfiles: UserModelProfiles;
 
   constructor(options: AuthServiceOptions) {
     this.#store = options.store;
@@ -98,10 +111,16 @@ export class AuthService {
     this.#oauthStateTtlMs = options.oauthStateTtlMs ?? DEFAULT_OAUTH_STATE_TTL_MS;
     this.#pairingTokenTtlMs = options.pairingTokenTtlMs ?? DEFAULT_PAIRING_TOKEN_TTL_MS;
     this.#resetBaseUrl = options.resetBaseUrl ?? "/auth/reset";
-    this.#userModelCrypto = options.userModelEncryptionKey
+    const userModelCrypto = options.userModelEncryptionKey
       ? new UserModelCrypto(options.userModelEncryptionKey)
       : undefined;
-    this.feishuBots = new FeishuBotService(this.#store, this.#userModelCrypto);
+    this.#modelProfiles = new UserModelProfiles({
+      store: this.#store,
+      crypto: userModelCrypto,
+      now: this.#now,
+      audit: (action, userId, metadata, details) => this.audit(action, userId, metadata, details),
+    });
+    this.feishuBots = new FeishuBotService(this.#store, userModelCrypto);
   }
 
   async register(emailInput: string, password: string, displayNameInput: string, metadata: RequestMetadata, _options?: RegistrationOptions): Promise<RegistrationResult> {
@@ -418,12 +437,12 @@ export class AuthService {
 
   /** 仅返回脱敏投影；用户密钥从不离开 Auth Service。 */
   async listMyModelProfiles(userId: string): Promise<AuthUserModelProfilePublic[]> {
-    return (await this.#store.listUserModelProfiles(userId)).map(publicUserModelProfile);
+    return this.#modelProfiles.list(userId);
   }
 
   /** 仅返回当前用户默认 Profile 的不透明 ID；不存在时为 undefined。 */
   async getMyDefaultModelProfileId(userId: string): Promise<string | undefined> {
-    return this.#store.getUserModelDefault(userId);
+    return this.#modelProfiles.defaultId(userId);
   }
 
   async createMyModelProfile(
@@ -431,29 +450,7 @@ export class AuthService {
     input: UserModelProfileDraft,
     metadata: RequestMetadata,
   ): Promise<AuthUserModelProfilePublic> {
-    const draft = normalizeUserModelDraft(input);
-    const now = nowIso(this.#now());
-    const id = randomUUID();
-    const revision = 1;
-    const secret = this.userModelCrypto().encrypt(draft.apiKey, { userId, profileId: id, revision });
-    const profile = await this.#store.createUserModelProfile({
-      id,
-      userId,
-      displayName: draft.displayName,
-      baseUrl: draft.baseUrl,
-      modelIds: draft.modelIds,
-      defaultModel: draft.defaultModel,
-      ...secret,
-      revision,
-      createdAt: now,
-      updatedAt: now,
-    });
-    // 第一个档案自动成为账户默认值；后续创建由显式“设为默认”控制。
-    if (!await this.#store.getUserModelDefault(userId)) {
-      await this.#store.setUserModelDefault(userId, profile.id, now);
-    }
-    await this.audit("user-model-profile-created", userId, metadata, { profileId: profile.id });
-    return publicUserModelProfile(profile);
+    return this.#modelProfiles.create(userId, input, metadata);
   }
 
   async updateMyModelProfile(
@@ -462,68 +459,25 @@ export class AuthService {
     patch: UserModelProfilePatch,
     metadata: RequestMetadata,
   ): Promise<UserModelProfileUpdateResult> {
-    const current = await this.#store.findUserModelProfile(userId, profileId);
-    if (!current) return { status: "not-found" };
-    if (!Number.isSafeInteger(patch.expectedRevision) || patch.expectedRevision < 1) {
-      throw new Error("INVALID_USER_MODEL_PROFILE_REVISION");
-    }
-    if (patch.expectedRevision !== current.revision) return { status: "conflict" };
-    const next = normalizeUserModelPatch(current, patch);
-    const revision = current.revision + 1;
-    // 即使本次未替换 Key，也会以新的 revision 重封装，使 AEAD 绑定保持精确。
-    const apiKey = next.apiKey ?? this.userModelCrypto().decrypt(current, {
-      userId,
-      profileId: current.id,
-      revision: current.revision,
-    });
-    const secret = this.userModelCrypto().encrypt(apiKey, { userId, profileId: current.id, revision });
-    const updated = await this.#store.updateUserModelProfile({
-      ...current,
-      displayName: next.displayName,
-      baseUrl: next.baseUrl,
-      modelIds: next.modelIds,
-      defaultModel: next.defaultModel,
-      ...secret,
-      revision,
-      updatedAt: nowIso(this.#now()),
-      expectedRevision: patch.expectedRevision,
-    });
-    if (!updated) return { status: "conflict" };
-    await this.audit("user-model-profile-updated", userId, metadata, { profileId: updated.id });
-    return { status: "updated", profile: publicUserModelProfile(updated) };
+    return this.#modelProfiles.update(userId, profileId, patch, metadata);
   }
 
   async deleteMyModelProfile(userId: string, profileId: string, expectedRevision: number, metadata: RequestMetadata): Promise<"deleted" | "not-found" | "conflict"> {
-    const current = await this.#store.findUserModelProfile(userId, profileId);
-    if (!current) return "not-found";
-    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1) throw new Error("INVALID_USER_MODEL_PROFILE_REVISION");
-    if (current.revision !== expectedRevision) return "conflict";
-    if (!await this.#store.deleteUserModelProfile(userId, profileId, expectedRevision)) return "conflict";
-    await this.audit("user-model-profile-deleted", userId, metadata, { profileId });
-    return "deleted";
+    return this.#modelProfiles.delete(userId, profileId, expectedRevision, metadata);
   }
 
   async setMyModelDefault(userId: string, profileId: string, metadata: RequestMetadata): Promise<boolean> {
-    const set = await this.#store.setUserModelDefault(userId, profileId, nowIso(this.#now()));
-    if (set) await this.audit("user-model-profile-defaulted", userId, metadata, { profileId });
-    return set;
+    return this.#modelProfiles.setDefault(userId, profileId, metadata);
   }
 
   /** 仅供 Auth Edge 组装可信 Worker scope，严禁透过浏览器响应调用。 */
   async resolveMyDefaultModelRoute(userId: string): Promise<UserModelRuntimeRoute | undefined> {
-    const profileId = await this.#store.getUserModelDefault(userId);
-    if (!profileId) return undefined;
-    const profile = await this.#store.findUserModelProfile(userId, profileId);
-    if (!profile) return undefined;
-    return this.resolveUserModelRoute(profile, userId, profile.id, profile.revision, profile.defaultModel);
+    return this.#modelProfiles.resolveDefaultRoute(userId);
   }
 
   /** 供 Auth Edge 填充 scope：只读 Profile 元数据，绝不解密 API Key。 */
   async resolveMyDefaultModelRouteRef(userId: string): Promise<UserModelRuntimeRouteRef | undefined> {
-    const profileId = await this.#store.getUserModelDefault(userId);
-    if (!profileId) return undefined;
-    const profile = await this.#store.findUserModelProfile(userId, profileId);
-    return profile ? { profileId: profile.id, revision: profile.revision, model: profile.defaultModel } : undefined;
+    return this.#modelProfiles.resolveDefaultRouteRef(userId);
   }
 
   /**
@@ -536,26 +490,7 @@ export class AuthService {
     revision: number,
     model: string,
   ): Promise<UserModelRuntimeRoute | undefined> {
-    if (!Number.isSafeInteger(revision) || revision < 1 || !model) return undefined;
-    const profile = await this.#store.findUserModelProfile(userId, profileId);
-    if (!profile || profile.revision !== revision || profile.defaultModel !== model) return undefined;
-    return this.resolveUserModelRoute(profile, userId, profileId, revision, model);
-  }
-
-  private resolveUserModelRoute(
-    profile: AuthUserModelProfileRecord,
-    userId: string,
-    profileId: string,
-    revision: number,
-    model: string,
-  ): UserModelRuntimeRoute {
-    return {
-      profileId: profile.id,
-      baseUrl: profile.baseUrl,
-      model,
-      apiKey: this.userModelCrypto().decrypt(profile, { userId, profileId, revision }),
-      revision,
-    };
+    return this.#modelProfiles.resolveRoute(userId, profileId, revision, model);
   }
 
   async listIdentities(userId: string): Promise<AuthIdentity[]> {
@@ -611,11 +546,6 @@ export class AuthService {
     return user && credential && valid && user.status === "active" ? user : undefined;
   }
 
-  private userModelCrypto(): UserModelCrypto {
-    if (!this.#userModelCrypto) throw new Error("USER_MODEL_ENCRYPTION_NOT_CONFIGURED");
-    return this.#userModelCrypto;
-  }
-
   private async bindExisting(userId: string, existing: Awaited<ReturnType<AuthStore["findIdentity"]>>, profile: FeishuProfile, metadata: RequestMetadata, returnPath: string): Promise<OAuthLoginResult | undefined> {
     if (!existing) await this.createFeishuIdentity(profile, userId);
     const user = await this.#store.findUserById(userId);
@@ -664,152 +594,3 @@ export class AuthService {
     try { await this.#store.audit({ action, userId, requestId: metadata.requestId, ipHash: hashMetadata(metadata.ip), userAgentHash: hashMetadata(metadata.userAgent), ...(details ? { metadata: details } : {}), createdAt: nowIso(this.#now()) }); } catch { /* 审计故障不把凭证错误泄露给客户端。 */ }
   }
 }
-
-function nowIso(now: number): string { return new Date(now).toISOString(); }
-function isoAfter(now: number, durationMs: number): string { return new Date(now + durationMs).toISOString(); }
-function adminSessionSummary(session: AuthSession, user: AuthUser): AdminSessionSummary {
-  return {
-    id: session.id,
-    userId: user.id,
-    email: user.email,
-    displayName: user.displayName,
-    role: user.role,
-    createdAt: session.createdAt,
-    expiresAt: session.expiresAt,
-    lastSeenAt: session.lastSeenAt,
-    revokedAt: session.revokedAt,
-  };
-}
-function generateVerificationCode(source: (size: number) => Buffer): string {
-  const bytes = source(4);
-  const value = bytes.readUInt32BE(0) % 1_000_000;
-  return String(value).padStart(VERIFICATION_CODE_LENGTH, "0");
-}
-function normalizeVerificationCode(value: string): string {
-  const code = value.trim();
-  if (!new RegExp(`^\\d{${VERIFICATION_CODE_LENGTH}}$`).test(code)) throw new Error("INVALID_VERIFICATION_CODE");
-  return code;
-}
-function hashVerificationCode(userId: string, code: string): string { return hashOpaqueToken(`${userId}:${code}`); }
-function normalizeDisplayName(value: string, email: string): string { const name = value.trim().slice(0, 120); return name || email.split("@")[0] || "用户"; }
-function normalizeFeishuOpenId(value: string): string {
-  const openId = value.trim();
-  if (!openId || openId.length > 256 || /[\u0000-\u001f\u007f]/.test(openId)) throw new Error("INVALID_FEISHU_OPEN_ID");
-  return openId;
-}
-function normalizeFeishuSessionId(value: string): string {
-  const sessionId = value.trim();
-  if (!/^session-[0-9a-f]{64}(?::[0-9]+)?$/.test(sessionId)) throw new Error("INVALID_FEISHU_SESSION_ID");
-  return sessionId;
-}
-function isUniqueViolation(error: unknown): boolean { return Boolean(error && typeof error === "object" && (error as { code?: unknown }).code === "23505"); }
-function assertUnreachable(value: never): never { throw new Error(`UNREACHABLE_AUTH_STATE:${JSON.stringify(value)}`); }
-function mailDeliveryError(cause: unknown): Error & { code: "MAIL_DELIVERY_FAILED" } {
-  const error = new Error("MAIL_DELIVERY_FAILED", { cause }) as Error & { code: "MAIL_DELIVERY_FAILED" };
-  error.code = "MAIL_DELIVERY_FAILED";
-  return error;
-}
-function normalizeFeishuProfile(profile: FeishuProfile): FeishuProfile | undefined {
-  const openId = profile.openId.trim();
-  if (!openId) return undefined;
-  const unionId = profile.unionId?.trim();
-  const email = profile.email?.trim();
-  const name = profile.name?.trim();
-  return { openId, ...(unionId ? { unionId } : {}), ...(email ? { email } : {}), ...(name ? { name } : {}) };
-}
-function assertFeishuIdentityConsistency(existing: AuthUserIdentity | undefined, unionExisting: AuthUserIdentity | undefined, unionId: string | undefined): void {
-  if (existing && unionExisting && existing.userId !== unionExisting.userId) throw new Error("FEISHU_IDENTITY_CONFLICT");
-  if (existing && unionId && existing.unionId && existing.unionId !== unionId) throw new Error("FEISHU_IDENTITY_CONFLICT");
-  if (unionExisting && unionId && unionExisting.unionId !== unionId) throw new Error("FEISHU_IDENTITY_CONFLICT");
-}
-function normalizedFeishuEmail(email: string | undefined, openId: string): string {
-  if (email) {
-    try { return normalizeEmail(email); } catch { /* provider email 不满足本地格式时使用不可登录的占位地址。 */ }
-  }
-  return `feishu-${hashOpaqueToken(openId).slice(0, 24)}@invalid.local`;
-}
-
-function publicUserModelProfile(profile: AuthUserModelProfileRecord): AuthUserModelProfilePublic {
-  return {
-    id: profile.id,
-    displayName: profile.displayName,
-    baseUrl: profile.baseUrl,
-    modelIds: [...profile.modelIds],
-    defaultModel: profile.defaultModel,
-    keyConfigured: true,
-    revision: profile.revision,
-    createdAt: profile.createdAt,
-    updatedAt: profile.updatedAt,
-  };
-}
-
-function normalizeUserModelDraft(input: UserModelProfileDraft): Required<UserModelProfileDraft> {
-  const modelIds = normalizeUserModelIds(input.modelIds);
-  return {
-    displayName: normalizeUserModelDisplayName(input.displayName),
-    baseUrl: normalizeUserModelBaseUrl(input.baseUrl),
-    modelIds,
-    defaultModel: normalizeUserModelDefault(input.defaultModel, modelIds),
-    apiKey: normalizeUserModelApiKey(input.apiKey),
-  };
-}
-
-function normalizeUserModelPatch(current: AuthUserModelProfileRecord, input: UserModelProfilePatch): {
-  displayName: string;
-  baseUrl: string;
-  modelIds: string[];
-  defaultModel: string;
-  apiKey?: string;
-} {
-  const modelIds = input.modelIds === undefined ? [...current.modelIds] : normalizeUserModelIds(input.modelIds);
-  return {
-    displayName: input.displayName === undefined ? current.displayName : normalizeUserModelDisplayName(input.displayName),
-    baseUrl: input.baseUrl === undefined ? current.baseUrl : normalizeUserModelBaseUrl(input.baseUrl),
-    modelIds,
-    defaultModel: normalizeUserModelDefault(input.defaultModel ?? current.defaultModel, modelIds),
-    ...(input.apiKey === undefined ? {} : { apiKey: normalizeUserModelApiKey(input.apiKey) }),
-  };
-}
-
-function normalizeUserModelDisplayName(value: string): string {
-  const name = value.trim();
-  if (!name || name.length > 120 || /[\u0000-\u001f\u007f]/.test(name)) throw new Error("INVALID_USER_MODEL_PROFILE_NAME");
-  return name;
-}
-
-function normalizeUserModelBaseUrl(value: string): string {
-  let parsed: URL;
-  try { parsed = new URL(value.trim()); } catch { throw new Error("INVALID_USER_MODEL_BASE_URL"); }
-  if (parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password || parsed.search || parsed.hash) {
-    throw new Error("INVALID_USER_MODEL_BASE_URL");
-  }
-  return parsed.toString().replace(/\/$/, "");
-}
-
-function normalizeUserModelIds(value: string[]): string[] {
-  if (!Array.isArray(value) || value.length === 0 || value.length > 64) throw new Error("INVALID_USER_MODEL_LIST");
-  const seen = new Set<string>();
-  return value.map((raw) => {
-    if (typeof raw !== "string") throw new Error("INVALID_USER_MODEL_LIST");
-    const model = raw.trim();
-    if (!model || model.length > 256 || /[\u0000-\u001f\u007f]/.test(model) || seen.has(model)) throw new Error("INVALID_USER_MODEL_LIST");
-    seen.add(model);
-    return model;
-  });
-}
-
-function normalizeUserModelDefault(value: string, modelIds: readonly string[]): string {
-  if (typeof value !== "string") throw new Error("INVALID_USER_MODEL_DEFAULT");
-  const model = value.trim();
-  if (!modelIds.includes(model)) throw new Error("INVALID_USER_MODEL_DEFAULT");
-  return model;
-}
-
-function normalizeUserModelApiKey(value: string): string {
-  if (typeof value !== "string") throw new Error("INVALID_USER_MODEL_KEY");
-  const key = value.trim();
-  if (!key || key.length > 16_384 || /[\u0000-\u001f\u007f]/.test(key)) throw new Error("INVALID_USER_MODEL_KEY");
-  return key;
-}
-
-type AuthUserIdentity = Awaited<ReturnType<AuthStore["findIdentity"]>>;

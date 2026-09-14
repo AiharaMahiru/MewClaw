@@ -9,5 +9,5 @@
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.test.ts"],
-  "references": [{ "path": "../../packages/lark/contracts" }]
+  "references": [{ "path": "../../packages/lark/contracts" }, { "path": "../../packages/lark/url-policy" }]
 }

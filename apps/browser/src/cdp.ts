@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess, type ChildProcessByStdio } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
 
-import type { UrlPolicy } from "./url-policy.js";
+import type { UrlPolicy } from "dsh-lark-url-policy";
 import { BrowserAppError } from "./errors.js";
 import { BrowserEgressProxy } from "./proxy.js";
 

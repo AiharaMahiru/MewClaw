@@ -2,7 +2,7 @@ import { createServer, request as httpRequest, type IncomingMessage, type Outgoi
 import { connect } from "node:net";
 import type { Duplex } from "node:stream";
 
-import type { UrlPolicy } from "./url-policy.js";
+import type { UrlPolicy } from "dsh-lark-url-policy";
 
 /**
  * Chromium 的所有 HTTP(S) 出站都经此 loopback 代理。代理使用 URL 策略同一次 DNS
