@@ -34,7 +34,7 @@ const STAT_TONE: Record<NonNullable<MetricItem["tone"]>, string> = { default: ""
 export function MetricStrip({ items, label }: { items: MetricItem[]; label: string }) {
   return <section className="adm-stats" aria-label={label}>{items.map((item) =>
     <article className={`adm-stat ${STAT_TONE[item.tone ?? "default"]}`} key={item.label}>
-      <div className="adm-stat-top"><span>{item.label}</span>{item.icon && <Icon name={item.icon} size={15} />}</div>
+      <div className="adm-stat-top"><span>{item.label}</span>{item.icon && <span className="adm-stat-icon"><Icon name={item.icon} size={13} /></span>}</div>
       <strong className="adm-stat-value">{item.value}</strong>
       <div className="adm-stat-sub">{item.detail}{item.trend ? ` · ${item.trend}` : ""}</div>
     </article>)}</section>;
