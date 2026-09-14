@@ -2,7 +2,7 @@
 
 更新时间：2026-09-14
 工作分支：`desktop-dev`
-本地同步基线：已拉取并合入最新 `origin/desktop@3d88e2d`，合并提交为 `ce3d0cc`；冲突已处理，保留桌面专属 Workspace、Shell、同步、Cloud Provider、admin/Auth 和液态玻璃 Web 更新。
+本地同步基线：已拉取并合入最新 `origin/desktop@4efc4c5`，合并提交为 `5bc346b`；冲突已处理（README 版本表述、Auth Edge `server.ts` 拆分后 `desktop-inference` 路由重贴到 `auth-routes.ts`），保留桌面专属 Workspace、Shell、同步、Cloud Provider、admin/Auth、液态玻璃 Web 与无缝切换更新。
 
 ## 当前唯一交付目录
 
@@ -95,9 +95,13 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 
 云端模式官方把 `dsh-client-ui-settings` 从 BootGraph 剔除，设置对话框不存在（管理员除外）；本地模式有该面板，管理的是本机 Harness 配置（`/api/settings` 本机文档）。账号级偏好走 `dsh-web-ui-settings`（已同步）、模型管理走 `/auth/models`（已同步）。本地模式设置→模型页显示的本机提供方列表是死配置面（本地推理走云端桥接），如需隐藏是 UX 层的另行决策。
 
+### 3. 上游 model-seat 包未过根 typecheck（上游问题，非合并回归）
+
+合并 `origin/desktop@4efc4c5` 带入的 `packages/lark/model-seat` 在根 `pnpm typecheck`（`tsconfig.test.json`）下失败：`client.test.ts` 的自定义 `El`/`SeatReactApi` 桩与 React 18 类型不兼容、`client.ts:42` 调用 `ctx.sessions.subagentAddress`（rc.2 已安装包里无此成员）。上游分支自身同样失败；该包自身 `tsconfig.json`/`tsconfig.client.json` 单独编译通过。修复需上游补桩类型/确认 `subagentAddress` 来源版本，或由上游把测试排除出根 typecheck——不属桌面端改动范围。
+
 ## 推送状态与限制
 
-- 本轮改动基于 `origin/desktop@3d88e2d`，合并提交为 `ce3d0cc`，随后纳入 rc.2 依赖、进程内切换、Release 命名、ASAR fallback、测试和文档更新。
+- 本轮改动基于 `origin/desktop@4efc4c5`，合并提交为 `5bc346b`，叠加无缝切换、同步边界修正、测试和文档更新。
 - 本轮实现与交接基线 `bd873dcd229b0da2eba373627ee05490081ec2be` 已推送并由 `git ls-remote` 核验（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成）；`desktop` 远端仍为 `3d88e2dcaed107b490a7863faa51aff792973ac7`。
 - 后续若继续修改源码或交接文档，完成提交后重新执行：
 
