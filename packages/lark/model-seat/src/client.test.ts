@@ -4,6 +4,7 @@ import { SlotCore } from "@deepseek-ai/dsh-client-ui-slots";
 import { applyModelSeat } from "./client.js";
 import {
   SEAT_CSS,
+  createEffortSlider,
   createSeatComponent,
   currentEntry,
   effortRows,
@@ -55,6 +56,23 @@ function makeReact(states: unknown[] = []) {
 }
 
 const dom = { createPortal: (node: unknown, host: unknown) => ({ portal: node, host }) };
+
+/** 滑条测试用的最小 React：useRef 固定返回 100px 宽的轨道。 */
+function makeSliderReact() {
+  const sets: unknown[][] = [];
+  return {
+    sets,
+    react: {
+      createElement: (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]): El => ({ type, props, children }),
+      useState: <T,>(initial: T) => {
+        const calls: T[] = [];
+        sets.push(calls);
+        return [typeof initial === "function" ? (initial as () => T)() : initial, (v: T) => calls.push(v)] as [T, (v: T) => void];
+      },
+      useRef: () => ({ current: { getBoundingClientRect: () => ({ left: 0, width: 100 }) } }),
+    },
+  };
+}
 
 (globalThis as { document?: unknown }).document ??= { body: { marker: true } };
 
@@ -230,27 +248,81 @@ describe("模型位渲染与选择", () => {
     expect(findAll(tree, (el) => "portal" in el)).toHaveLength(0);
   });
 
+  const isSliderEl = (el: El) => typeof el.type === "function" && Array.isArray(el.props?.rows);
+
   it("打开后首先呈现思考强度滑条，而非模型清单", () => {
     const react = makeReact([true, "effort", { left: 0, top: 0 }]);
     const SeatOpen = createSeatComponent(react.react as never, dom);
     const tree = SeatOpen(seatProps(snapshot())) as El;
     const menu = findAll(tree, byClass("mwseat-menu"))[0]!;
-    const segments = findAll(menu, byClass("mwseat-seg"));
-    expect(segments.map((seg) => seg.children[0])).toEqual(["Low", "High"]);
-    expect(segments[1]!.props.className).toContain("on");
-    expect(segments[1]!.props["aria-checked"]).toBe(true);
+    const slider = findAll(menu, isSliderEl)[0]!;
+    const rows = slider.props.rows as { label: string; active: boolean }[];
+    expect(rows.map((r) => r.label)).toEqual(["Low", "High"]);
+    expect(rows[1]!.active).toBe(true);
     expect(findAll(menu, byClass("mwseat-more"))[0]!.children).toContain("更多");
     expect(findAll(menu, byClass("mwseat-row"))).toHaveLength(0);
   });
 
-  it("点击档位经官方 select 通路提交 reasoningEffort", () => {
+  it("滑条选档经官方 select 通路提交 reasoningEffort", () => {
     const select = vi.fn(async () => true);
     const react = makeReact([true, "effort", { left: 0, top: 0 }]);
     const SeatOpen = createSeatComponent(react.react as never, dom);
     const tree = SeatOpen(seatProps(snapshot(), { select })) as El;
-    const seg = findAll(tree, byClass("mwseat-seg"))[0]!;
-    (seg.props.onClick as () => void)();
+    const slider = findAll(tree, isSliderEl)[0]!;
+    (slider.props.onPick as (effort: string | undefined) => void)("low");
     expect(select).toHaveBeenCalledWith({ provider: "deepseek-official", model: "muse-spark-1.3", reasoningEffort: "low" });
+  });
+
+  it("滑条：role=slider 语义、刻度与档位标签", () => {
+    const slider = createEffortSlider(makeSliderReact().react as never);
+    const rows = effortRows(MUSE, { provider: "deepseek-official", model: "muse-spark-1.3" });
+    const tree = slider({ rows, busy: false, onPick: () => {} }) as El;
+    const rail = findAll(tree, byClass("mwseat-sliderRail"))[0]!;
+    expect(rail.props.role).toBe("slider");
+    expect(rail.props["aria-valuemax"]).toBe(1);
+    expect(rail.props["aria-valuenow"]).toBe(1);
+    expect(rail.props["aria-valuetext"]).toBe("High");
+    expect(findAll(tree, byClass("mwseat-sliderTick"))).toHaveLength(2);
+    expect(findAll(tree, byClass("mwseat-sliderThumb"))[0]!.props.style).toMatchObject({ left: "100%" });
+    expect(findAll(tree, byClass("mwseat-sliderStop")).map((s) => s.children[0])).toEqual(["Low", "High"]);
+  });
+
+  it("滑条：拖动经 pointerdown/up 提交落点档位", () => {
+    const listeners = new Map<string, (ev: { clientX: number }) => void>();
+    const win = { addEventListener: (n: string, f: (ev: { clientX: number }) => void) => listeners.set(n, f), removeEventListener: (n: string) => listeners.delete(n) };
+    const g = globalThis as { window?: unknown };
+    const prev = g.window;
+    g.window = win;
+    try {
+      const onPick = vi.fn();
+      const fake = makeSliderReact();
+      const slider = createEffortSlider(fake.react as never);
+      const rows = effortRows(MUSE, { provider: "deepseek-official", model: "muse-spark-1.3" });
+      const tree = slider({ rows, busy: false, onPick }) as El;
+      const rail = findAll(tree, byClass("mwseat-sliderRail"))[0]!;
+      (rail.props.onPointerDown as (ev: unknown) => void)({ clientX: 0, button: 0, preventDefault: () => {} });
+      expect(listeners.has("pointermove")).toBe(true);
+      listeners.get("pointerup")!({ clientX: 0 });
+      expect(onPick).toHaveBeenCalledWith("low");
+      expect(listeners.has("pointermove")).toBe(false);
+    } finally {
+      if (prev === undefined) delete g.window; else g.window = prev;
+    }
+  });
+
+  it("滑条：方向键与标签点击直达档位", () => {
+    const onPick = vi.fn();
+    const slider = createEffortSlider(makeSliderReact().react as never);
+    const rows = effortRows(MUSE, { provider: "deepseek-official", model: "muse-spark-1.3" });
+    const tree = slider({ rows, busy: false, onPick }) as El;
+    const rail = findAll(tree, byClass("mwseat-sliderRail"))[0]!;
+    (rail.props.onKeyDown as (ev: unknown) => void)({ key: "ArrowLeft", preventDefault: () => {} });
+    expect(onPick).toHaveBeenLastCalledWith("low");
+    const stops = findAll(tree, byClass("mwseat-sliderStop"));
+    (stops[0]!.props.onClick as () => void)();
+    expect(onPick).toHaveBeenLastCalledWith("low");
+    (stops[1]!.props.onClick as () => void)();
+    expect(onPick).toHaveBeenCalledTimes(2); // 点击当前档不重复提交
   });
 
   it("「更多」切换到模型清单视图", () => {

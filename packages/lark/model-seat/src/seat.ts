@@ -92,11 +92,101 @@ export function effortRows(model: SeatModel | undefined, current: SeatSelection 
   return rows;
 }
 
+export type SeatSliderProps = { rows: readonly EffortRow[]; busy: boolean; onPick(effort: string | undefined): void };
+export type SeatSliderComponent = (props: SeatSliderProps) => ReactNode;
+
+/**
+ * 思考强度离散滑条：指针按下后随拖动预览档位、松开提交；
+ * 方向键逐档、Home/End 跳端点；档位标签本身可点。提交值是 row.effort
+ * （「默认」档为 undefined，由上层清除显式 effort）。
+ */
+export function createEffortSlider(React: SeatReactApi): SeatSliderComponent {
+  const h = React.createElement;
+  return function EffortSlider(props: SeatSliderProps): ReactNode {
+    const { rows, busy, onPick } = props;
+    const [drag, setDrag] = React.useState<number | null>(null);
+    const trackRef = React.useRef<{ getBoundingClientRect(): { left: number; width: number } } | null>(null);
+    const n = rows.length;
+    if (n === 0) return null;
+    const found = rows.findIndex((r) => r.active);
+    const active = found < 0 ? 0 : found;
+    const index = Math.min(n - 1, Math.max(0, drag ?? active));
+    const pct = (i: number) => (n <= 1 ? 50 : (i / (n - 1)) * 100);
+    const indexAt = (clientX: number): number => {
+      const rect = trackRef.current?.getBoundingClientRect();
+      if (rect === undefined || rect.width <= 0 || n <= 1) return index;
+      return Math.min(n - 1, Math.max(0, Math.round(((clientX - rect.left) / rect.width) * (n - 1))));
+    };
+    const commit = (i: number) => {
+      if (i !== active) onPick(rows[i]?.effort);
+    };
+    const onPointerDown = (event: { clientX: number; button?: number; preventDefault?(): void }) => {
+      if (busy || (event.button !== undefined && event.button !== 0)) return;
+      event.preventDefault?.();
+      setDrag(indexAt(event.clientX));
+      const win = globalThis.window;
+      if (win === undefined) return;
+      const move = (ev: { clientX: number }) => setDrag(indexAt(ev.clientX));
+      const up = (ev: { clientX: number }) => {
+        win.removeEventListener("pointermove", move);
+        win.removeEventListener("pointerup", up);
+        setDrag(null);
+        commit(indexAt(ev.clientX));
+      };
+      win.addEventListener("pointermove", move);
+      win.addEventListener("pointerup", up);
+    };
+    const onKeyDown = (event: { key: string; preventDefault(): void }) => {
+      const step = event.key === "ArrowLeft" || event.key === "ArrowDown" ? -1 : event.key === "ArrowRight" || event.key === "ArrowUp" ? 1 : 0;
+      if (step !== 0) {
+        event.preventDefault();
+        commit(Math.min(n - 1, Math.max(0, index + step)));
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        commit(0);
+      } else if (event.key === "End") {
+        event.preventDefault();
+        commit(n - 1);
+      }
+    };
+    return h("div", { className: "mwseat-slider" },
+      h("div", {
+        ref: trackRef,
+        className: `mwseat-sliderRail${drag !== null ? " drag" : ""}`,
+        role: "slider",
+        tabIndex: busy ? -1 : 0,
+        "aria-label": "思考强度",
+        "aria-orientation": "horizontal",
+        "aria-valuemin": 0,
+        "aria-valuemax": n - 1,
+        "aria-valuenow": index,
+        "aria-valuetext": rows[index]?.label,
+        "aria-disabled": busy,
+        onPointerDown,
+        onKeyDown,
+      },
+        h("div", { className: "mwseat-sliderFill", style: { width: `${pct(index)}%` } }),
+        rows.map((row, i) => h("span", { key: `t:${row.key}`, className: "mwseat-sliderTick", "aria-hidden": "true", style: { left: `${pct(i)}%` } })),
+        h("span", { className: "mwseat-sliderThumb", "aria-hidden": "true", style: { left: `${pct(index)}%` } })),
+      h("div", { className: "mwseat-sliderStops" },
+        rows.map((row, i) => h("button", {
+          key: `s:${row.key}`,
+          type: "button",
+          className: `mwseat-sliderStop${i === index ? " on" : ""}`,
+          disabled: busy,
+          ...(row.description !== undefined ? { title: row.description } : {}),
+          style: { left: `${pct(i)}%`, transform: i === 0 ? "translateX(0)" : i === n - 1 ? "translateX(-100%)" : "translateX(-50%)" },
+          onClick: () => commit(i),
+        }, row.label))));
+  };
+}
+
 export type MenuBodyOpts = {
   view: SeatView;
   state: SeatSnapshot;
   model: SeatModel | undefined;
   busy: boolean;
+  slider: SeatSliderComponent;
   onEffort(effort: string | undefined): void;
   onModel(group: SeatGroup, model: SeatModel): void;
   onMore(): void;
@@ -113,17 +203,7 @@ export function seatMenuBody(React: Pick<SeatReactApi, "createElement">, o: Menu
       h("div", { className: "mwseat-head" },
         h("span", { className: "mwseat-title" }, triggerModelLabel(state, model)),
         h("button", { type: "button", className: "mwseat-more", onClick: o.onMore }, "更多")),
-      h("div", { className: "mwseat-track", role: "radiogroup", "aria-label": "思考强度" },
-        rows.map((row) => h("button", {
-          key: row.key,
-          type: "button",
-          role: "radio",
-          "aria-checked": row.active,
-          className: `mwseat-seg${row.active ? " on" : ""}`,
-          disabled: busy,
-          ...(row.description !== undefined ? { title: row.description } : {}),
-          onClick: () => o.onEffort(row.effort),
-        }, row.label))),
+      h(o.slider, { rows, busy, onPick: o.onEffort }),
       state.error !== null ? h("div", { className: "mwseat-error" }, state.error) : null);
   }
   const rows: unknown[] = [];
@@ -168,6 +248,7 @@ export function seatMenuBody(React: Pick<SeatReactApi, "createElement">, o: Menu
 /** 生成 slot 组件：闭包持有 React/DOM 面，props 即注入面 + 宿主 locked。 */
 export function createSeatComponent(React: SeatReactApi, dom: SeatDomApi) {
   const h = React.createElement;
+  const Slider = createEffortSlider(React);
   return function ModelSeat(props: SeatProps): ReactNode {
     const { locked, available, directory, load, select } = props;
     const state = React.useSyncExternalStore((fn) => directory.subscribe(fn), () => directory.getSnapshot());
@@ -251,7 +332,7 @@ export function createSeatComponent(React: SeatReactApi, dom: SeatDomApi) {
       "aria-label": "模型与思考强度",
       style: pos ?? { visibility: "hidden", left: 0, top: 0 },
     }, seatMenuBody(React, {
-      view, state, model, busy,
+      view, state, model, busy, slider: Slider,
       onEffort: chooseEffort,
       onModel: chooseModel,
       onMore: () => setView("list"),
@@ -298,12 +379,22 @@ export const SEAT_CSS = `
 .mwseat-more{font-weight:500}
 .mwseat-back{display:inline-flex;align-items:center;padding:0 2px;font-size:14px}
 .mwseat-more:hover,.mwseat-back:hover{color:var(--dsw-alias-label-primary)}
-.mwseat-track{display:flex;gap:2px;margin:0 4px 4px;padding:2px;border-radius:10px;background:var(--dsw-alias-interactive-bg-hover)}
-.mwseat-seg{flex:1 1 0;min-width:0;height:30px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;font-weight:500;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 8px}
-.mwseat-seg:hover:not(:disabled):not(.on){color:var(--dsw-alias-label-primary)}
-.mwseat-seg.on{background:var(--dsw-specific-menu);color:var(--dsw-alias-label-primary);box-shadow:0 1px 3px rgba(0,0,0,.18)}
-.mwseat-seg:disabled{cursor:default;opacity:.6}
+.mwseat-slider{padding:0 10px 4px;user-select:none}
+.mwseat-sliderRail{position:relative;height:24px;cursor:pointer;touch-action:none;outline:none}
+.mwseat-sliderRail::before{content:"";position:absolute;left:0;right:0;top:50%;height:4px;transform:translateY(-50%);border-radius:999px;background:var(--dsw-alias-interactive-bg-hover)}
+.mwseat-sliderRail:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary,Highlight);outline-offset:2px;border-radius:6px}
+.mwseat-sliderFill{position:absolute;left:0;top:50%;height:4px;transform:translateY(-50%);border-radius:999px;background:var(--dsw-alias-state-business-primary,#5c70c9)}
+.mwseat-sliderTick{position:absolute;top:50%;width:5px;height:5px;border-radius:50%;transform:translate(-50%,-50%);background:var(--dsw-alias-label-dimmed);pointer-events:none}
+.mwseat-sliderThumb{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;transform:translate(-50%,-50%);background:var(--dsw-alias-label-primary);box-shadow:0 1px 4px rgb(0 0 0 / 32%);pointer-events:none}
+.mwseat-sliderRail:not(.drag) .mwseat-sliderThumb,.mwseat-sliderRail:not(.drag) .mwseat-sliderFill{transition:left .12s ease,width .12s ease}
+.mwseat-sliderStops{position:relative;height:20px;margin-top:2px}
+.mwseat-sliderStop{position:absolute;border:0;background:transparent;padding:0;font:inherit;font-size:11px;line-height:18px;color:var(--dsw-alias-label-tertiary);cursor:pointer;white-space:nowrap}
+.mwseat-sliderStop.on{color:var(--dsw-alias-label-primary);font-weight:500}
+.mwseat-sliderStop:disabled{cursor:default;opacity:.6}
 .mwseat-list{overflow-y:auto;min-height:0;padding:0 0 2px}
+/* liquid-glass 的 panels 选择器命中 [role="menu"]；清单只是 dialog 内内容区，
+   压平第二层面板避免叠出两层圆角半透明背景。 */
+.mwseat-menu .mwseat-list[role="menu"]{background:transparent;background-color:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:0;padding:0;scroll-padding:0}
 .mwseat-groupTitle{padding:8px 8px 4px;font-size:12px;font-weight:500;line-height:16px;color:var(--dsw-alias-label-caption);background:transparent}
 .mwseat-row{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:20px;cursor:pointer;text-align:left}
 .mwseat-row:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover)}
