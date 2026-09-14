@@ -5,7 +5,7 @@
   globals.__ModuleLoader__.load({ id: "dsh-lark-desktop-workspace", factory: (require2) => {
     const React = require2("react");
     function Location({ sessionId }) {
-      const [text, setText] = React.useState("\u2601\uFE0F");
+      const [text, setText] = React.useState("\u2601\uFE0F \u4E91\u7AEF");
       React.useEffect(() => {
         if (!globals.__MEWCLAW_WORKSPACE_ENABLED__) return;
         const abort = new AbortController();
@@ -22,7 +22,7 @@
             if (!response.ok) return;
             const state = await response.json();
             if (abort.signal.aborted) return;
-            setText(state.mode === "desktop" ? state.connected ? "\u672C\u673A\u5DE5\u4F5C\u533A \xB7 \u684C\u9762\u5DF2\u8FDE\u63A5" : "\u672C\u673A\u5DE5\u4F5C\u533A \xB7 \u684C\u9762\u5DF2\u65AD\u7EBF" : "\u2601\uFE0F");
+            setText(state.mode === "desktop" ? state.connected ? "\u672C\u673A\u5DE5\u4F5C\u533A \xB7 \u684C\u9762\u5DF2\u8FDE\u63A5" : "\u672C\u673A\u5DE5\u4F5C\u533A \xB7 \u684C\u9762\u5DF2\u65AD\u7EBF" : "\u2601\uFE0F \u4E91\u7AEF");
             if (state.mode === "desktop") timer = setTimeout(() => {
               void refresh();
             }, 5e3);
@@ -30,7 +30,7 @@
             if (!abort.signal.aborted) setText("\u5DE5\u4F5C\u533A\u72B6\u6001\u4E0D\u53EF\u7528");
           }
         };
-        setText("\u2601\uFE0F");
+        setText("\u2601\uFE0F \u4E91\u7AEF");
         void refresh();
         return () => {
           abort.abort();
@@ -44,7 +44,7 @@
       ctx.slots.inject("conversation.session.header.actions", () => ctx.slots.register({
         name: "conversation.session.header.actions",
         id: "mewclaw-workspace-location",
-        order: -100,
+        order: -5,
         inject: (sessionId) => ({ sessionId })
       }, Location));
     } };
