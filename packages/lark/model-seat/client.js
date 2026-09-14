@@ -118,7 +118,7 @@
             onKeyDown
           },
           h("div", { className: "mwseat-sliderFill", "aria-hidden": "true", style: { width: pos(index) } }),
-          rows.map((row, i) => h("span", { key: `t:${row.key}`, className: "mwseat-sliderTick", "aria-hidden": "true", style: { left: pos(i) } })),
+          rows.map((row, i) => h("span", { key: `t:${row.key}`, className: `mwseat-sliderTick${i <= index ? " on" : ""}`, "aria-hidden": "true", style: { left: pos(i) } })),
           h("span", { className: "mwseat-sliderThumb", "aria-hidden": "true", style: { left: pos(index) } })
         ),
         h(
@@ -351,15 +351,20 @@
 .mwseat-back{display:inline-flex;align-items:center;padding:0 2px;font-size:14px}
 .mwseat-more:hover,.mwseat-back:hover{color:var(--dsw-alias-label-primary)}
 .mwseat-slider{padding:2px 10px 6px;user-select:none}
-.mwseat-sliderRail{position:relative;height:28px;border-radius:999px;cursor:pointer;touch-action:none;outline:none;background:var(--dsw-alias-interactive-bg-hover);box-shadow:inset 0 1px 2px rgb(0 0 0 / 10%)}
+.mwseat-sliderRail{position:relative;height:30px;border-radius:999px;cursor:pointer;touch-action:none;outline:none;background:var(--dsw-alias-interactive-bg-hover);box-shadow:inset 0 1px 3px rgb(0 0 0 / 12%),inset 0 -1px 0 rgb(255 255 255 / 6%);transition:background-color .18s ease}
+.mwseat-sliderRail:hover{background:var(--dsw-alias-interactive-bg-active,var(--dsw-alias-interactive-bg-hover))}
 .mwseat-sliderRail:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary,Highlight);outline-offset:2px}
-.mwseat-sliderFill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--dsw-alias-state-business-primary,#5c70c9);opacity:.3;pointer-events:none}
-.mwseat-sliderTick{position:absolute;top:50%;width:4px;height:4px;border-radius:50%;transform:translate(-50%,-50%);background:var(--dsw-alias-label-dimmed);opacity:.55;pointer-events:none}
-.mwseat-sliderThumb{position:absolute;top:50%;width:20px;height:20px;border-radius:999px;transform:translate(-50%,-50%);background:var(--dsw-alias-label-primary);box-shadow:0 1px 4px rgb(0 0 0 / 30%),inset 0 1px 0 rgb(255 255 255 / 22%);pointer-events:none}
-.mwseat-sliderRail:not(.drag) .mwseat-sliderThumb,.mwseat-sliderRail:not(.drag) .mwseat-sliderFill{transition:left .14s ease,width .14s ease}
-.mwseat-sliderStops{position:relative;height:20px;margin-top:4px}
-.mwseat-sliderStop{position:absolute;border:0;background:transparent;padding:0;font:inherit;font-size:11px;line-height:18px;color:var(--dsw-alias-label-tertiary);cursor:pointer;white-space:nowrap}
-.mwseat-sliderStop.on{color:var(--dsw-alias-label-primary);font-weight:500}
+.mwseat-sliderFill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,color-mix(in srgb,var(--dsw-alias-state-business-primary,#5c70c9) 38%,transparent),color-mix(in srgb,var(--dsw-alias-state-business-primary,#5c70c9) 88%,transparent));pointer-events:none}
+.mwseat-sliderTick{position:absolute;top:50%;width:4px;height:4px;border-radius:50%;transform:translate(-50%,-50%);background:var(--dsw-alias-label-dimmed);opacity:.5;pointer-events:none;transition:background-color .15s ease,opacity .15s ease}
+.mwseat-sliderTick.on{background:var(--dsw-alias-label-primary);opacity:.9}
+.mwseat-sliderThumb{position:absolute;top:50%;width:22px;height:22px;border-radius:999px;transform:translate(-50%,-50%);background:var(--dsw-alias-label-primary);border:1px solid rgb(255 255 255 / 28%);box-shadow:0 2px 6px rgb(0 0 0 / 32%),inset 0 1px 0 rgb(255 255 255 / 30%);pointer-events:none;transition:transform .15s ease}
+.mwseat-sliderRail.drag .mwseat-sliderThumb{transform:translate(-50%,-50%) scale(1.14)}
+.mwseat-sliderRail:not(.drag) .mwseat-sliderThumb{transition:left .14s ease,transform .15s ease}
+.mwseat-sliderRail:not(.drag) .mwseat-sliderFill,.mwseat-sliderRail:not(.drag) .mwseat-sliderTick{transition:left .14s ease,width .14s ease,background-color .15s ease,opacity .15s ease}
+.mwseat-sliderStops{position:relative;height:20px;margin-top:5px}
+.mwseat-sliderStop{position:absolute;border:0;background:transparent;padding:0;font:inherit;font-size:11px;line-height:18px;color:var(--dsw-alias-label-tertiary);cursor:pointer;white-space:nowrap;transition:color .15s ease}
+.mwseat-sliderStop:hover:not(:disabled){color:var(--dsw-alias-label-secondary)}
+.mwseat-sliderStop.on{color:var(--dsw-alias-state-business-primary,var(--dsw-alias-label-primary));font-weight:600}
 .mwseat-sliderStop:disabled{cursor:default;opacity:.6}
 .mwseat-list{overflow-y:auto;min-height:0;padding:0 0 2px}
 /* liquid-glass \u7684 panels \u9009\u62E9\u5668\u547D\u4E2D [role="menu"]\uFF1B\u6E05\u5355\u53EA\u662F dialog \u5185\u5185\u5BB9\u533A\uFF0C

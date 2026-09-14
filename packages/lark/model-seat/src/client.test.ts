@@ -283,7 +283,9 @@ describe("模型位渲染与选择", () => {
     expect(rail.props["aria-valuemax"]).toBe(1);
     expect(rail.props["aria-valuenow"]).toBe(1);
     expect(rail.props["aria-valuetext"]).toBe("High");
-    expect(findAll(tree, byClass("mwseat-sliderTick"))).toHaveLength(2);
+    const ticks = findAll(tree, byClass("mwseat-sliderTick"));
+    expect(ticks).toHaveLength(2);
+    expect(ticks.map((t) => String(t.props.className).includes("on"))).toEqual([true, true]); // 已越过档位的刻度点亮
     expect(findAll(tree, byClass("mwseat-sliderThumb"))[0]!.props.style).toMatchObject({ left: "calc(16px + (100% - 32px) * 1)" });
     expect(findAll(tree, byClass("mwseat-sliderStop")).map((s) => s.children[0])).toEqual(["Low", "High"]);
   });
