@@ -56,7 +56,7 @@
       const index = Math.min(n - 1, Math.max(0, drag ?? pending ?? active));
       const frac = (i) => n <= 1 ? 0.5 : i / (n - 1);
       const pos = (i) => `calc(${PAD}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
-      const fill = (i) => `calc(${PAD + HALF}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
+      const fill = (i) => `calc(${PAD + HALF + 5}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
       const indexAt = (clientX) => {
         const rect = trackRef.current?.getBoundingClientRect();
         if (rect === void 0 || rect.width <= PAD * 2 || n <= 1) return index;
@@ -125,16 +125,9 @@
         ),
         h(
           "div",
-          { className: "mwseat-sliderStops" },
-          rows.map((row, i) => h("button", {
-            key: `s:${row.key}`,
-            type: "button",
-            className: `mwseat-sliderStop${i === index ? " on" : ""}`,
-            disabled: busy,
-            ...row.description !== void 0 ? { title: row.description } : {},
-            style: { left: pos(i), transform: i === 0 ? "translateX(0)" : i === n - 1 ? "translateX(-100%)" : "translateX(-50%)" },
-            onClick: () => commit(i)
-          }, row.label))
+          { className: "mwseat-sliderValue", "aria-live": "polite", ...rows[index]?.description !== void 0 ? { title: rows[index].description } : {} },
+          h("span", { className: "mwseat-sliderValueName" }, rows[index]?.label),
+          h("span", { className: "mwseat-sliderValuePos" }, `${index + 1}/${n}`)
         )
       );
     };
@@ -363,11 +356,9 @@
 .mwseat-sliderRail.drag .mwseat-sliderThumb{transform:translate(-50%,-50%) scale(1.14)}
 .mwseat-sliderRail:not(.drag) .mwseat-sliderThumb{transition:left .14s ease,transform .15s ease}
 .mwseat-sliderRail:not(.drag) .mwseat-sliderFill,.mwseat-sliderRail:not(.drag) .mwseat-sliderTick{transition:left .14s ease,width .14s ease,background-color .15s ease,opacity .15s ease}
-.mwseat-sliderStops{position:relative;height:20px;margin-top:5px}
-.mwseat-sliderStop{position:absolute;border:0;background:transparent;padding:0;font:inherit;font-size:11px;line-height:18px;color:var(--dsw-alias-label-tertiary);cursor:pointer;white-space:nowrap;transition:color .15s ease}
-.mwseat-sliderStop:hover:not(:disabled){color:var(--dsw-alias-label-secondary)}
-.mwseat-sliderStop.on{color:var(--dsw-alias-state-business-primary,var(--dsw-alias-label-primary));font-weight:600}
-.mwseat-sliderStop:disabled{cursor:default;opacity:.6}
+.mwseat-sliderValue{display:flex;align-items:baseline;justify-content:center;gap:6px;height:20px;margin-top:5px;font-size:12px;line-height:18px}
+.mwseat-sliderValueName{color:var(--dsw-alias-state-business-primary,var(--dsw-alias-label-primary));font-weight:600}
+.mwseat-sliderValuePos{color:var(--dsw-alias-label-dimmed);font-size:11px}
 .mwseat-list{overflow-y:auto;min-height:0;padding:0 0 2px}
 /* liquid-glass \u7684 panels \u9009\u62E9\u5668\u547D\u4E2D [role="menu"]\uFF1B\u6E05\u5355\u53EA\u662F dialog \u5185\u5185\u5BB9\u533A\uFF0C
    \u538B\u5E73\u7B2C\u4E8C\u5C42\u9762\u677F\u907F\u514D\u53E0\u51FA\u4E24\u5C42\u5706\u89D2\u534A\u900F\u660E\u80CC\u666F\u3002 */

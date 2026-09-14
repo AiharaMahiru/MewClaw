@@ -287,9 +287,11 @@ describe("模型位渲染与选择", () => {
     expect(ticks).toHaveLength(2);
     expect(ticks.map((t) => String(t.props.className).includes("on"))).toEqual([true, true]); // 已越过档位的刻度点亮
     expect(findAll(tree, byClass("mwseat-sliderThumb"))[0]!.props.style).toMatchObject({ left: "calc(16px + (100% - 32px) * 1)" });
-    // 填充延伸到拇指右缘（中心 + 半径 11px），整段盖住白色拇指
-    expect(findAll(tree, byClass("mwseat-sliderFill"))[0]!.props.style).toMatchObject({ width: "calc(27px + (100% - 32px) * 1)" });
-    expect(findAll(tree, byClass("mwseat-sliderStop")).map((s) => s.children[0])).toEqual(["Low", "High"]);
+    // 填充延伸到拇指右缘再外延 5px（中心 16 + 半径 11 + 5），蓝色吞过白色拇指
+    expect(findAll(tree, byClass("mwseat-sliderFill"))[0]!.props.style).toMatchObject({ width: "calc(32px + (100% - 32px) * 1)" });
+    // 单行当前值：多档模型（如 sol 的 6 档）标签不再重叠
+    expect(findAll(tree, byClass("mwseat-sliderValueName"))[0]!.children).toEqual(["High"]);
+    expect(findAll(tree, byClass("mwseat-sliderValuePos"))[0]!.children).toEqual(["2/2"]);
   });
 
   it("滑条：拖动经 pointerdown/up 提交落点档位", () => {
@@ -321,27 +323,29 @@ describe("模型位渲染与选择", () => {
     const slider = createEffortSlider(fake.react as never);
     const rows = effortRows(MUSE, { provider: "deepseek-official", model: "muse-spark-1.3" });
     const tree = slider({ rows, busy: false, onPick }) as El;
-    const stops = findAll(tree, byClass("mwseat-sliderStop"));
-    (stops[0]!.props.onClick as () => void)();
+    const rail = findAll(tree, byClass("mwseat-sliderRail"))[0]!;
+    (rail.props.onKeyDown as (ev: unknown) => void)({ key: "Home", preventDefault: () => {} });
     await new Promise((resolve) => setTimeout(resolve, 0));
     const pendingSets = fake.sets[1]!;
     expect(pendingSets).toContain(0); // 落点 pending=0
     expect(pendingSets[pendingSets.length - 1]).toBe(null); // 失败后清除回退
   });
 
-  it("滑条：方向键与标签点击直达档位", () => {
+  it("滑条：方向键直达档位，当前档不重复提交", () => {
     const onPick = vi.fn();
     const slider = createEffortSlider(makeSliderReact().react as never);
     const rows = effortRows(MUSE, { provider: "deepseek-official", model: "muse-spark-1.3" });
     const tree = slider({ rows, busy: false, onPick }) as El;
     const rail = findAll(tree, byClass("mwseat-sliderRail"))[0]!;
-    (rail.props.onKeyDown as (ev: unknown) => void)({ key: "ArrowLeft", preventDefault: () => {} });
+    const key = (k: string) => (rail.props.onKeyDown as (ev: unknown) => void)({ key: k, preventDefault: () => {} });
+    key("ArrowLeft");
     expect(onPick).toHaveBeenLastCalledWith("low");
-    const stops = findAll(tree, byClass("mwseat-sliderStop"));
-    (stops[0]!.props.onClick as () => void)();
+    key("End"); // 已是末档（index 1），不重复提交
+    key("ArrowRight"); // 同样越界收敛到当前档
+    expect(onPick).toHaveBeenCalledTimes(1);
+    key("ArrowDown");
     expect(onPick).toHaveBeenLastCalledWith("low");
-    (stops[1]!.props.onClick as () => void)();
-    expect(onPick).toHaveBeenCalledTimes(2); // 点击当前档不重复提交
+    expect(onPick).toHaveBeenCalledTimes(2);
   });
 
   it("「更多」切换到模型清单视图", () => {

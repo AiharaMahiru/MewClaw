@@ -122,8 +122,8 @@ export function createEffortSlider(React: SeatReactApi): SeatSliderComponent {
     const frac = (i: number) => (n <= 1 ? 0.5 : i / (n - 1));
     /** 胶囊内行程：拇指中心从 PAD 到 width-PAD，用 calc 混算 px 与百分比。 */
     const pos = (i: number) => `calc(${PAD}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
-    /** 填充延到拇指右缘，蓝色整段盖住白色拇指而不是在中心被截断。 */
-    const fill = (i: number) => `calc(${PAD + HALF}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
+    /** 填充越过拇指右缘再外延 5px：蓝色整段吞过白色拇指并留一点尾巴。 */
+    const fill = (i: number) => `calc(${PAD + HALF + 5}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
     const indexAt = (clientX: number): number => {
       const rect = trackRef.current?.getBoundingClientRect();
       if (rect === undefined || rect.width <= PAD * 2 || n <= 1) return index;
@@ -185,16 +185,9 @@ export function createEffortSlider(React: SeatReactApi): SeatSliderComponent {
         h("div", { className: "mwseat-sliderFill", "aria-hidden": "true", style: { width: fill(index) } }),
         rows.map((row, i) => h("span", { key: `t:${row.key}`, className: `mwseat-sliderTick${i <= index ? " on" : ""}`, "aria-hidden": "true", style: { left: pos(i) } })),
         h("span", { className: "mwseat-sliderThumb", "aria-hidden": "true", style: { left: pos(index) } })),
-      h("div", { className: "mwseat-sliderStops" },
-        rows.map((row, i) => h("button", {
-          key: `s:${row.key}`,
-          type: "button",
-          className: `mwseat-sliderStop${i === index ? " on" : ""}`,
-          disabled: busy,
-          ...(row.description !== undefined ? { title: row.description } : {}),
-          style: { left: pos(i), transform: i === 0 ? "translateX(0)" : i === n - 1 ? "translateX(-100%)" : "translateX(-50%)" },
-          onClick: () => commit(i),
-        }, row.label))));
+      h("div", { className: "mwseat-sliderValue", "aria-live": "polite", ...(rows[index]?.description !== undefined ? { title: rows[index]!.description } : {}) },
+        h("span", { className: "mwseat-sliderValueName" }, rows[index]?.label),
+        h("span", { className: "mwseat-sliderValuePos" }, `${index + 1}/${n}`)));
   };
 }
 
@@ -409,11 +402,9 @@ export const SEAT_CSS = `
 .mwseat-sliderRail.drag .mwseat-sliderThumb{transform:translate(-50%,-50%) scale(1.14)}
 .mwseat-sliderRail:not(.drag) .mwseat-sliderThumb{transition:left .14s ease,transform .15s ease}
 .mwseat-sliderRail:not(.drag) .mwseat-sliderFill,.mwseat-sliderRail:not(.drag) .mwseat-sliderTick{transition:left .14s ease,width .14s ease,background-color .15s ease,opacity .15s ease}
-.mwseat-sliderStops{position:relative;height:20px;margin-top:5px}
-.mwseat-sliderStop{position:absolute;border:0;background:transparent;padding:0;font:inherit;font-size:11px;line-height:18px;color:var(--dsw-alias-label-tertiary);cursor:pointer;white-space:nowrap;transition:color .15s ease}
-.mwseat-sliderStop:hover:not(:disabled){color:var(--dsw-alias-label-secondary)}
-.mwseat-sliderStop.on{color:var(--dsw-alias-state-business-primary,var(--dsw-alias-label-primary));font-weight:600}
-.mwseat-sliderStop:disabled{cursor:default;opacity:.6}
+.mwseat-sliderValue{display:flex;align-items:baseline;justify-content:center;gap:6px;height:20px;margin-top:5px;font-size:12px;line-height:18px}
+.mwseat-sliderValueName{color:var(--dsw-alias-state-business-primary,var(--dsw-alias-label-primary));font-weight:600}
+.mwseat-sliderValuePos{color:var(--dsw-alias-label-dimmed);font-size:11px}
 .mwseat-list{overflow-y:auto;min-height:0;padding:0 0 2px}
 /* liquid-glass 的 panels 选择器命中 [role="menu"]；清单只是 dialog 内内容区，
    压平第二层面板避免叠出两层圆角半透明背景。 */
