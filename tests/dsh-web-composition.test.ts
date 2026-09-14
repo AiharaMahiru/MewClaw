@@ -219,14 +219,16 @@ describe("官方 dsh Web 组合", () => {
     expect(client).toContain('mewclaw-account-session-buttons');
     expect(client).toContain("\\u5207\\u6362\\u8D26\\u53F7");
     expect(client).toContain("\\u9000\\u51FA\\u767B\\u5F55");
-    expect(client).toContain('.mewclaw-account-center{box-sizing:border-box;display:flex;flex-direction:column;gap:20px');
+    expect(client).toContain('.mewclaw-account-center{box-sizing:border-box;display:flex;flex-direction:column;gap:18px');
     expect(client).toContain('.mewclaw-account-profile{display:grid;grid-template-columns:auto minmax(0,1fr) auto');
     expect(client).toContain('div:has(>div>div>div>.mewclaw-account-center){flex-direction:column}');
     expect(client).not.toContain('[data-dsh-surface="settings"]:has(.mewclaw-account-center)');
     expect(client).not.toContain('label: "账户概览"');
     expect(client).toContain('priority: -1');
     expect(client).not.toContain('id: "mewclaw-security"');
-    expect(client).not.toContain('id: "mewclaw-feishu"');
+    // 账户中心与「飞书连接」是分离的两个 settings.section（feishu-bots SPEC）。
+    expect(client).toContain('id: "mewclaw-feishu"');
+    expect(client).toContain('order: -20');
     expect(client).not.toContain('id: "mewclaw-usage"');
     expect(client).not.toContain('id: "mewclaw-admin"');
     expect(client).not.toContain('"settings.general.item"');

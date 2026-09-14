@@ -30,7 +30,7 @@ release 根禁止出现 `patches/` 或 `pnpm.patchedDependencies`；依赖包自
 - **现状**：`@deepseek-ai` npm 作用域需组织权限，本仓库暂不具备 → **不发布 npm 包**；
 - **分发策略**：仓库私有，按 **`file:` 依赖 + git 归档** 分发（部署机 clone/归档后
   `pnpm install --frozen-lockfile` 即可运行）；dsh 生态包保持精确锁版本
-  （当前源码核心包为 0.1.5-rc.1，`pnpm-lock.yaml` 固化；不等同于生产版本）；
+  （当前源码核心包为 0.1.5-rc.2，`pnpm-lock.yaml` 固化；不等同于生产版本）；
 - **升级窗口**：dsh rc 升级作为里程碑前置任务；更新精确版本后执行
   `pnpm install --frozen-lockfile`、官方完整性、品牌、组合与全量门禁。任何官方包
   内容漂移、自有插件公开 seam 不兼容或 release manifest 校验失败都必须使升级失败；

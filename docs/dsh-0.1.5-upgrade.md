@@ -1,5 +1,7 @@
 # DSH 0.1.5-rc.1 源码升级
 
+> 后续状态：生态已升级至 `0.1.5-rc.2`（commit `e2a4987` 及适配 `3214206`），相关改动均已合入 master 并推送；生产经 R4–R13 演进至 `R13-admin-ui-20260912`。本文件保留 rc.1 升级的过程记录。
+
 状态：2026-09-10 已经用户确认切换到生产 `R3-dsh-015-rc1-presetfix-20260910`，基础健康检查通过，等待用户实际功能测试；尚未提交或推送。开发目录 `/opt/dsh/upgrade-015-source`，分支 `upgrade/dsh-0.1.5-rc.1`；目标为 master，不直接同步 desktop。
 
 生产发布证据：候选90790个文件摘要一致；六个DSH服务的实际cwd均为新release，NRestarts均为0；公网首页、healthz、manifest均HTTP200。停服备份位于 `/opt/dsh/backups/R3-before-dsh-015-20260910`，会话tar经compare和SHA-256校验。新增三个已验证v3文件后，最新生产95个会话全部通过官方只读恢复；旧日志全部保留。PostgreSQL、Nginx、SSH进程基线未变。尚未证明真实模型续聊、工具执行、飞书交互和子代理冷恢复，用户自行实际测试后再决定提交推送。
