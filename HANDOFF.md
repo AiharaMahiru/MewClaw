@@ -98,7 +98,7 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 ## 推送状态与限制
 
 - 本轮改动基于 `origin/desktop@3d88e2d`，合并提交为 `ce3d0cc`，随后纳入 rc.2 依赖、进程内切换、Release 命名、ASAR fallback、测试和文档更新。
-- 桌面同步实现基线 `1133a68e0c1bf23e3ef720916d8099302ea1e9fd` 已推送并由 `git ls-remote` 核验；本交接更新随后随文档提交推送，最终远端值以同一命令的最新输出为准；`desktop` 远端仍为 `3d88e2dcaed107b490a7863faa51aff792973ac7`。
+- 本轮实现与交接基线 `bd873dcd229b0da2eba373627ee05490081ec2be` 已推送并由 `git ls-remote` 核验（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成）；`desktop` 远端仍为 `3d88e2dcaed107b490a7863faa51aff792973ac7`。
 - 后续若继续修改源码或交接文档，完成提交后重新执行：
 
   ```text
