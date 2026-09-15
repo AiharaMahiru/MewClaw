@@ -77,5 +77,9 @@ describe("dsh-lark-atw-brand", () => {
     expect(html).toContain('sessionStorage.setItem("mewclaw.boot.v1","1")');
     expect(html).toContain("setTimeout(remove,1600)");
     expect(html).toContain("pointer-events:none");
+    // 移动适配覆盖层样式（§6 移动适配）
+    expect(html).toContain("@media(max-width:768px)");
+    expect(html).toContain('[class*="_sidebarCol"]{position:fixed');
+    expect(html).toContain('[class*="_centerCol"]{margin-left:55px}');
   });
 });
