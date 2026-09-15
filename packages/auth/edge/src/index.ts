@@ -1,5 +1,6 @@
 export * from "./config.js";
 export * from "./cookies.js";
+export * from "./desktop-inference.js";
 export * from "./feishu.js";
 export * from "./login-page.js";
 export * from "./mail.js";

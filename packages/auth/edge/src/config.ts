@@ -24,7 +24,7 @@ export interface AuthEdgeConfig {
   proxyBodyLimit?: number;
   /** 桌面二进制同步使用独立有界体积，不扩大普通 RPC 限制。 */
   desktopBodyLimit?: number;
-  /** 桌面模型流总时限，毫秒。 */
+  /** 桌面推理 SSE 调用上限；默认 120 秒，界于 1 秒与 10 分钟。 */
   desktopInferenceTimeoutMs?: number;
   /** 默认开启；显式关闭仅用于不提供模型的隔离环境。 */
   promptAudit?: { enabled: boolean; timeoutMs: number; maxConcurrent: number };
@@ -110,10 +110,10 @@ export function resolveAuthConfig(environment: Record<string, string | undefined
     requestBodyLimit: boundedInteger(environment.AUTH_BODY_LIMIT, DEFAULT_BODY_LIMIT, 1024, 4 * 1024 * 1024),
     proxyBodyLimit: boundedInteger(environment.AUTH_PROXY_BODY_LIMIT, DEFAULT_PROXY_BODY_LIMIT, 1024 * 1024, 512 * 1024 * 1024),
     desktopBodyLimit: boundedInteger(environment.AUTH_DESKTOP_BODY_LIMIT, 8 * 1024 * 1024, 1024, 16 * 1024 * 1024),
-    desktopInferenceTimeoutMs: boundedInteger(environment.AUTH_DESKTOP_INFERENCE_TIMEOUT_MS, 120000, 1000, 600000),
+    desktopInferenceTimeoutMs: boundedInteger(environment.AUTH_DESKTOP_INFERENCE_TIMEOUT_MS, 120_000, 1_000, 600_000),
     promptAudit: {
       enabled: auditEnabled(environment.AUTH_PROMPT_AUDIT_ENABLED),
-      timeoutMs: boundedInteger(environment.AUTH_PROMPT_AUDIT_TIMEOUT_MS, 15_000, 100, 60_000),
+      timeoutMs: boundedInteger(environment.AUTH_PROMPT_AUDIT_TIMEOUT_MS, 10_000, 100, 10_000),
       maxConcurrent: boundedInteger(environment.AUTH_PROMPT_AUDIT_MAX_CONCURRENT, 4, 1, 32),
     },
     userModelEncryptionKey: required(environment.AUTH_USER_MODEL_ENCRYPTION_KEY, "AUTH_USER_MODEL_ENCRYPTION_KEY"),

@@ -1,9 +1,9 @@
 {
-  "name": "dsh-lark-atw-brand",
+  "name": "dsh-lark-mewclaw-brand-desktop",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "MewClaw 品牌插件：填充官方品牌槽位并提供 Web 元数据与图标",
+  "description": "MewClaw 品牌桌面变体：与 Web 版共享商标/槽位，关闭移动端适配样式",
   "exports": {
     ".": {
       "types": "./lib/types/index.d.ts",
@@ -27,6 +27,9 @@
       ],
       "platform": "web"
     }
+  },
+  "dependencies": {
+    "dsh-lark-mewclaw-brand": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.2",

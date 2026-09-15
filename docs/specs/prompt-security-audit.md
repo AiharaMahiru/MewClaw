@@ -42,7 +42,7 @@ Auth 使用独立 Cordis Context 挂载官方设置、凭证和 DeepSeek Provide
 独立审计调用不挂载 Agent 会话、工具或 Worker，不写入 DSH 会话上下文或 Auth 内容日志。
 
 启用配置：AUTH_PROMPT_AUDIT_ENABLED，缺省 true，显式 false 仅用于隔离环境。
-AUTH_PROMPT_AUDIT_TIMEOUT_MS 缺省 15000，范围 100–60000。
+AUTH_PROMPT_AUDIT_TIMEOUT_MS 缺省 10000，范围 100–10000（审计延迟硬上限 10 秒，超时即失败关闭）。
 AUTH_PROMPT_AUDIT_MAX_CONCURRENT 缺省 4，范围 1–32；并发满立即失败关闭，不排无限队列。
 启动器必须传入原始分层环境快照；生产启用却没有模型工厂时启动失败。
 boot-check 不初始化模型，不解析审计凭证，不产生外部调用。

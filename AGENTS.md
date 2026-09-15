@@ -40,7 +40,7 @@
 - 工作区包名 `dsh-lark-*`（生态惯例，参考 dsh-cc-tui）；能力缝包可用 `dsh-knowledge-*` / `dsh-memory-*` / `dsh-sandbox-oci`。
 - 当前不占用 `@deepseek-ai` 发布作用域；私有仓库采用 workspace `file:` 依赖 + git/release archive 分发，官方依赖锁定精确版本。
 - 依赖的 dsh 包锁定精确版本（M0 固化 `pnpm-lock.yaml`）。
-- **品牌插件是升级硬门禁**：官方 UI 与 Web 包必须保持原样；MewClaw 品牌仅通过 `dsh-lark-atw-brand` 占据公开 slots，并通过 WebServer transform/route 提供元数据与资源。`pnpm install`、`pnpm verify:dsh-brand` 与官方完整性门禁未通过前不得接受升级。
+- **品牌插件是升级硬门禁**：官方 UI 与 Web 包必须保持原样；MewClaw 品牌仅通过 `dsh-lark-mewclaw-brand` 占据公开 slots，并通过 WebServer transform/route 提供元数据与资源。`pnpm install`、`pnpm verify:dsh-brand` 与官方完整性门禁未通过前不得接受升级。
 
 ## 运行态验收经验
 

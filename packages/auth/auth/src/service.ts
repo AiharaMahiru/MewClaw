@@ -481,6 +481,18 @@ export class AuthService {
   }
 
   /**
+   * 仅供 Auth Edge 桌面推理：解析本人 profile 内任意已声明模型（当前版本）。
+   * 返回路由含服务端 API Key，仅可在请求作用域内使用，禁止透出。
+   */
+  async resolveMyProfileModelRoute(
+    userId: string,
+    profileId: string,
+    model?: string,
+  ): Promise<UserModelRuntimeRoute | undefined> {
+    return this.#modelProfiles.resolveProfileModelRoute(userId, profileId, model);
+  }
+
+  /**
    * 仅供 Worker loopback 回调。版本和模型必须与此前的 scope 引用相同，避免
    * 排队 prompt 被后来的账户设置重定向到别的端点或密钥。
    */

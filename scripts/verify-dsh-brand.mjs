@@ -34,15 +34,16 @@ function requireMatch(value, expected, label) {
   if (typeof value !== "string" || !value.includes(expected)) failures.push(`${label}: 缺少 ${expected}`);
 }
 
-const [workspacePackage, dshPackage, brandPackage, brandClient, brandHost, builtBrandClient, builtBrandHost, builtBrandTypes, webBundle, adminIndexHtml, adminApp, adminStyles] = await Promise.all([
+const [workspacePackage, dshPackage, brandPackage, brandClient, brandClientLoader, brandHost, builtBrandClient, builtBrandHost, builtBrandTypes, webBundle, adminIndexHtml, adminApp, adminStyles] = await Promise.all([
   readJson("package.json", "工作区 package.json"),
   readJson("node_modules/@deepseek-ai/dsh/package.json", "已安装 DSH package.json"),
-  readJson("packages/lark/atw-brand/package.json", "品牌插件 package.json"),
-  readRequired("packages/lark/atw-brand/src/client.ts", "品牌客户端插件"),
-  readRequired("packages/lark/atw-brand/src/index.ts", "品牌 Host 插件"),
-  readRequired("packages/lark/atw-brand/client.js", "品牌客户端发布入口"),
-  readRequired("packages/lark/atw-brand/lib/index.js", "品牌 Host 发布入口"),
-  readRequired("packages/lark/atw-brand/lib/types/index.d.ts", "品牌发布声明"),
+  readJson("packages/lark/mewclaw-brand/package.json", "品牌插件 package.json"),
+  readRequired("packages/lark/mewclaw-brand/src/client-impl.ts", "品牌客户端槽位实现"),
+  readRequired("packages/lark/mewclaw-brand/src/client.ts", "品牌客户端注册"),
+  readRequired("packages/lark/mewclaw-brand/src/index.ts", "品牌 Host 插件"),
+  readRequired("packages/lark/mewclaw-brand/client.js", "品牌客户端发布入口"),
+  readRequired("packages/lark/mewclaw-brand/lib/index.js", "品牌 Host 发布入口"),
+  readRequired("packages/lark/mewclaw-brand/lib/types/index.d.ts", "品牌发布声明"),
   readRequired("packages/bundle/web/cordis.patch.yml", "Web bundle 插件 roster"),
   readRequired("apps/admin-web/index.html", "管理台 HTML 入口"),
   readRequired("apps/admin-web/src/App.tsx", "管理台品牌组件"),
@@ -62,12 +63,12 @@ for (const packageName of officialBrandPackages) {
 }
 
 if (workspacePackage?.pnpm?.patchedDependencies !== undefined) failures.push("package.json 不得声明 patchedDependencies");
-if (brandPackage?.name !== "dsh-lark-atw-brand") failures.push("品牌插件 package identity 错误");
+if (brandPackage?.name !== "dsh-lark-mewclaw-brand") failures.push("品牌插件 package identity 错误");
 if (brandPackage?.dsh?.client?.platform !== "web") failures.push("品牌插件缺少 Web client 声明");
 for (const slot of ["conversation.hero.brand.mark", "sidebar.brand.mark", "sidebar.brand.name"]) {
   requireMatch(brandClient, slot, `品牌公开槽位 ${slot}`);
 }
-requireMatch(brandClient, 'id: "dsh-lark-atw-brand"', "品牌客户端注册");
+requireMatch(brandClientLoader, 'id: "dsh-lark-mewclaw-brand"', "品牌客户端注册");
 requireMatch(brandHost, "ctx.webServer.tapIndex", "品牌 HTML transform");
 requireMatch(brandHost, "ctx.webServer.register", "品牌静态资源路由");
 requireMatch(brandHost, 'FAVICON_PATH = "/mewclaw-brand/favicon.svg"', "品牌 favicon 独占路由");
@@ -81,7 +82,7 @@ if (brandHost?.includes("grid-template-columns:104px") || builtBrandHost?.includ
   failures.push("品牌 Host 不得覆盖官方 Hero 网格布局");
 }
 requireMatch(webBundle, "id: ui-brand-official\n  disabled: true", "禁用官方品牌 occupant");
-requireMatch(webBundle, "name: dsh-lark-atw-brand", "启用 MewClaw 品牌插件");
+requireMatch(webBundle, "name: dsh-lark-mewclaw-brand", "启用 MewClaw 品牌插件");
 
 for (const source of [brandClient, brandHost]) {
   if (source?.includes("node_modules/")) failures.push("品牌插件不得读写 node_modules 官方产物");
@@ -91,7 +92,7 @@ requireMatch(adminIndexHtml, 'rel="icon" type="image/svg+xml" href="/favicon.svg
 requireMatch(adminApp, 'viewBox="0 0 512 512"', "管理台 MewClaw 商标几何");
 requireMatch(adminApp, 'className="mewclaw-mark-ink"', "管理台商标墨色分层");
 requireMatch(adminStyles, "body[data-ds-dark-theme] .mewclaw-brand-mark", "管理台商标自动深色反转");
-requireMatch(adminStyles, ".hHd-Xa_brandMark {", "管理台商标样式");
+requireMatch(adminStyles, ".mewclaw-brand-mark {", "管理台商标样式");
 
 if (failures.length > 0) {
   console.error("[verify-dsh-brand] MewClaw 品牌插件校验失败：");

@@ -1,7 +1,4 @@
 import type { Context as ClientContext } from "@deepseek-ai/cordis";
-import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
-import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
-import type {} from "@deepseek-ai/dsh-client-ui-sidebar/client";
 import type { ReactNode } from "react";
 
 import {
@@ -10,25 +7,11 @@ import {
   type ReactApi,
 } from "./mark.js";
 
-type ModuleLoader = {
-  load(input: {
-    id: string;
-    factory: (require: (specifier: string) => unknown) => {
-      apply: (ctx: ClientContext) => void;
-      inject: string[];
-    };
-  }): void;
-};
-
-type BrandReactApi = ReactApi & {
+export type BrandReactApi = ReactApi & {
   useState<T>(initializer: () => T): [T, (value: T) => void];
 };
 
 const HERO_COPY = ["该做点什么呢~ Mew", "灵感正伸着懒腰", "把难题交给猫爪", "今天也要聪明一点"] as const;
-
-const loader = (globalThis as typeof globalThis & {
-  __ModuleLoader__?: ModuleLoader;
-}).__ModuleLoader__;
 
 /** 只占据会话首屏中央标识，不接触会话、模型或网络状态。 */
 export function applyBrand(ctx: ClientContext, React: BrandReactApi): void {
@@ -53,14 +36,3 @@ function registerMark(ctx: ClientContext, React: ReactApi, slot: "sidebar.brand.
     className: [props.className, ownClass].filter(Boolean).join(" "),
   }) as ReactNode));
 }
-
-loader?.load({
-  id: "dsh-lark-atw-brand",
-  factory: (require) => {
-    const React = require("react") as BrandReactApi;
-    return {
-      apply: (ctx) => applyBrand(ctx, React),
-      inject: ["slots"],
-    };
-  },
-});

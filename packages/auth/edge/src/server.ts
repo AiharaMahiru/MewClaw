@@ -6,10 +6,11 @@ import { URL } from "node:url";
 
 import { accessPolicy } from "dsh-lark-auth";
 import type { AuthService, AuthUser } from "dsh-lark-auth";
-import { FAVICON_PATH as BRAND_FAVICON_PATH, MANIFEST_PATH as BRAND_MANIFEST_PATH } from "dsh-lark-atw-brand";
+import { FAVICON_PATH as BRAND_FAVICON_PATH, MANIFEST_PATH as BRAND_MANIFEST_PATH } from "dsh-lark-mewclaw-brand";
 
 import { handleAdminData } from "./admin-routes.js";
 import { AuthRouteHandlers } from "./auth-routes.js";
+import type { DesktopSharedRuntime } from "./desktop-inference.js";
 import { filterClientPlugins, injectRemoteSettings } from "./client-manifest.js";
 import { DEFAULT_PREVIEW_URL, DEFAULT_PROXY_BODY_LIMIT, DEFAULT_SESSION_TTL_MS, type AuthEdgeConfig } from "./config.js";
 import { appendCookie, CSRF_COOKIE, newCsrfToken, readCookie, sessionCookieName } from "./cookies.js";
@@ -61,6 +62,8 @@ export interface AuthEdgeServerOptions {
   service: AuthService;
   roots?: { user: string; admin: string };
   promptAuditor?: PromptAuditor;
+  /** 部署侧共享模型目录；未装配时桌面 `shared/*` 选择器 fail-closed 404。 */
+  sharedModels?: DesktopSharedRuntime;
 }
 
 export class AuthEdgeServer {
@@ -97,6 +100,7 @@ export class AuthEdgeServer {
       loginGuard: this.#loginGuard,
       generalLimiter: this.#generalLimiter,
       promptAuditor: options.promptAuditor,
+      sharedModels: options.sharedModels,
       current: (req) => this.current(req),
       ensureCsrf: (req, cookies) => this.ensureCsrf(req, cookies),
       refreshSessionCookie: (req, cookies) => this.refreshSessionCookie(req, cookies),

@@ -29,6 +29,7 @@ export interface BillingService {
   recordUsage(input: UsageInput): Promise<UsageCharge>;
   quota(scope: Scope, at?: Date): Promise<QuotaSnapshot>;
   setQuota(scope: Scope, monthlyLimitMicroCredits: number): Promise<QuotaSnapshot>;
+  resetUsage(scope: Scope): Promise<QuotaSnapshot>;
   listPrices(): Promise<ModelPrice[]>;
   setPrice(price: ModelPrice): Promise<ModelPrice>;
   aggregate(filter: UsageAggregateFilter): Promise<UsageAggregate[]>;
@@ -83,9 +84,15 @@ export class DefaultBillingService implements BillingService {
   async quota(scope: Scope, at = new Date()): Promise<QuotaSnapshot> {
     scope = this.billingScope(scope);
     const userScope = billingUserScope(scope);
-    const charges = await this.store.listCharges({ scope, userId: scope.userId, from: new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1)) });
+    const [charges, epoch] = await Promise.all([
+      this.store.listCharges({ scope, userId: scope.userId, from: new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1)) }),
+      this.store.getUsageEpoch(userScope),
+    ]);
+    const epochMs = epoch ? Date.parse(epoch) : undefined;
     const period = periodStartFor(at);
-    const used = charges.filter((charge) => charge.periodStart === period).reduce((sum, charge) => sum + charge.totalMicroCredits, 0);
+    const used = charges
+      .filter((charge) => charge.periodStart === period && (epochMs === undefined || Date.parse(charge.recordedAt) >= epochMs))
+      .reduce((sum, charge) => sum + charge.totalMicroCredits, 0);
     const configured = await this.store.getQuotaPolicy(userScope);
     const limit = configured ?? this.defaultMonthlyLimitMicroCredits;
     return {
@@ -104,6 +111,12 @@ export class DefaultBillingService implements BillingService {
     return this.quota(scope);
   }
 
+  async resetUsage(scope: Scope): Promise<QuotaSnapshot> {
+    scope = this.billingScope(scope);
+    await this.store.setUsageEpoch(billingUserScope(scope), new Date().toISOString());
+    return this.quota(scope);
+  }
+
   async listPrices(): Promise<ModelPrice[]> {
     const stored = await this.store.listPrices();
     const overrides = new Map(stored.map((price) => [`${price.provider}\0${price.model}`, price]));
@@ -119,9 +132,17 @@ export class DefaultBillingService implements BillingService {
   }
 
   async aggregate(filter: UsageAggregateFilter): Promise<UsageAggregate[]> {
-    const charges = await this.store.listCharges({ ...filter, scope: this.billingScope(filter.scope) });
+    const scope = this.billingScope(filter.scope);
+    const [charges, epochs] = await Promise.all([
+      this.store.listCharges({ ...filter, scope }),
+      this.store.listUsageEpochs({ tenantId: scope.tenantId, botId: scope.botId, deploymentId: scope.deploymentId }),
+    ]);
+    const epochByUser = new Map(epochs.map((entry) => [entry.userId, Date.parse(entry.epoch)] as const));
     const groups = new Map<string, UsageAggregate>();
     for (const charge of charges) {
+      // 聚合明细同样以用量纪元为界：重置前的账本保留在表里，但不再计入展示值。
+      const epoch = epochByUser.get(charge.scope.userId);
+      if (epoch !== undefined && Date.parse(charge.recordedAt) < epoch) continue;
       const key = [charge.periodStart, charge.scope.userId, charge.provider, charge.model].join("\0");
       const current = groups.get(key) ?? {
         periodStart: charge.periodStart,

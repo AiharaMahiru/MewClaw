@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc -b && node scripts/build-web-auth-client.mjs",
     "clean": "tsc -b --clean",
-    "postinstall": "tsc -b packages/lark/atw-brand && node scripts/verify-dsh-brand.mjs",
+    "postinstall": "tsc -b packages/lark/mewclaw-brand packages/lark/mewclaw-brand-desktop && node scripts/verify-dsh-brand.mjs",
     "verify:dsh-brand": "node scripts/verify-dsh-brand.mjs",
     "verify:official-integrity": "node scripts/verify-official-integrity.mjs",
     "dev:gateway": "node --import tsx/esm apps/lark-gateway/src/main.ts",
@@ -116,7 +116,8 @@
     "dsh-lark-admin-app": "workspace:*",
     "dsh-lark-admin-bundle": "workspace:*",
     "dsh-lark-approval": "workspace:*",
-    "dsh-lark-atw-brand": "workspace:*",
+    "dsh-lark-mewclaw-brand": "workspace:*",
+    "dsh-lark-mewclaw-brand-desktop": "workspace:*",
     "dsh-lark-auth": "workspace:*",
     "dsh-lark-auth-edge": "workspace:*",
     "dsh-lark-base": "workspace:*",

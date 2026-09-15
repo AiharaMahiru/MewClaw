@@ -3,8 +3,13 @@ import type { ServerResponse } from "node:http";
 import type { Context } from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-host-webserver";
 
-export const name = "dsh-lark-atw-brand";
+export const name = "dsh-lark-mewclaw-brand";
 export const inject = ["webServer"];
+
+/** 端形态选项：desktop 变体（mewclaw-brand-desktop）关闭移动适配样式。 */
+export interface MewClawBrandOptions {
+  mobile?: boolean;
+}
 
 export const PRODUCT_NAME = "MewClaw Harness";
 export const FAVICON_PATH = "/mewclaw-brand/favicon.svg";
@@ -14,6 +19,10 @@ const MANIFEST = JSON.stringify({ id: "/", name: PRODUCT_NAME, short_name: "MewC
 const BRAND_STYLE = `.mewclaw-sidebar-name{font-family:"Maple Mono NF CN",monospace;font-weight:600}.mewclaw-brand-mark{--mewclaw-mark-bg:#fff;--mewclaw-mark-ink:#181717}.mewclaw-mark-bg{fill:var(--mewclaw-mark-bg)}.mewclaw-mark-ink{fill:var(--mewclaw-mark-ink);stroke:var(--mewclaw-mark-ink)}.mewclaw-mark-cutout{fill:var(--mewclaw-mark-bg);stroke:var(--mewclaw-mark-bg)}body[data-ds-dark-theme] .mewclaw-brand-mark{--mewclaw-mark-bg:#181717;--mewclaw-mark-ink:#fff}`;
 const STROKE_ONLY_STYLE = `.mewclaw-mark-ink[fill="none"],.mewclaw-mark-cutout[fill="none"],g.mewclaw-mark-ink,g.mewclaw-mark-cutout{fill:none}`;
 const HERO_STYLE = `.mewclaw-hero-brand{display:inline-flex;align-items:center;gap:12px;white-space:nowrap}.mewclaw-hero-copy{display:inline-block;font-size:22px;font-weight:600;line-height:32px;letter-spacing:-.02em}span:has(.mewclaw-hero-brand)+span{display:none}.mewclaw-sidebar-mark{width:24px;height:24px}`;
+// 官方前端无移动断点：侧栏列在手机上是侧推挤压而非覆盖。利用 CSS Module 稳定后缀
+// （<hash>_<name>，重建仅哈希变化）把侧栏改为 fixed 覆盖；侧栏脱离 grid 后
+// centerCol 会掉进 56px 的第一轨，需 grid-column:1/-1 跨全行再按收起态栏宽让位。
+const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh}[class*="_centerCol"]{grid-column:1/-1;margin-left:55px}}`;
 const BOOT_STYLE = `html.mewclaw-boot-seen .mewclaw-boot{display:none}.mewclaw-boot{position:fixed;z-index:2147483647;inset:0;display:grid;place-items:center;pointer-events:none;background:#f5f5f7;color:#181717;animation:mewclaw-boot-away .32s cubic-bezier(.4,0,1,1) 1.05s forwards}.mewclaw-boot-inner{display:grid;justify-items:center;gap:24px;animation:mewclaw-boot-arrive .52s cubic-bezier(.22,1,.36,1) both}.mewclaw-boot-logo{width:88px;height:88px;border-radius:50%;filter:drop-shadow(0 12px 24px rgb(0 0 0/.12))}.mewclaw-boot-track{width:112px;height:3px;overflow:hidden;border-radius:999px;background:rgb(24 23 23/.12)}.mewclaw-boot-progress{display:block;width:42%;height:100%;border-radius:inherit;background:currentColor;animation:mewclaw-boot-progress .82s cubic-bezier(.2,.8,.2,1) .14s both}@keyframes mewclaw-boot-arrive{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}@keyframes mewclaw-boot-progress{from{transform:translateX(-110%)}to{transform:translateX(250%)}}@keyframes mewclaw-boot-away{to{opacity:0;visibility:hidden}}body[data-ds-dark-theme] .mewclaw-boot{background:#18181a;color:#fff}@media(prefers-color-scheme:dark){html:not([data-ds-theme=light]) .mewclaw-boot{background:#18181a;color:#fff}}@media(prefers-reduced-motion:reduce){.mewclaw-boot,.mewclaw-boot-inner,.mewclaw-boot-progress{animation:none}.mewclaw-boot{opacity:0;visibility:hidden}}`;
 const BOOT_MARKUP = `<div class="mewclaw-boot" aria-hidden="true"><div class="mewclaw-boot-inner"><img class="mewclaw-boot-logo" src="${FAVICON_PATH}" alt=""><span class="mewclaw-boot-track"><span class="mewclaw-boot-progress"></span></span></div></div>`;
 const BOOT_HEAD_SCRIPT = `<script data-mewclaw-boot>try{if(sessionStorage.getItem("mewclaw.boot.v1"))document.documentElement.classList.add("mewclaw-boot-seen")}catch{}</script>`;
@@ -21,13 +30,14 @@ const BOOT_END_SCRIPT = `<script data-mewclaw-boot-end>(()=>{const boot=document
 const FAVICON_RESPONSE = FAVICON_SVG.replace("</style>", `.ink[fill="none"],.cutout[fill="none"],g.ink,g.cutout{fill:none}</style>`);
 
 /** Host 品牌资源与 HTML 元数据均通过 WebServer 的公开路由/transform 扩展点提供。 */
-export function apply(ctx: Context): void {
+export function apply(ctx: Context, options?: MewClawBrandOptions): void {
+  const mobileStyle = options?.mobile === false ? "" : MOBILE_STYLE;
   ctx.effect(() => ctx.webServer.tapIndex((html) => html
     .replace(/<html(?:\s+lang="[^"]*")?>/u, '<html lang="zh-CN">')
     .replace(/<title>[^<]*<\/title>/u, `<title>${PRODUCT_NAME}</title>`)
     .replace(/(<link\b[^>]*rel="icon"[^>]*href=")[^"]*(")/u, `$1${FAVICON_PATH}$2`)
     .replace(/(<link\b[^>]*rel="manifest"[^>]*href=")[^"]*(")/u, `$1${MANIFEST_PATH}$2`)
-    .replace("</head>", `${BOOT_HEAD_SCRIPT}<style data-mewclaw-brand>${BRAND_STYLE}${STROKE_ONLY_STYLE}${HERO_STYLE}${BOOT_STYLE}</style></head>`)
+    .replace("</head>", `${BOOT_HEAD_SCRIPT}<style data-mewclaw-brand>${BRAND_STYLE}${STROKE_ONLY_STYLE}${HERO_STYLE}${mobileStyle}${BOOT_STYLE}</style></head>`)
     .replace(/<body([^>]*)>/u, `<body$1>${BOOT_MARKUP}`)
     .replace("</body>", `${BOOT_END_SCRIPT}</body>`)));
   ctx.effect(() => ctx.webServer.register({ kind: "exact", path: FAVICON_PATH, handler: (_req, res) => respond(res, "image/svg+xml; charset=utf-8", FAVICON_RESPONSE) }));

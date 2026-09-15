@@ -73,6 +73,31 @@ describe("DefaultBillingService", () => {
     expect(charge.totalMicroCredits).toBe(550_000);
   });
 
+  it("resetUsage 通过纪元清零当月已用，账本与额度保持不变", async () => {
+    const { service, store } = create(1);
+    // 重置前 2 秒入账，保证 charge.recordedAt 严格早于纪元（同毫秒会被 >= 边界计入）。
+    const recordedAt = new Date(Date.now() - 2_000);
+    const input = {
+      scope: scope("user-a"), runId: "run-reset", turn: 0, step: 0,
+      provider: "deepseek", model: "deepseek-chat",
+      usage: { inputTokens: 1_000_000, outputTokens: 0 },
+      recordedAt,
+    };
+    const charge = await service.recordUsage(input);
+    expect(charge.totalMicroCredits).toBeGreaterThan(0);
+    const before = await service.quota(input.scope, recordedAt);
+    expect(before.usedMicroCredits).toBe(charge.totalMicroCredits);
+
+    const after = await service.resetUsage(input.scope);
+    expect(after.usedMicroCredits).toBe(0);
+    expect(after.remainingMicroCredits).toBe(after.monthlyLimitMicroCredits);
+    // 账本行仍在（审计不丢），额度策略不受影响
+    expect(await store.findCharge([input.scope.tenantId, input.scope.botId, input.scope.deploymentId, input.scope.userId, input.scope.conversationId, input.runId, input.turn, input.step, input.provider, input.model].join("\0"))).toBeDefined();
+    // 纪元之后的新用量正常累计
+    const again = await service.recordUsage({ ...input, runId: "run-reset-2", recordedAt: new Date() });
+    expect((await service.quota(input.scope, recordedAt)).usedMicroCredits).toBe(again.totalMicroCredits);
+  });
+
   it("隔离不同用户和会话，并在额度耗尽时拒绝新运行", async () => {
     const { service } = create(1);
     // 固定在本次运行的自然月，避免测试跨月后把历史账单正确排除却误判为失败。

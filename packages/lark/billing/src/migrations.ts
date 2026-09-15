@@ -56,6 +56,19 @@ CREATE INDEX IF NOT EXISTS billing_usage_model_period_idx
   ON billing_usage_ledger (provider, model, period_start);
 `;
 
+export const BILLING_MIGRATION_002 = `
+CREATE TABLE IF NOT EXISTS billing_usage_epochs (
+  tenant_id text NOT NULL,
+  bot_id text NOT NULL,
+  deployment_id text NOT NULL,
+  user_id text NOT NULL,
+  epoch timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  PRIMARY KEY (tenant_id, bot_id, deployment_id, user_id)
+);
+`;
+
 export const BILLING_MIGRATIONS = [
   { version: "billing/001_billing", sql: BILLING_MIGRATION_001 },
+  { version: "billing/002_usage_epochs", sql: BILLING_MIGRATION_002 },
 ] as const;

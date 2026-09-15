@@ -1,9 +1,9 @@
-# dsh-lark-atw-brand SPEC（MewClaw 品牌插件）
+# dsh-lark-mewclaw-brand SPEC（MewClaw 品牌插件 · Web/移动）
 
 | 元数据 | 值 |
 | --- | --- |
-| 包 | `dsh-lark-atw-brand`（Plugin，web bundle + client slot） |
-| 位置 | `packages/lark/atw-brand/` |
+| 包 | `dsh-lark-mewclaw-brand`（Plugin，web bundle + client slot） |
+| 位置 | `packages/lark/mewclaw-brand/` |
 | 角色 | MewClaw 品牌的唯一合法注入点：WebServer `tapIndex`/`register` + 客户端公开 slots |
 | 里程碑 | 贯穿（升级硬门禁，见 release.md §1.1） |
 | 状态 | implemented |
@@ -63,6 +63,12 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   `application/manifest+json`；
 - 启动屏：`prefers-reduced-motion` 下不播放；~1.05s 后淡出并自删，失败兜底
   1600ms `setTimeout` 移除；
+- 移动适配：官方前端无移动断点，`≤768px` 视口下左侧栏列仍占 grid 轨侧推
+  挤压主列。注入样式把 `[class*="_sidebarCol"]` 改为 `fixed` 覆盖层
+  （`top/bottom/left:0`，`z-index:120`，`height:100dvh`）；侧栏脱离 grid 布局后
+  `centerCol` 会落进 56px 的首轨，须以 `grid-column:1/-1` 跨满全行再加
+  `margin-left:55px` 为收起态图标栏让位；选择器用 CSS Module 稳定后缀
+  （`<hash>_<name>`，重建仅哈希变化），不改官方包；
 - 所有注册经 `ctx.effect()`/`ctx.slots.inject`，卸载即回收。
 
 ## 7 安全与信任
@@ -77,6 +83,8 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
 - `unit`：使用指定 MewClaw 商标几何；不引用 DeepSeek 鱼形组件或外部资源；经
   WebServer 扩展点提供标题/语言/favicon/manifest；
 - `client`：等待官方 conversation 槽位声明后再注册占位者；
+- 移动适配以真实浏览器验收为准：390px 视口下侧栏展开为覆盖层、主列不被
+  挤压、无横向溢出（`scrollWidth ≤ 视口宽`）、关闭后恢复；
 - 门禁：`pnpm verify:dsh-brand`（官方完整性 + 品牌 slot 白名单）。
 
 ## 9 迁移映射
@@ -84,6 +92,7 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
 | 来源 | 处置 |
 | --- | --- |
 | lark-claw 品牌资产（DoorAgent 时代） | 重做为 MewClaw 商标 + "MewClaw Harness" 产品名 |
+| `dsh-lark-atw-brand` | 包改名为 `dsh-lark-mewclaw-brand`（atw 为 AutoWell 旧名）；桌面端拆分为 `dsh-lark-mewclaw-brand-desktop` |
 
 行为变化：产品名与商标替换；启动屏为新增（DSH 原生无开屏）。
 

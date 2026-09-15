@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // packages/lark/atw-brand/src/mark.ts
+  // packages/lark/mewclaw-brand/src/mark.ts
   var MEWCLAW_MARK_VIEWBOX = "0 0 512 512";
   function renderMewClawBrandMark(React, props) {
     const requestedSize = Number.isFinite(props.size) && props.size > 0 ? props.size : 24;
@@ -42,9 +42,8 @@
     );
   }
 
-  // packages/lark/atw-brand/src/client.ts
+  // packages/lark/mewclaw-brand/src/client-impl.ts
   var HERO_COPY = ["\u8BE5\u505A\u70B9\u4EC0\u4E48\u5462~ Mew", "\u7075\u611F\u6B63\u4F38\u7740\u61D2\u8170", "\u628A\u96BE\u9898\u4EA4\u7ED9\u732B\u722A", "\u4ECA\u5929\u4E5F\u8981\u806A\u660E\u4E00\u70B9"];
-  var loader = globalThis.__ModuleLoader__;
   function applyBrand(ctx, React) {
     ctx.slots.inject("conversation.hero.brand.mark", () => ctx.slots.register({ name: "conversation.hero.brand.mark" }, () => {
       const [copy] = React.useState(() => HERO_COPY[Math.floor(Math.random() * HERO_COPY.length)] ?? HERO_COPY[0]);
@@ -67,8 +66,11 @@
       className: [props.className, ownClass].filter(Boolean).join(" ")
     })));
   }
+
+  // packages/lark/mewclaw-brand/src/client.ts
+  var loader = globalThis.__ModuleLoader__;
   loader?.load({
-    id: "dsh-lark-atw-brand",
+    id: "dsh-lark-mewclaw-brand",
     factory: (require2) => {
       const React = require2("react");
       return {
