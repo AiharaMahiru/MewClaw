@@ -6,7 +6,7 @@ import { URL } from "node:url";
 
 import { accessPolicy } from "dsh-lark-auth";
 import type { AuthService, AuthUser } from "dsh-lark-auth";
-import { FAVICON_PATH as BRAND_FAVICON_PATH, MANIFEST_PATH as BRAND_MANIFEST_PATH } from "dsh-lark-atw-brand";
+import { FAVICON_PATH as BRAND_FAVICON_PATH, MANIFEST_PATH as BRAND_MANIFEST_PATH } from "dsh-lark-mewclaw-brand";
 
 import { handleAdminData } from "./admin-routes.js";
 import { AuthRouteHandlers } from "./auth-routes.js";

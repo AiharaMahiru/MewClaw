@@ -2,7 +2,7 @@ import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from "node:
 
 import { hashOpaqueToken } from "dsh-lark-auth";
 import type { AdminUserPatch, AuthUser, UserModelProfileDraft, UserModelProfilePatch } from "dsh-lark-auth";
-import { FAVICON_PATH as BRAND_FAVICON_PATH, MANIFEST_PATH as BRAND_MANIFEST_PATH } from "dsh-lark-atw-brand";
+import { FAVICON_PATH as BRAND_FAVICON_PATH, MANIFEST_PATH as BRAND_MANIFEST_PATH } from "dsh-lark-mewclaw-brand";
 import { UrlPolicy } from "dsh-lark-url-policy";
 
 import { DEFAULT_SESSION_TTL_MS, type AuthEdgeConfig } from "./config.js";

@@ -19,7 +19,7 @@ const fakeReact = {
   },
 };
 
-describe("dsh-lark-atw-brand", () => {
+describe("dsh-lark-mewclaw-brand", () => {
   it("使用指定的 MewClaw 商标几何", () => {
     const mark = renderMewClawBrandMark(fakeReact, { size: 104, className: "hero-mark" }) as ElementNode;
 

@@ -274,8 +274,8 @@ describe("官方 dsh Web 组合", () => {
   it("MewClaw 品牌占据官方槽位且禁用官方 occupant", async () => {
     const rows = overlayRows("packages/bundle/web/cordis.patch.yml");
     expect(rows).toContainEqual(expect.objectContaining({ id: "ui-brand-official", disabled: true }));
-    expect(rows).toContainEqual(expect.objectContaining({ id: "atw-brand", name: "dsh-lark-atw-brand" }));
-    const client = await readFile(repositoryPath("packages/lark/atw-brand/src/client.ts"), "utf8");
+    expect(rows).toContainEqual(expect.objectContaining({ id: "mewclaw-brand", name: "dsh-lark-mewclaw-brand" }));
+    const client = await readFile(repositoryPath("packages/lark/mewclaw-brand/src/client-impl.ts"), "utf8");
     for (const slot of ["conversation.hero.brand.mark", "sidebar.brand.mark", "sidebar.brand.name"]) expect(client).toContain(slot);
   });
 
@@ -290,7 +290,7 @@ describe("官方 dsh Web 组合", () => {
   });
 
   it("MewClaw Host 半部通过公开 WebServer 扩展点提供静态品牌", async () => {
-    const host = await readFile(repositoryPath("packages/lark/atw-brand/src/index.ts"), "utf8");
+    const host = await readFile(repositoryPath("packages/lark/mewclaw-brand/src/index.ts"), "utf8");
     expect(host).toContain("ctx.webServer.tapIndex");
     expect(host).toContain('FAVICON_PATH = "/mewclaw-brand/favicon.svg"');
     expect(host).toContain('MANIFEST_PATH = "/mewclaw-brand/manifest.webmanifest"');
@@ -299,7 +299,7 @@ describe("官方 dsh Web 组合", () => {
   });
 
   it("品牌实现不读取或修改官方包产物", async () => {
-    const sources = await Promise.all(["index.ts", "client.ts", "mark.ts"].map((file) => readFile(repositoryPath(`packages/lark/atw-brand/src/${file}`), "utf8")));
+    const sources = await Promise.all(["index.ts", "client.ts", "client-impl.ts", "mark.ts"].map((file) => readFile(repositoryPath(`packages/lark/mewclaw-brand/src/${file}`), "utf8")));
     expect(sources.join("\n")).not.toContain("node_modules/");
     expect(sources.join("\n")).not.toContain("FishLogo");
   });
