@@ -3,8 +3,13 @@ import type { ServerResponse } from "node:http";
 import type { Context } from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-host-webserver";
 
-export const name = "dsh-lark-atw-brand";
+export const name = "dsh-lark-mewclaw-brand";
 export const inject = ["webServer"];
+
+/** 端形态选项：desktop 变体（mewclaw-brand-desktop）关闭移动适配样式。 */
+export interface MewClawBrandOptions {
+  mobile?: boolean;
+}
 
 export const PRODUCT_NAME = "MewClaw Harness";
 export const FAVICON_PATH = "/mewclaw-brand/favicon.svg";
@@ -25,13 +30,14 @@ const BOOT_END_SCRIPT = `<script data-mewclaw-boot-end>(()=>{const boot=document
 const FAVICON_RESPONSE = FAVICON_SVG.replace("</style>", `.ink[fill="none"],.cutout[fill="none"],g.ink,g.cutout{fill:none}</style>`);
 
 /** Host 品牌资源与 HTML 元数据均通过 WebServer 的公开路由/transform 扩展点提供。 */
-export function apply(ctx: Context): void {
+export function apply(ctx: Context, options?: MewClawBrandOptions): void {
+  const mobileStyle = options?.mobile === false ? "" : MOBILE_STYLE;
   ctx.effect(() => ctx.webServer.tapIndex((html) => html
     .replace(/<html(?:\s+lang="[^"]*")?>/u, '<html lang="zh-CN">')
     .replace(/<title>[^<]*<\/title>/u, `<title>${PRODUCT_NAME}</title>`)
     .replace(/(<link\b[^>]*rel="icon"[^>]*href=")[^"]*(")/u, `$1${FAVICON_PATH}$2`)
     .replace(/(<link\b[^>]*rel="manifest"[^>]*href=")[^"]*(")/u, `$1${MANIFEST_PATH}$2`)
-    .replace("</head>", `${BOOT_HEAD_SCRIPT}<style data-mewclaw-brand>${BRAND_STYLE}${STROKE_ONLY_STYLE}${HERO_STYLE}${MOBILE_STYLE}${BOOT_STYLE}</style></head>`)
+    .replace("</head>", `${BOOT_HEAD_SCRIPT}<style data-mewclaw-brand>${BRAND_STYLE}${STROKE_ONLY_STYLE}${HERO_STYLE}${mobileStyle}${BOOT_STYLE}</style></head>`)
     .replace(/<body([^>]*)>/u, `<body$1>${BOOT_MARKUP}`)
     .replace("</body>", `${BOOT_END_SCRIPT}</body>`)));
   ctx.effect(() => ctx.webServer.register({ kind: "exact", path: FAVICON_PATH, handler: (_req, res) => respond(res, "image/svg+xml; charset=utf-8", FAVICON_RESPONSE) }));

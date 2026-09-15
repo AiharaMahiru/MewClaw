@@ -16,7 +16,7 @@
   "files": ["lib"],
   "dependencies": {
     "dsh-lark-auth": "workspace:*",
-    "dsh-lark-atw-brand": "workspace:*",
+    "dsh-lark-mewclaw-brand": "workspace:*",
     "dsh-lark-url-policy": "workspace:*",
     "nodemailer": "^7.0.5"
   },

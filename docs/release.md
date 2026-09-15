@@ -39,7 +39,7 @@ release 根禁止出现 `patches/` 或 `pnpm.patchedDependencies`；依赖包自
 
 ### 1.1 MewClaw 品牌插件升级协议
 
-品牌只由自有 `dsh-lark-atw-brand` 客户端插件、公开 slots、WebServer transform/route
+品牌只由自有 `dsh-lark-mewclaw-brand` 客户端插件、公开 slots、WebServer transform/route
 与 Auth Edge 标准路径代理实现；不修改官方 UI/Web 包，不复制上游 bundle 覆盖。
 升级 DSH 时必须按以下顺序执行：
 

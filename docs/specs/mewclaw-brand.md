@@ -1,9 +1,9 @@
-# dsh-lark-atw-brand SPEC（MewClaw 品牌插件）
+# dsh-lark-mewclaw-brand SPEC（MewClaw 品牌插件 · Web/移动）
 
 | 元数据 | 值 |
 | --- | --- |
-| 包 | `dsh-lark-atw-brand`（Plugin，web bundle + client slot） |
-| 位置 | `packages/lark/atw-brand/` |
+| 包 | `dsh-lark-mewclaw-brand`（Plugin，web bundle + client slot） |
+| 位置 | `packages/lark/mewclaw-brand/` |
 | 角色 | MewClaw 品牌的唯一合法注入点：WebServer `tapIndex`/`register` + 客户端公开 slots |
 | 里程碑 | 贯穿（升级硬门禁，见 release.md §1.1） |
 | 状态 | implemented |
@@ -92,6 +92,7 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
 | 来源 | 处置 |
 | --- | --- |
 | lark-claw 品牌资产（DoorAgent 时代） | 重做为 MewClaw 商标 + "MewClaw Harness" 产品名 |
+| `dsh-lark-atw-brand` | 包改名为 `dsh-lark-mewclaw-brand`（atw 为 AutoWell 旧名）；桌面端拆分为 `dsh-lark-mewclaw-brand-desktop` |
 
 行为变化：产品名与商标替换；启动屏为新增（DSH 原生无开屏）。
 

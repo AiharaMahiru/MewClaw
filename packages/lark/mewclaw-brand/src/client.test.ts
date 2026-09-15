@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyBrand } from "./client.js";
+import { applyBrand } from "./client-impl.js";
 
 type Registration = {
   options: { name: string };
