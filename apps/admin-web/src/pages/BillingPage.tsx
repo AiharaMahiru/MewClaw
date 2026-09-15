@@ -14,7 +14,7 @@ import {
   type BillingModelPrice,
   type BillingQuota,
 } from "../api.js";
-import { Card, MetricStrip, PageHeader, RefreshButton } from "../components/AdminUi.js";
+import { Card, MetricStrip, PageHeader, RefreshButton, Select } from "../components/AdminUi.js";
 import { billingTotals } from "../admin-view-model.js";
 
 function credits(value: number): string {
@@ -93,7 +93,7 @@ function QuotaPanel(props: { users: AdminUserSummary[]; onError: (message: strin
   };
   return <Card title="月度额度" meta={quota ? `周期起点 ${quota.periodStart}` : "选择用户"}>
     <form className="adm-form" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-      <label className="adm-field"><span className="adm-label">用户</span><select value={userId} onChange={(event) => setUserId(event.target.value)}>{props.users.map((user) => <option key={user.id} value={user.id}>{user.displayName} · {user.email}</option>)}</select></label>
+      <label className="adm-field"><span className="adm-label">用户</span><Select value={userId} onChange={setUserId} placeholder="选择用户" options={props.users.map((user) => ({ value: user.id, label: `${user.displayName} · ${user.email}` }))} /></label>
       <label className="adm-field adm-field-sm"><span className="adm-label">额度（USD）</span><input type="number" min="0" step="0.000001" value={limit} onChange={(event) => setLimit(Number(event.target.value))} /></label>
       <button className="adm-btn adm-btn-primary" type="submit" disabled={busy || !userId}>保存额度</button>
     </form>

@@ -13,7 +13,7 @@ import {
   type KnowledgeSnapshot,
   type KnowledgeVisibility,
 } from "../api.js";
-import { Badge, Card, MetricStrip, PageHeader, RefreshButton } from "../components/AdminUi.js";
+import { Badge, Card, MetricStrip, PageHeader, RefreshButton, Select } from "../components/AdminUi.js";
 
 const CATEGORIES: KnowledgeCategory[] = [
   "general", "product_manual", "technical_spec", "project_document", "policy_process", "faq",
@@ -87,8 +87,8 @@ function UploadPanel(props: { refresh: () => Promise<void>; setError: (value: st
     <Card title="上传文档">
       <form className="adm-form" onSubmit={(event) => void submit(event)}>
         <label className="adm-field adm-file"><span className="adm-label">选择文件</span><input type="file" accept=".md,.markdown,.txt,.csv,.json,.log,.ts,.js,.py,.yaml,.yml,.html,.xml" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>
-        <label className="adm-field adm-field-sm"><span className="adm-label">可见性</span><select value={visibility} onChange={(event) => setVisibility(event.target.value as KnowledgeVisibility)}><option value="user_private">私有</option><option value="bot_shared">共享</option></select></label>
-        <label className="adm-field adm-field-sm"><span className="adm-label">分类</span><select value={category} onChange={(event) => setCategory(event.target.value as KnowledgeCategory)}>{CATEGORIES.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+        <label className="adm-field adm-field-sm"><span className="adm-label">可见性</span><Select value={visibility} onChange={(value) => setVisibility(value as KnowledgeVisibility)} options={[{ value: "user_private", label: "私有" }, { value: "bot_shared", label: "共享" }]} /></label>
+        <label className="adm-field adm-field-sm"><span className="adm-label">分类</span><Select value={category} onChange={(value) => setCategory(value as KnowledgeCategory)} options={CATEGORIES.map((item) => ({ value: item, label: item }))} /></label>
         <label className="adm-field"><span className="adm-label">标签</span><input value={tags} placeholder="逗号分隔，最多 8 个" onChange={(event) => setTags(event.target.value)} /></label>
         <button className="adm-btn adm-btn-primary" type="submit" disabled={busy || !file}>{busy ? "上传中" : "上传并摄入"}</button>
       </form>

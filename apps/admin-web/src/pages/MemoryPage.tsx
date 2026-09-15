@@ -17,7 +17,7 @@ import {
   type MemoryPart,
   type MemoryVisibility,
 } from "../api.js";
-import { Badge, Card, FilterBar, MetricStrip, PageHeader, RefreshButton } from "../components/AdminUi.js";
+import { Badge, Card, FilterBar, MetricStrip, PageHeader, RefreshButton, Select } from "../components/AdminUi.js";
 import { Icon } from "../components/Icon.js";
 
 const VISIBILITY_TEXT: Record<MemoryVisibility, string> = {
@@ -104,7 +104,7 @@ function CubeDetail(props: {
     </div>
     <div className="adm-section"><div className="adm-section-head"><span>基本信息</span><small>乐观锁更新</small></div>
       <label className="adm-field"><span className="adm-label">名称</span><input value={name} disabled={props.busy} onChange={(event) => setName(event.target.value)} /></label>
-      <label className="adm-field"><span className="adm-label">可见性</span><select value={visibility} disabled={props.busy} onChange={(event) => setVisibility(event.target.value as MemoryVisibility)}>{Object.entries(VISIBILITY_TEXT).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <label className="adm-field"><span className="adm-label">可见性</span><Select value={visibility} disabled={props.busy} onChange={(value) => setVisibility(value as MemoryVisibility)} options={Object.entries(VISIBILITY_TEXT).map(([value, label]) => ({ value, label }))} /></label>
       <div className="adm-actions"><button className="adm-btn adm-btn-primary" type="button" disabled={!dirty || props.busy || !name.trim()} onClick={() => void props.onSave(cube, { ...(name.trim() !== cube.name ? { name: name.trim() } : {}), ...(visibility !== cube.visibility ? { visibility } : {}) })}><Icon name="check" size={14} /><span>保存修改</span></button></div>
     </div>
     <div className="adm-section"><div className="adm-section-head"><span>归属</span><small>只读</small></div>

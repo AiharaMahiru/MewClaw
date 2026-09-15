@@ -8,7 +8,7 @@ import {
   type AdminDashboardSnapshot,
 } from "../api.js";
 import { SessionSummary } from "../components/SessionSummary.js";
-import { Card, Dot, MetricStrip, PageHeader, RefreshButton } from "../components/AdminUi.js";
+import { Card, Dot, MetricStrip, PageHeader, RefreshButton, Select } from "../components/AdminUi.js";
 
 const MAX_GENERATION = 1_000_000;
 
@@ -93,10 +93,7 @@ export function ConversationsPage({ onUnauthorized }: { onUnauthorized: () => vo
     </Card>
     <Card title="读取会话投影" meta="只读">
       <form className="adm-form" onSubmit={(event) => { event.preventDefault(); void loadSnapshot(); }}>
-        <label className="adm-field"><span className="adm-label">会话目标</span><select value={selectedId} onChange={(event) => chooseTarget(event.target.value)} disabled={!targets.length}>
-          <option value="">选择已配置目标</option>
-          {targets.map((item) => <option key={item.target.id} value={item.target.id}>{item.target.label}</option>)}
-        </select></label>
+        <label className="adm-field"><span className="adm-label">会话目标</span><Select value={selectedId} onChange={chooseTarget} disabled={!targets.length} placeholder="选择已配置目标" options={targets.map((item) => ({ value: item.target.id, label: item.target.label }))} /></label>
         <label className="adm-field adm-field-sm"><span className="adm-label">会话代次</span><input value={generation} inputMode="numeric" onChange={(event) => setGeneration(event.target.value)} /></label>
         <button className="adm-btn adm-btn-primary" type="submit" disabled={loading || !selectedId}>读取</button>
       </form>

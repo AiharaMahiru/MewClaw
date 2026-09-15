@@ -12,7 +12,7 @@ import {
   type AdminRole,
   type AdminUserSummary,
 } from "../api.js";
-import { Badge, Card, FilterBar, MetricStrip, PageHeader, RefreshButton } from "../components/AdminUi.js";
+import { Badge, Card, FilterBar, MetricStrip, PageHeader, RefreshButton, Select } from "../components/AdminUi.js";
 import { Icon } from "../components/Icon.js";
 import { filterUsers, type UserFilter } from "../admin-view-model.js";
 
@@ -157,7 +157,7 @@ function UserDrawer(props: {
             </div></div>
           </div>
           <div className="adm-section"><div className="adm-section-head"><span>访问状态</span><small>会话即时生效</small></div>
-            {user.status === "pending" ? <div className="adm-state"><span>待完成邮箱验证，暂不可编辑状态</span></div> : <label className="adm-field"><span className="adm-label">账号状态</span><select value={status} disabled={saving} onChange={(event) => setStatus(event.target.value as "active" | "disabled")}><option value="active">正常 · 允许登录</option><option value="disabled">已停用 · 拒绝登录</option></select></label>}
+            {user.status === "pending" ? <div className="adm-state"><span>待完成邮箱验证，暂不可编辑状态</span></div> : <label className="adm-field"><span className="adm-label">账号状态</span><Select value={status} disabled={saving} onChange={(value) => setStatus(value as "active" | "disabled")} options={[{ value: "active", label: "正常 · 允许登录" }, { value: "disabled", label: "已停用 · 拒绝登录" }]} /></label>}
             <div className="adm-field"><span className="adm-label">默认运行模式</span><div className="adm-readonly">{modeLabel(effectiveMode)}<span className="adm-sub">由角色自动决定</span></div></div>
           </div>
           <div className="adm-section"><div className="adm-section-head"><span>资源概览</span><small>只读</small></div>

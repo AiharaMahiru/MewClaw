@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Icon, type IconName } from "./Icon.js";
 
@@ -73,4 +73,75 @@ export function Dot({ tone }: { tone?: "ok" | "warn" | "err" }) {
 
 export function Empty({ children }: { children: ReactNode }) {
   return <div className="adm-state">{children}</div>;
+}
+
+export interface SelectOption { value: string; label: string }
+
+export function Select(props: {
+  value: string;
+  options: SelectOption[];
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  ariaLabel?: string;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+  const root = useRef<HTMLDivElement>(null);
+  const currentIndex = props.options.findIndex((option) => option.value === props.value);
+  const current = currentIndex >= 0 ? props.options[currentIndex] : null;
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent) => {
+      if (root.current && !root.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const openMenu = () => {
+    setHighlight(currentIndex >= 0 ? currentIndex : 0);
+    setOpen(true);
+  };
+  const pick = (value: string) => {
+    props.onChange(value);
+    setOpen(false);
+  };
+
+  return <div className="adm-select" ref={root}>
+    <button type="button" className="adm-select-btn" disabled={props.disabled}
+      aria-haspopup="listbox" aria-expanded={open} aria-label={props.ariaLabel}
+      onClick={() => (open ? setOpen(false) : openMenu())}
+      onKeyDown={(event) => {
+        if (!open) {
+          if (["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key)) { event.preventDefault(); openMenu(); }
+          return;
+        }
+        if (event.key === "ArrowDown") { event.preventDefault(); setHighlight((index) => Math.min(index + 1, props.options.length - 1)); }
+        else if (event.key === "ArrowUp") { event.preventDefault(); setHighlight((index) => Math.max(index - 1, 0)); }
+        else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); if (highlight >= 0 && props.options[highlight]) pick(props.options[highlight].value); }
+        else if (event.key === "Tab") setOpen(false);
+      }}>
+      <span className="adm-select-value">{current ? current.label : (props.placeholder ?? "请选择")}</span>
+    </button>
+    {open && <div className="adm-select-pop" role="listbox" aria-label={props.ariaLabel}>
+      {props.options.map((option, index) => (
+        <button key={option.value} type="button" role="option" aria-selected={option.value === props.value}
+          className={`adm-select-opt${index === highlight ? " is-active" : ""}`}
+          ref={index === highlight ? (element) => element?.scrollIntoView({ block: "nearest" }) : undefined}
+          onMouseEnter={() => setHighlight(index)}
+          onClick={() => pick(option.value)}>
+          <span>{option.label}</span>
+        </button>
+      ))}
+    </div>}
+  </div>;
 }
