@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   ApiError,
@@ -6,7 +6,7 @@ import {
   revokeAdminSession,
   type AdminSessionSummary,
 } from "../api.js";
-import { Badge, Card, FilterBar, MetricStrip, PageHeader, RefreshButton } from "../components/AdminUi.js";
+import { Badge, Card, FilterBar, MetricStrip, PageHeader, RefreshButton, TableSkeleton } from "../components/AdminUi.js";
 import { Icon } from "../components/Icon.js";
 import { filterSessions, isActiveSession, type SessionFilter } from "../admin-view-model.js";
 
@@ -39,6 +39,7 @@ export function SessionsPage({ onUnauthorized }: { onUnauthorized: () => void })
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<SessionFilter>("active");
+  const [expanded, setExpanded] = useState<string | null>(null);
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
@@ -71,12 +72,22 @@ export function SessionsPage({ onUnauthorized }: { onUnauthorized: () => void })
     ]} />
     <Card title="会话记录" meta={`${visible.length} 项`}>
       <div className="adm-table-scroll"><table className="adm-table"><thead><tr><th>用户</th><th>状态</th><th>创建时间</th><th>最近活动</th><th>过期时间</th><th>操作</th></tr></thead>
-        <tbody>{visible.map((session) => <tr key={session.id}>
-          <td><strong>{session.displayName}</strong><span className="adm-sub">{session.email}</span></td>
-          <td><Badge tone={isActiveSession(session) ? "ok" : session.revokedAt ? "err" : undefined}>{isActiveSession(session) ? "活跃" : session.revokedAt ? "已撤销" : "已过期"}</Badge></td>
-          <td>{date(session.createdAt)}</td><td>{date(session.lastSeenAt)}</td><td>{date(session.expiresAt)}</td>
-          <td><SessionAction session={session} refresh={refresh} onError={setError} onUnauthorized={onUnauthorized} /></td>
-        </tr>)}{!visible.length && !loading && <tr><td className="adm-empty" colSpan={6}>暂无会话</td></tr>}{loading && <tr><td className="adm-empty" colSpan={6}><span className="adm-spinner" /> 正在读取会话</td></tr>}</tbody>
+        <tbody>{visible.map((session) => <Fragment key={session.id}>
+          <tr className={`adm-row-btn${expanded === session.id ? " is-selected" : ""}`} onClick={() => setExpanded((id) => (id === session.id ? null : session.id))}>
+            <td><strong>{session.displayName}</strong><span className="adm-sub">{session.email}</span></td>
+            <td><Badge tone={isActiveSession(session) ? "ok" : session.revokedAt ? "err" : undefined}>{isActiveSession(session) ? "活跃" : session.revokedAt ? "已撤销" : "已过期"}</Badge></td>
+            <td>{date(session.createdAt)}</td><td>{date(session.lastSeenAt)}</td><td>{date(session.expiresAt)}</td>
+            <td onClick={(event) => event.stopPropagation()}><SessionAction session={session} refresh={refresh} onError={setError} onUnauthorized={onUnauthorized} /></td>
+          </tr>
+          {expanded === session.id && <tr className="adm-row-exp"><td colSpan={6}>
+            <div className="adm-expand">
+              <div className="adm-expand-item"><span>会话 ID</span><strong><code>{session.id}</code></strong></div>
+              <div className="adm-expand-item"><span>用户 ID</span><strong><code>{session.userId}</code></strong></div>
+              <div className="adm-expand-item"><span>角色</span><strong>{session.role === "admin" ? "管理员" : "成员"}</strong></div>
+              <div className="adm-expand-item"><span>撤销时间</span><strong>{session.revokedAt ? date(session.revokedAt) : "—"}</strong></div>
+            </div>
+          </td></tr>}
+        </Fragment>)}{!visible.length && !loading && <tr><td className="adm-empty" colSpan={6}>暂无会话</td></tr>}{loading && <TableSkeleton cols={6} />}</tbody>
       </table></div>
     </Card>
   </>;

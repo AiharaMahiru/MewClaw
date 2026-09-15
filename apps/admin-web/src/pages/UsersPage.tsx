@@ -12,7 +12,7 @@ import {
   type AdminRole,
   type AdminUserSummary,
 } from "../api.js";
-import { Badge, Card, FilterBar, MetricStrip, PageHeader, RefreshButton, Select } from "../components/AdminUi.js";
+import { Badge, Card, FilterBar, MetricStrip, PageHeader, RefreshButton, Select, Skeleton, TableSkeleton } from "../components/AdminUi.js";
 import { Icon } from "../components/Icon.js";
 import { filterUsers, type UserFilter } from "../admin-view-model.js";
 
@@ -82,7 +82,7 @@ function IdentitySection(props: { user: AdminUserSummary; onError: (message: str
   };
 
   return <div className="adm-section"><div className="adm-section-head"><span>身份绑定</span><small>飞书登录凭据</small></div>
-    {identities === null && <div className="adm-state"><span className="adm-spinner" /><span>正在读取身份绑定…</span></div>}
+    {identities === null && <Skeleton lines={2} />}
     {identities !== null && !identities.length && <div className="adm-state"><span>没有绑定的外部身份</span></div>}
     {identities !== null && identities.map((identity) => <div className="adm-identity" key={identity.subject}>
       <Badge tone="info">飞书</Badge>
@@ -263,7 +263,7 @@ export function UsersPage({ onUnauthorized }: { onUnauthorized: () => void }) {
           <td><strong>{user.sessionCount} 会话</strong><span className="adm-sub">{user.workspaceCount} 工作区 · {user.identityCount} 身份</span></td>
           <td>{date(user.createdAt)}</td>
           <td><button className="adm-btn adm-btn-sm" type="button" aria-label={`编辑 ${user.displayName}`} onClick={() => { setSelectedId(user.id); setNotice(""); }}><Icon name="edit" size={13} /><span>编辑</span></button></td>
-        </tr>)}{!visible.length && !loading && <tr><td className="adm-empty" colSpan={7}>没有符合条件的用户</td></tr>}{loading && <tr><td className="adm-empty" colSpan={7}><span className="adm-spinner" /> 正在读取账号目录</td></tr>}</tbody>
+        </tr>)}{!visible.length && !loading && <tr><td className="adm-empty" colSpan={7}>没有符合条件的用户</td></tr>}{loading && <TableSkeleton cols={7} />}</tbody>
       </table></div>
     </Card>
     {selected && <UserDrawer user={selected} onClose={() => setSelectedId("")} onSave={saveUser} onRevoke={revokeUserSessions} onIdentitiesChanged={() => void refresh()} onError={setError} />}

@@ -13,7 +13,7 @@ import {
   type AdminUserSummary,
   type BillingAggregate,
 } from "../api.js";
-import { Badge, Card, Dot, Empty, MetricStrip, PageHeader, RefreshButton, type MetricItem } from "../components/AdminUi.js";
+import { Badge, Card, Dot, Empty, MetricStrip, PageHeader, RefreshButton, Skeleton, type MetricItem } from "../components/AdminUi.js";
 import { Icon } from "../components/Icon.js";
 import { isActiveSession, sessionActivityPoints } from "../admin-view-model.js";
 
@@ -83,7 +83,7 @@ function HealthPanel({ data, errors }: { data: HomeData; errors: HomeErrors }) {
 }
 
 function UsagePanel({ rows, error }: { rows: BillingAggregate[] | null; error?: string }) {
-  if (!rows) return <Card title="用量分布" meta="模型计费"><Empty>{error ?? "正在读取用量"}</Empty></Card>;
+  if (!rows) return <Card title="用量分布" meta="模型计费">{error ? <Empty>{error}</Empty> : <Skeleton />}</Card>;
   const input = rows.reduce((total, row) => total + row.inputTokens, 0);
   const output = rows.reduce((total, row) => total + row.outputTokens, 0);
   const reasoning = rows.reduce((total, row) => total + row.reasoningTokens, 0);
@@ -100,7 +100,7 @@ function UsagePanel({ rows, error }: { rows: BillingAggregate[] | null; error?: 
 }
 
 function UserMixPanel({ users, error }: { users: AdminUserSummary[] | null; error?: string }) {
-  if (!users) return <Card title="用户构成" meta="账号状态"><Empty>{error ?? "正在读取用户数据"}</Empty></Card>;
+  if (!users) return <Card title="用户构成" meta="账号状态">{error ? <Empty>{error}</Empty> : <Skeleton />}</Card>;
   const groups = [
     { label: "正常账号", value: users.filter((user) => user.status === "active").length, tone: "" },
     { label: "待验证", value: users.filter((user) => user.status === "pending").length, tone: "adm-bar-warn" },
@@ -116,7 +116,7 @@ function UserMixPanel({ users, error }: { users: AdminUserSummary[] | null; erro
 
 function ModelCostChart({ rows, error }: { rows: BillingAggregate[] | null; error?: string }) {
   const points = useMemo(() => modelCostPoints(rows ?? []), [rows]);
-  if (!rows || !points.length) return <Card title="模型费用" meta="USD"><Empty>{error ?? (rows ? "暂无模型费用记录" : "正在读取费用数据")}</Empty></Card>;
+  if (!rows || !points.length) return <Card title="模型费用" meta="USD">{error ? <Empty>{error}</Empty> : rows ? <Empty>暂无模型费用记录</Empty> : <Skeleton />}</Card>;
   const max = Math.max(...points.map((point) => point.value), 0.000001);
   return <Card title="模型费用" meta={`${points.length} 个模型`}>
     <div className="adm-chart-bars" role="img" aria-label="按模型汇总的费用柱状图">{points.map((point) => <div className="adm-chart-col" key={point.label}><div className="adm-chart-track"><i style={{ height: `${Math.max(8, (point.value / max) * 100)}%` }} title={`${point.label} ${money(point.value)}`} /></div><strong>{money(point.value)}</strong><span title={point.label}>{point.label}</span></div>)}</div>
@@ -126,7 +126,7 @@ function ModelCostChart({ rows, error }: { rows: BillingAggregate[] | null; erro
 
 function LoginActivityChart({ sessions, error }: { sessions: AdminSessionSummary[] | null; error?: string }) {
   const points = useMemo(() => sessionActivityPoints(sessions ?? []), [sessions]);
-  if (!sessions || !points.length) return <Card title="登录活动" meta="近 7 日"><Empty>{error ?? (sessions ? "暂无可用登录记录" : "正在读取登录活动")}</Empty></Card>;
+  if (!sessions || !points.length) return <Card title="登录活动" meta="近 7 日">{error ? <Empty>{error}</Empty> : sessions ? <Empty>暂无可用登录记录</Empty> : <Skeleton />}</Card>;
   const max = Math.max(...points.map((point) => point.value), 1);
   const coordinates = points.map((point, index) => ({ x: 12 + index * 49.33, y: 112 - (point.value / max) * 82 }));
   const line = coordinates.map((point) => `${point.x},${point.y}`).join(" ");
@@ -137,7 +137,7 @@ function LoginActivityChart({ sessions, error }: { sessions: AdminSessionSummary
 }
 
 function RuntimePanel({ runtime, error }: { runtime: AdminDashboardSnapshot | null; error?: string }) {
-  if (!runtime) return <Card title="运行观察" meta="会话投影"><Empty><strong>运行观察不可用</strong><span>{error ?? "正在读取会话目标"}</span><a href="/admin/conversations">打开运行观察</a></Empty></Card>;
+  if (!runtime) return <Card title="运行观察" meta="会话投影">{error ? <Empty><strong>运行观察不可用</strong><span>{error}</span><a href="/admin/conversations">打开运行观察</a></Empty> : <Skeleton />}</Card>;
   return <Card title="运行观察" meta={`${runtime.targets.length} 个目标`}>
     <div className="adm-rows">{runtime.targets.slice(0, 4).map((item) => <a className="adm-row" href="/admin/conversations" key={item.target.id}><Dot tone={item.session.exists ? "ok" : "warn"} /><span className="adm-row-main"><strong>{item.target.label}</strong><small>代次 {item.generation}</small></span><span className="adm-row-side">{item.session.exists ? "有活动" : "空闲"}</span><Icon name="arrow-right" size={13} /></a>)}</div>
     {!runtime.targets.length && <Empty>暂无配置目标</Empty>}
@@ -147,7 +147,7 @@ function RuntimePanel({ runtime, error }: { runtime: AdminDashboardSnapshot | nu
 
 function RecentSessionsPanel({ sessions, error }: { sessions: AdminSessionSummary[] | null; error?: string }) {
   const recent = useMemo(() => [...(sessions ?? [])].sort((a, b) => Date.parse(b.lastSeenAt) - Date.parse(a.lastSeenAt)).slice(0, 5), [sessions]);
-  if (!sessions) return <Card title="最近登录" meta="账号活动"><Empty>{error ?? "正在读取登录活动"}</Empty></Card>;
+  if (!sessions) return <Card title="最近登录" meta="账号活动">{error ? <Empty>{error}</Empty> : <Skeleton />}</Card>;
   return <Card title="最近登录" meta={`${sessions.filter((item) => isActiveSession(item)).length} 个在线`}>
     <div className="adm-rows">{recent.map((session) => <div className="adm-row" key={session.id}><span className="adm-avatar adm-avatar-sm">{session.displayName.slice(0, 1)}</span><span className="adm-row-main"><strong>{session.displayName}</strong><small>{session.email}</small></span><Badge tone={isActiveSession(session) ? "ok" : undefined}>{isActiveSession(session) ? "在线" : "离线"}</Badge><span className="adm-row-side">{date(session.lastSeenAt)}</span></div>)}</div>
     {!recent.length && <Empty>暂无登录活动</Empty>}

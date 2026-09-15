@@ -75,6 +75,19 @@ export function Empty({ children }: { children: ReactNode }) {
   return <div className="adm-state">{children}</div>;
 }
 
+export function Skeleton({ lines = 3 }: { lines?: number }) {
+  return <div className="adm-skel" aria-hidden="true">
+    {Array.from({ length: lines }, (_, index) => <div key={index} className="adm-skel-line" style={{ width: `${86 - index * 14}%` }} />)}
+  </div>;
+}
+
+export function TableSkeleton({ cols, rows = 4 }: { cols: number; rows?: number }) {
+  return <>{Array.from({ length: rows }, (_, row) => (
+    <tr key={row}>{Array.from({ length: cols }, (_, col) => (
+      <td key={col}><div className="adm-skel-bar" style={{ width: `${col === 0 ? 72 : 42 + ((row + col) % 3) * 16}%` }} /></td>))}
+    </tr>))}</>;
+}
+
 export interface SelectOption { value: string; label: string }
 
 export function Select(props: {

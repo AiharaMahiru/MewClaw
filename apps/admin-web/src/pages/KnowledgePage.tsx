@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
 import {
   ApiError,
@@ -124,17 +124,30 @@ function DocumentActions(props: { document: KnowledgeDocument; refresh: () => Pr
 }
 
 function DocumentsPanel(props: { documents: KnowledgeDocument[]; refresh: () => Promise<void>; setError: (value: string) => void; onUnauthorized: () => void }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
   return (
     <Card title="文档" meta={`${props.documents.length} 项`}>
       <div className="adm-table-scroll"><table className="adm-table"><thead><tr><th>名称</th><th>可见性</th><th>版本</th><th>状态</th><th>块</th><th>分类</th><th>操作</th></tr></thead>
-        <tbody>{props.documents.map((document) => <tr key={document.docId}>
-          <td><strong>{document.name}</strong></td>
-          <td><Badge tone={document.visibility === "user_private" ? "warn" : "info"}>{document.visibility === "user_private" ? "私有" : "共享"}</Badge></td>
-          <td>v{document.version}</td>
-          <td><Badge tone={STATUS_TONE[document.status]}>{STATUS_TEXT[document.status] ?? document.status}</Badge></td>
-          <td>{document.chunkCount}</td><td>{document.category}</td>
-          <td><DocumentActions document={document} refresh={props.refresh} setError={props.setError} onUnauthorized={props.onUnauthorized} /></td>
-        </tr>)}{!props.documents.length && <tr><td className="adm-empty" colSpan={7}>暂无文档。</td></tr>}</tbody>
+        <tbody>{props.documents.map((document) => <Fragment key={document.docId}>
+          <tr className={`adm-row-btn${expanded === document.docId ? " is-selected" : ""}`} onClick={() => setExpanded((id) => (id === document.docId ? null : document.docId))}>
+            <td><strong>{document.name}</strong></td>
+            <td><Badge tone={document.visibility === "user_private" ? "warn" : "info"}>{document.visibility === "user_private" ? "私有" : "共享"}</Badge></td>
+            <td>v{document.version}</td>
+            <td><Badge tone={STATUS_TONE[document.status]}>{STATUS_TEXT[document.status] ?? document.status}</Badge></td>
+            <td>{document.chunkCount}</td><td>{document.category}</td>
+            <td onClick={(event) => event.stopPropagation()}><DocumentActions document={document} refresh={props.refresh} setError={props.setError} onUnauthorized={props.onUnauthorized} /></td>
+          </tr>
+          {expanded === document.docId && <tr className="adm-row-exp"><td colSpan={7}>
+            <div className="adm-expand">
+              <div className="adm-expand-item"><span>文档 ID</span><strong><code>{document.docId}</code></strong></div>
+              <div className="adm-expand-item"><span>文档键</span><strong><code>{document.documentKey}</code></strong></div>
+              <div className="adm-expand-item"><span>类型 / 大小</span><strong>{document.mimeType} · {bytes(document.size)}</strong></div>
+              <div className="adm-expand-item"><span>SHA-256</span><strong><code>{document.sha256.slice(0, 16)}…</code></strong></div>
+              <div className="adm-expand-item"><span>标签</span><strong>{document.tags.length ? document.tags.join("、") : "—"}</strong></div>
+              <div className="adm-expand-item"><span>激活时间</span><strong>{document.activatedAt ? new Intl.DateTimeFormat("zh-CN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(document.activatedAt)) : "—"}</strong></div>
+            </div>
+          </td></tr>}
+        </Fragment>)}{!props.documents.length && <tr><td className="adm-empty" colSpan={7}>暂无文档。</td></tr>}</tbody>
       </table></div>
     </Card>
   );

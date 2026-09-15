@@ -17,7 +17,7 @@ import {
   type MemoryPart,
   type MemoryVisibility,
 } from "../api.js";
-import { Badge, Card, FilterBar, MetricStrip, PageHeader, RefreshButton, Select } from "../components/AdminUi.js";
+import { Badge, Card, FilterBar, MetricStrip, PageHeader, RefreshButton, Select, Skeleton, TableSkeleton } from "../components/AdminUi.js";
 import { Icon } from "../components/Icon.js";
 
 const VISIBILITY_TEXT: Record<MemoryVisibility, string> = {
@@ -130,7 +130,7 @@ function NodeDetail(props: { nodeId: string; onClose: () => void; onDelete: (nod
     danger={node ? <button className="adm-btn adm-btn-danger" type="button" disabled={props.busy} onClick={() => void props.onDelete(node.id)}><Icon name="close" size={14} /><span>删除这个节点</span></button> : undefined}
     footer={node ? <>创建于 {date(node.createdAt)} · 最近更新 {date(node.updatedAt)}</> : undefined}>
     {error && <p className="adm-notice adm-notice-err">{error}</p>}
-    {!node && !error && <div className="adm-state"><span className="adm-spinner" /><span>正在读取节点…</span></div>}
+    {!node && !error && <Skeleton lines={4} />}
     {node && <>
       <div className="adm-memparts">{node.parts.map((part, index) => <p className="adm-mempart" key={index}>{partText(part)}</p>)}</div>
       <dl className="adm-usage" style={{ marginTop: 14 }}>
@@ -309,7 +309,7 @@ export function MemoryPage({ onUnauthorized }: { onUnauthorized: () => void }) {
             <td>{date(cube.updatedAt)}</td>
             <td><button className="adm-btn adm-btn-sm" type="button" aria-label={`查看 ${cube.name}`} title="查看详情" onClick={() => void openCube(cube.id)}><Icon name="edit" size={13} /><span>详情</span></button></td>
           </tr>;
-        })}{!visible.length && !loading && <tr><td className="adm-empty" colSpan={6}>没有符合条件的记忆空间</td></tr>}{loading && <tr><td className="adm-empty" colSpan={6}><span className="adm-spinner" /> 正在读取记忆空间</td></tr>}</tbody>
+        })}{!visible.length && !loading && <tr><td className="adm-empty" colSpan={6}>没有符合条件的记忆空间</td></tr>}{loading && <TableSkeleton cols={6} />}</tbody>
       </table></div>
     </Card>
     {selectedNodeId ? <NodeDetail nodeId={selectedNodeId} busy={busy} onClose={() => setSelectedNodeId("")} onDelete={removeNode} />

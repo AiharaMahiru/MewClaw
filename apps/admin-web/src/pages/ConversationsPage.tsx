@@ -8,7 +8,7 @@ import {
   type AdminDashboardSnapshot,
 } from "../api.js";
 import { SessionSummary } from "../components/SessionSummary.js";
-import { Card, Dot, MetricStrip, PageHeader, RefreshButton, Select } from "../components/AdminUi.js";
+import { Card, Dot, MetricStrip, PageHeader, RefreshButton, Select, Skeleton } from "../components/AdminUi.js";
 
 const MAX_GENERATION = 1_000_000;
 
@@ -98,7 +98,7 @@ export function ConversationsPage({ onUnauthorized }: { onUnauthorized: () => vo
         <button className="adm-btn adm-btn-primary" type="submit" disabled={loading || !selectedId}>读取</button>
       </form>
     </Card>
-    {loading && !snapshot && <div className="adm-state"><span className="adm-spinner" /><span>正在读取可用目标…</span></div>}
+    {loading && !snapshot && <Skeleton lines={3} />}
     {snapshot && <Card title={snapshot.target.label} meta={`代次 ${snapshot.generation}`}>
       <SessionSummary session={snapshot.session} />
     </Card>}
