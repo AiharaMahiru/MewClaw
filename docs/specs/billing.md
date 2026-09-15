@@ -24,6 +24,7 @@ interface BillingService {
   recordUsage(input: UsageInput): Promise<UsageCharge> // 幂等
   quota(scope: Scope): Promise<QuotaSnapshot>
   setQuota(scope: Scope, monthlyLimitMicroCredits: number): Promise<QuotaSnapshot> // Provider 内部精确单位
+  resetUsage(scope: Scope): Promise<QuotaSnapshot> // 记录用量纪元，已用归零重计
   listPrices(): Promise<ModelPrice[]>
   setPrice(price: ModelPrice): Promise<ModelPrice>
   aggregate(filter: UsageAggregateFilter): Promise<UsageAggregate[]>
@@ -31,6 +32,8 @@ interface BillingService {
 ```
 
 `recordUsage` 使用 `(runId, turn, step, provider, model)` 唯一键；重复投递只返回既有账本行，不重复扣费。账本行保存当时使用的价格与计算结果，价格修改不回写历史。
+
+`resetUsage` 把该用户的用量纪元推进到当前时间（`billing_usage_epochs` 表，按 `tenant/bot/deployment/user` 一行）：`quota()` 与 `aggregate()` 只统计纪元之后入账的 charge，账本行不删不改，历史仍可审计；纪元等同或早于 charge 时间戳的边界按「计入」处理。与 `setQuota` 的额度策略互不干扰。
 
 ## 3 配置契约
 
@@ -81,6 +84,7 @@ Lark Admin 身份域，使 Web UUID 用量与飞书历史账本可由同一 Admi
 GET  /api/admin/billing/summary?userId=&provider=&model=&from=&to=
 GET  /api/admin/billing/quota?userId=
 PUT  /api/admin/billing/quota       { userId, monthlyLimitUsd }
+POST /api/admin/billing/quota/reset { userId }
 GET  /api/admin/billing/prices
 PUT  /api/admin/billing/prices      { provider, model, ...rates }
 ```
