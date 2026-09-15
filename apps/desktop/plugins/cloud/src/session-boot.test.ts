@@ -19,7 +19,7 @@ it('本地复用Web品牌时停用官方品牌Consumer，避免同优先级重�
   const html = '<script>globalThis["__DSH_BOOT__"] = ' + JSON.stringify(graph) + ';</script>';
   const output = sessionLocationHtml(html, { location: 'local', locationRevision: 'next', brandRevision: 'brand' });
   expect(output).not.toContain(id);
-  expect(output).toContain('dsh-lark-atw-brand');
+  expect(output).toContain('dsh-lark-mewclaw-brand-desktop');
   expect(sessionLocationHtml(html, { location: 'cloud', locationRevision: 'next' })).toContain(id);
 });
 

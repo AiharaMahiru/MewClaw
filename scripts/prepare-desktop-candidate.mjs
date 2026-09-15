@@ -111,8 +111,8 @@ await writeFile(resolve(destination, 'package.json'), `${JSON.stringify({
   private: true, type: 'module', main: 'launcher.mjs',
   dependencies: { 'dsh-plugin-desktop': manifest.version, 'dsh-lark-desktop-cloud': '0.1.0' },
   overrides: JSON.parse(await readFile(fileURLToPath(new URL('../apps/desktop/dsh-overrides.json', import.meta.url)), 'utf8')),
-  workspaces: ['dsh-plugin-desktop', 'mewclaw-cloud', 'mewclaw-host', 'mewclaw-brand'],
-  scripts: { build: 'npm run build --workspace mewclaw-host && npm run build --workspace mewclaw-brand && node generate-mewclaw-icon.mjs && npm run build --workspace dsh-plugin-desktop && npm run build --workspace mewclaw-cloud' },
+  workspaces: ['dsh-plugin-desktop', 'mewclaw-cloud', 'mewclaw-host', 'mewclaw-brand', 'mewclaw-brand-desktop'],
+  scripts: { build: 'npm run build --workspace mewclaw-host && npm run build --workspace mewclaw-brand && npm run build --workspace mewclaw-brand-desktop && node generate-mewclaw-icon.mjs && npm run build --workspace dsh-plugin-desktop && npm run build --workspace mewclaw-cloud' },
 }, null, 2)}\n`);
 await writeFile(resolve(destination, 'UPSTREAM.json'), `${JSON.stringify({
   repository: 'https://github.com/anywhere-labs/dsh-desktop', revision,

@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "dsh-lark-desktop-host": "0.1.0",
-    "dsh-lark-atw-brand": "0.1.0"
+    "dsh-lark-mewclaw-brand-desktop": "0.1.0"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.2",

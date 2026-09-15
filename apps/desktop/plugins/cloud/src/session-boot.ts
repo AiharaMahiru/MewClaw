@@ -42,7 +42,7 @@ export function sessionLocationHtml(html: string, options: {
   graph.entries.push({ id: LOCATION_CLIENT, url: LOCATION_CLIENT_PATH, rev: options.locationRevision, inject: ['dsh-plugin-desktop', SIDEBAR] });
   graph.batches.push({ phase: 'application', url: LOCATION_CLIENT_PATH, rev: options.locationRevision, entries: [LOCATION_CLIENT] });
   if (options.location === 'local' && options.brandRevision) {
-    const id = 'dsh-lark-atw-brand';
+    const id = 'dsh-lark-mewclaw-brand-desktop';
     const url = '/_dsh/desktop/brand-client.js';
     graph.entries.push({ id, url, rev: options.brandRevision, inject: [LOCATION_CLIENT, SIDEBAR, '@deepseek-ai/dsh-client-ui-renderer'] });
     graph.batches.push({ phase: 'application', url, rev: options.brandRevision, entries: [id] });
