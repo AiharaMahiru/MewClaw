@@ -132,6 +132,23 @@ export class UserModelProfiles {
   }
 
   /**
+   * 供 Auth Edge 桌面推理：按当前版本解析本人 profile 内任意已声明模型；
+   * `model` 缺省取 `defaultModel`。与 resolveRoute 不同，不校验版本钉扎——
+   * 桌面请求是实时调用，不存在先取 scope 后排队执行的重定向风险。
+   */
+  async resolveProfileModelRoute(
+    userId: string,
+    profileId: string,
+    model?: string,
+  ): Promise<UserModelRuntimeRoute | undefined> {
+    const profile = await this.deps.store.findUserModelProfile(userId, profileId);
+    if (!profile) return undefined;
+    const target = model ?? profile.defaultModel;
+    if (!profile.modelIds.includes(target)) return undefined;
+    return this.resolveRecord(profile, userId, profile.id, profile.revision, target);
+  }
+
+  /**
    * 仅供 Worker loopback 回调。版本和模型必须与此前的 scope 引用相同，避免
    * 排队 prompt 被后来的账户设置重定向到别的端点或密钥。
    */

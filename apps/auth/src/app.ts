@@ -21,6 +21,7 @@ import {
 } from "dsh-lark-auth-edge";
 import type { PromptAuditModel } from "./prompt-audit-model.js";
 import { createPromptAuditModel } from "./prompt-audit-model.js";
+import { createSharedModelRuntime, type SharedModelRuntime } from "./shared-model-runtime.js";
 
 export const name = "lark-auth-runtime";
 export const Config = z.object({});
@@ -38,7 +39,10 @@ export async function apply(ctx: Context): Promise<void> {
   const runtime = await runAuthApp({
     config: (await import("dsh-lark-auth-edge")).resolveAuthConfig(environment),
     bootCheck,
-    dependencies: { createAuditModel: () => createPromptAuditModel({ launchEnvironment: launchEnvironmentOf(ctx) }) },
+    dependencies: {
+      createAuditModel: () => createPromptAuditModel({ launchEnvironment: launchEnvironmentOf(ctx) }),
+      createSharedModels: () => createSharedModelRuntime({ launchEnvironment: launchEnvironmentOf(ctx) }),
+    },
   });
   if (runtime) ctx.effect(() => () => runtime.close());
 }
@@ -64,6 +68,8 @@ export interface AuthAppDependencies {
   createService(options: AuthServiceOptions): AuthService;
   createEdgeServer(options: AuthEdgeServerOptions): AuthEdgeLifecycle;
   createAuditModel(): Promise<PromptAuditModel>;
+  /** 缺省即不装配共享目录；`shared/*` 选择器由 Edge fail-closed 404。 */
+  createSharedModels?(): Promise<SharedModelRuntime>;
 }
 
 export interface StartAuthAppOptions {
@@ -110,6 +116,7 @@ export async function startAuthApp(options: StartAuthAppOptions): Promise<AuthAp
   const store = dependencies.createStore(config.databaseUrl);
   let edge: AuthEdgeLifecycle | undefined;
   let auditModel: PromptAuditModel | undefined;
+  let sharedModels: SharedModelRuntime | undefined;
   try {
     await store.migrate();
     const service = dependencies.createService({
@@ -120,13 +127,14 @@ export async function startAuthApp(options: StartAuthAppOptions): Promise<AuthAp
       ...(config.sessionTtlMs !== undefined ? { sessionTtlMs: config.sessionTtlMs } : {}),
     });
     if (config.promptAudit?.enabled && !options.bootCheck) auditModel = await dependencies.createAuditModel();
+    if (!options.bootCheck) sharedModels = await dependencies.createSharedModels?.();
     const promptAuditor = auditModel && config.promptAudit ? createPromptAuditor(auditModel, config.promptAudit) : undefined;
-    edge = dependencies.createEdgeServer({ config, service, ...(promptAuditor ? { promptAuditor } : {}) });
+    edge = dependencies.createEdgeServer({ config, service, ...(promptAuditor ? { promptAuditor } : {}), ...(sharedModels ? { sharedModels } : {}) });
     await edge.listen();
     if (options.bootCheck) await assertBootHealthy(edge);
-    return createRuntime(config, edge, store, auditModel);
+    return createRuntime(config, edge, store, auditModel, sharedModels);
   } catch (error) {
-    await closeInOrder(edge, store, auditModel).catch(() => undefined);
+    await closeInOrder(edge, store, auditModel, sharedModels).catch(() => undefined);
     throw error;
   }
 }
@@ -166,6 +174,7 @@ function createRuntime(
   edge: AuthEdgeLifecycle,
   store: AuthStoreLifecycle,
   auditModel?: PromptAuditModel,
+  sharedModels?: SharedModelRuntime,
 ): AuthAppRuntime {
   let closed = false;
   return {
@@ -173,16 +182,18 @@ function createRuntime(
     async close() {
       if (closed) return;
       closed = true;
-      await closeInOrder(edge, store, auditModel);
+      await closeInOrder(edge, store, auditModel, sharedModels);
     },
   };
 }
 
-async function closeInOrder(edge: AuthEdgeLifecycle | undefined, store: AuthStoreLifecycle, auditModel?: PromptAuditModel): Promise<void> {
+async function closeInOrder(edge: AuthEdgeLifecycle | undefined, store: AuthStoreLifecycle, auditModel?: PromptAuditModel, sharedModels?: SharedModelRuntime): Promise<void> {
   const edgeResult = edge ? await settle(() => edge.close()) : undefined;
+  const sharedResult = sharedModels ? await settle(() => sharedModels.close()) : undefined;
   const auditResult = auditModel ? await settle(() => auditModel.close()) : undefined;
   const storeResult = await settle(() => store.close());
   if (edgeResult?.status === "rejected") throw edgeResult.reason;
+  if (sharedResult?.status === "rejected") throw sharedResult.reason;
   if (auditResult?.status === "rejected") throw auditResult.reason;
   if (storeResult.status === "rejected") throw storeResult.reason;
 }

@@ -374,7 +374,7 @@ describe("AuthEdgeServer", () => {
     const ownList = await fetch(`${base}/auth/models`, { headers: { cookie: memberCookie } });
     expect(await ownList.json()).toMatchObject({ defaultProfileId: createdBody.profile.id, profiles: [{ id: createdBody.profile.id, keyConfigured: true }] });
     const otherList = await fetch(`${base}/auth/models`, { headers: { cookie: otherCookie } });
-    expect(await otherList.json()).toEqual({ profiles: [] });
+    expect(await otherList.json()).toEqual({ profiles: [], sharedModels: [] });
     const otherPatch = await fetch(`${base}/auth/models/${createdBody.profile.id}`, {
       method: "PATCH",
       headers: { origin: base, cookie: otherCookie, "x-csrf-token": csrf, "content-type": "application/json" },

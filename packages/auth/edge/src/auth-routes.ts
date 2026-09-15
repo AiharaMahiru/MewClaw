@@ -5,10 +5,12 @@ import type { AuthService, AuthUser } from "dsh-lark-auth";
 
 import type { AuthEdgeConfig } from "./config.js";
 import { appendCookie, CSRF_COOKIE, newCsrfToken, OAUTH_STATE_COOKIE, readCookie, sessionCookieName } from "./cookies.js";
+import { desktopInference, type DesktopSharedRuntime } from "./desktop-inference.js";
 import { buildFeishuAuthorizeUrl, exchangeFeishuCode } from "./feishu.js";
 import { handleBotAccount } from "./feishu-bots.js";
 import { httpError, readJson, sendError, sendHtml, sendJson, sessionToken } from "./http-utils.js";
 import { messagePage, pairPage, resetPage } from "./login-page.js";
+import type { PromptAuditor } from "./prompt-audit.js";
 import type { LoginGuard, RateLimiter } from "./rate-limit.js";
 import {
   assertPublicUserModelUrl,
@@ -36,6 +38,9 @@ export interface AuthRouteDeps {
   loginLimiter: RateLimiter;
   loginGuard: LoginGuard;
   generalLimiter: RateLimiter;
+  promptAuditor?: PromptAuditor | undefined;
+  /** 部署侧共享模型目录（apps/auth 装配）；未装配时 `shared/*` 选择器 404。 */
+  sharedModels?: DesktopSharedRuntime | undefined;
   current(req: IncomingMessage): Promise<{ user: AuthUser } | undefined>;
   ensureCsrf(req: IncomingMessage, cookies: string[]): void;
   refreshSessionCookie(req: IncomingMessage, cookies: string[]): void;
@@ -52,6 +57,15 @@ export class AuthRouteHandlers {
       if (!current) { sendError(res, 401, "UNAUTHORIZED"); return; }
       if (req.method !== "GET" && !this.deps.generalLimiter.allow(`feishu-bot:${current.user.id}`)) throw httpError(429, "RATE_LIMITED");
       return handleBotAccount(req, res, url.pathname, current.user.id, service.feishuBots, config);
+    }
+    if (req.method === "POST" && url.pathname === "/auth/desktop-inference/chat/completions") {
+      const current = await this.deps.current(req);
+      if (!current) { sendError(res, 401, "UNAUTHORIZED"); return; }
+      if (!this.deps.generalLimiter.allow(`desktop-inference:${current.user.id}`)) throw httpError(429, "RATE_LIMITED");
+      return desktopInference(req, res, { userId: current.user.id, service, shared: this.deps.sharedModels,
+        maxBytes: config.desktopBodyLimit ?? 8 * 1024 * 1024, timeoutMs: config.desktopInferenceTimeoutMs ?? 120000,
+        audit: text => config.promptAudit?.enabled === false ? Promise.resolve('allow') : this.deps.promptAuditor?.audit(text) ?? Promise.resolve('unavailable'),
+        assertPublicUrl: assertPublicUserModelUrl });
     }
     if (req.method === "GET" && url.pathname === "/auth/account") return this.redirectLegacyAccount(req, res);
     if (req.method === "GET" && url.pathname === "/auth/me") { const current = await this.deps.current(req); if (!current) { sendError(res, 401, "UNAUTHORIZED"); return; } const cookies: string[] = []; this.deps.refreshSessionCookie(req, cookies); sendJson(res, 200, { user: publicUser(current.user) }, cookies); return; }
@@ -88,11 +102,12 @@ export class AuthRouteHandlers {
     const current = await this.deps.current(req);
     if (!current) { sendError(res, 401, "UNAUTHORIZED"); return; }
     if (req.method === "GET") {
-      const [profiles, defaultProfileId] = await Promise.all([
+      const [profiles, defaultProfileId, sharedModels] = await Promise.all([
         service.listMyModelProfiles(current.user.id),
         service.getMyDefaultModelProfileId(current.user.id),
+        this.deps.sharedModels?.listModels().catch(() => []) ?? Promise.resolve([]),
       ]);
-      sendJson(res, 200, { profiles, ...(defaultProfileId ? { defaultProfileId } : {}) });
+      sendJson(res, 200, { profiles, sharedModels, ...(defaultProfileId ? { defaultProfileId } : {}) });
       return;
     }
     const body = await readJson(req, config.requestBodyLimit);
