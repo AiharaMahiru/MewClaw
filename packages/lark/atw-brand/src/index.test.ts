@@ -80,6 +80,6 @@ describe("dsh-lark-atw-brand", () => {
     // 移动适配覆盖层样式（§6 移动适配）
     expect(html).toContain("@media(max-width:768px)");
     expect(html).toContain('[class*="_sidebarCol"]{position:fixed');
-    expect(html).toContain('[class*="_centerCol"]{margin-left:55px}');
+    expect(html).toContain('[class*="_centerCol"]{grid-column:1/-1;margin-left:55px}');
   });
 });

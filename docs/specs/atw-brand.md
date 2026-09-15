@@ -63,10 +63,11 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   `application/manifest+json`；
 - 启动屏：`prefers-reduced-motion` 下不播放；~1.05s 后淡出并自删，失败兜底
   1600ms `setTimeout` 移除；
-- 移动适配：官方前端无移动断点，`≤768px` 视口下左侧栏列仍按桌面 flex 侧推
+- 移动适配：官方前端无移动断点，`≤768px` 视口下左侧栏列仍占 grid 轨侧推
   挤压主列。注入样式把 `[class*="_sidebarCol"]` 改为 `fixed` 覆盖层
-  （`top/bottom/left:0`，`z-index:120`，`height:100dvh`），`[class*="_centerCol"]`
-  以 `margin-left:55px` 为收起态图标栏让位；选择器用 CSS Module 稳定后缀
+  （`top/bottom/left:0`，`z-index:120`，`height:100dvh`）；侧栏脱离 grid 布局后
+  `centerCol` 会落进 56px 的首轨，须以 `grid-column:1/-1` 跨满全行再加
+  `margin-left:55px` 为收起态图标栏让位；选择器用 CSS Module 稳定后缀
   （`<hash>_<name>`，重建仅哈希变化），不改官方包；
 - 所有注册经 `ctx.effect()`/`ctx.slots.inject`，卸载即回收。
 
