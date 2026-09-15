@@ -2,7 +2,7 @@
 
 更新时间：2026-09-15
 工作分支：`desktop-dev`
-本地同步基线：`origin/desktop` 现为 `c627dae`（merge master 带入 R32 计费纪元/管理端按用户用量 + R33 桌面推理三形态选择器与共享模型目录，均已部署生产）。desktop-dev 尚未合入该基线；下次 sync 时 merge `origin/desktop`，`packages/auth/edge` 下桌面端自写的旧版 `desktop-inference.ts` / `auth-routes.ts` 路由块一律以主线版本为准（主线已扩展，详见「待办 1」）。
+本地同步基线：已拉取并合入 `origin/desktop@c627dae`（merge master 带入 R32 计费纪元/管理端按用户用量 + R33 桌面推理三形态选择器与共享模型目录，均已部署生产），合并提交为 `889230f`。按交接约定 `packages/auth/edge` 下 `desktop-inference.ts`/`desktop-inference.test.ts`/`auth-routes.ts`/`server.ts`/`config.ts` 冲突全部取主线版本，本分支不再维护这些文件。
 
 ## 当前唯一交付目录
 
@@ -77,7 +77,7 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 
 **状态更新（2026-09-15）**：主线 `master@38795d2` 已把 Edge `desktop-inference` 移植回主线并扩展为三形态选择器，`/auth/models` 附带 `sharedModels` 目录，部署为 `R33-desktop-inference-20260915`（生产已上线，端点 CSRF→401 链路验证通过）。SPEC 见 `docs/specs/auth.md` §6 桌面推理段。**桌面端 picker 扩展是剩余工作**：
 
-- `apps/desktop/plugins/cloud/cloud-model.ts`：`session/modelCatalog` 目前只注册 `cloud-default`。改为拉 `/auth/models` 后展开全部选项：
+- `apps/desktop/plugins/cloud/src/cloud-model.ts`：`session/modelCatalog` 目前只注册 `cloud-default`。改为拉 `/auth/models` 后展开全部选项：
   - `profiles[].modelIds` 每项 → 选择器 `account/<profileId>/<model>`（显示名建议 `<profile.displayName> · <model>`）
   - `sharedModels[]` 每项 → 选择器 `shared/<provider>/<model>`（显示名建议 `<name>`）
   - 保留 `cloud-default` 作为"账号默认"条目（账号默认 profile 的默认模型）
@@ -98,8 +98,8 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 
 ## 推送状态与限制
 
-- 本轮改动基于 `origin/desktop@4efc4c5`，合并提交为 `5bc346b`，叠加无缝切换、同步边界修正、测试和文档更新。
-- `desktop` 远端现为 `c627dae`（含 R32/R33，均已部署生产；R33 提供三形态推理选择器与共享模型目录）。合并实现与交接基线 `82f0f83d27371e186d4bc3916d12da0258987b0b` 已推送并由 `git ls-remote` 核验（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成）。
+- 本轮改动基于 `origin/desktop@c627dae`，合并提交为 `889230f`，叠加无缝切换、同步边界修正、测试和文档更新。
+- `desktop` 远端现为 `c627dae`（含 R32/R33，均已部署生产；R33 提供三形态推理选择器与共享模型目录）。本分支推送后重新核验 `git ls-remote`（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成）。
 - 后续若继续修改源码或交接文档，完成提交后重新执行：
 
   ```text
