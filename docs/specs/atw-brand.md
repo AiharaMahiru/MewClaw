@@ -63,6 +63,11 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   `application/manifest+json`；
 - 启动屏：`prefers-reduced-motion` 下不播放；~1.05s 后淡出并自删，失败兜底
   1600ms `setTimeout` 移除；
+- 移动适配：官方前端无移动断点，`≤768px` 视口下左侧栏列仍按桌面 flex 侧推
+  挤压主列。注入样式把 `[class*="_sidebarCol"]` 改为 `fixed` 覆盖层
+  （`top/bottom/left:0`，`z-index:120`，`height:100dvh`），`[class*="_centerCol"]`
+  以 `margin-left:55px` 为收起态图标栏让位；选择器用 CSS Module 稳定后缀
+  （`<hash>_<name>`，重建仅哈希变化），不改官方包；
 - 所有注册经 `ctx.effect()`/`ctx.slots.inject`，卸载即回收。
 
 ## 7 安全与信任
@@ -77,6 +82,8 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
 - `unit`：使用指定 MewClaw 商标几何；不引用 DeepSeek 鱼形组件或外部资源；经
   WebServer 扩展点提供标题/语言/favicon/manifest；
 - `client`：等待官方 conversation 槽位声明后再注册占位者；
+- 移动适配以真实浏览器验收为准：390px 视口下侧栏展开为覆盖层、主列不被
+  挤压、无横向溢出（`scrollWidth ≤ 视口宽`）、关闭后恢复；
 - 门禁：`pnpm verify:dsh-brand`（官方完整性 + 品牌 slot 白名单）。
 
 ## 9 迁移映射
