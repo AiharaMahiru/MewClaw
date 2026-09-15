@@ -483,9 +483,21 @@ upstream、宿主端口或内部认证头。未知、过期和已撤销 ID 统�
 
 代理永不接受浏览器提供的 `agentPreset` 作为授权证据；`session.create` 缺省/非法 preset 由角色策略补齐或拒绝。代理不修改 Worker 的 preset 文件、overlay、sandbox provider 或飞书运行面。
 
+`POST /auth/desktop-inference/chat/completions` 是桌面客户端的账号级模型代理（OpenAI Chat Completions SSE）。它要求已登录会话 Cookie + CSRF，按用户限流，请求体走 `desktopBodyLimit`（默认 8MiB，上限 16MiB），推理超时 `desktopInferenceTimeoutMs`（默认 120 秒，1 秒至 10 分钟），客户端断开或超时必须取消上游调用。请求体字段只接受 OpenAI 白名单；`model` 是服务端路由选择器而不是供应商模型名，三种形态：
+
+| 选择器 | 路由 |
+| --- | --- |
+| `cloud-default` | 账号默认私有 profile 的默认模型 |
+| `account/<profileId>` 或 `account/<profileId>/<model>` | 该账号本人 profile；`model` 缺省取 `defaultModel`，显式值必须 ∈ profile 已声明 `modelIds` |
+| `shared/<provider>/<model>` | 部署侧共享目录：Edge 进程内独立 Cordis 上下文承载 `LlmRuntime` 与凭证引用，模型目录由注册 provider 的 `listModels()` 枚举 |
+
+`profileId`/`provider` 段不含 `/`；`model` 段允许 `/`（供应商模型 ID 可带命名空间）。私有 profile 路径在服务端解析 `baseUrl + apiKey`，`assertPublicUserModelUrl` 校验通过后才发请求，`redirect: 'error'`，上游错误体与状态不透传（统一 `CLOUD_INFERENCE_FAILED`）。共享路径把 OpenAI 消息翻译为 provider 中立的 `Message[]` 后经 `ctx.llm.stream()` 调用，再把 `StreamChunk` 翻译回 OpenAI SSE delta（`text-delta→delta.content`、`reasoning-delta→delta.reasoning_content`、`tool-call-delta→delta.tool_calls`、finish 映射 `stop`/`tool_calls`/`length`）；工具消息映射为 `tool-result` 用户消息，非函数工具、`tool_choice`、`top_p` 等无对应槽位的字段不下发。图片/文件等内容部件私有路径原样转发，共享路径拒绝非文本部件。
+
+两条路径的密钥都只存在于服务器请求作用域，永不下发、不落盘、不进日志；审计（`promptAuditor`）结果为 `block` 或 `unavailable` 时一律拒绝（`PROMPT_AUDIT_REJECTED`）。默认 profile 缺失返回 `409 CLOUD_DEFAULT_MODEL_REQUIRED`；profile、模型或共享目录项不存在返回 `404 MODEL_UNAVAILABLE`；共享运行时未装配时 `shared/*` 选择器同样返回 `404`。`GET /auth/models` 响应附带 `sharedModels`（`{provider, model, name}` 数组，无凭证字段），供桌面模型选择器列出部署共享目录。
+
 ## 7 配置与凭证
 
-可校验配置至少包括：`listenHost`、`listenPort`、`workerBaseUrl`、`workerTokenEnv`、`adminBaseUrl`、`adminTokenEnv`、`databaseUrlEnv`、`credentialRollbackKeyEnv`、`credentialRollbackPath`、`approvalTtlMs`（60 秒至 60 分钟，默认 15 分钟）、`sessionTtlMs`（1 分钟至 30 天，默认 7 天；同源驱动服务端滑动会话过期与会话 Cookie `Max-Age`，登录态须跨浏览器重启持久化）、`sessionCookieSecure`、`trustedOrigins`、`userWorkspaceRoot`、`adminWorkspaceRoot`、`feishu`（app id/secret/redirect URI 的凭证引用）、`mail`（SMTP provider/凭证引用）、请求体和限流上限。请求体上限按路径分级：认证端点与 Admin/计费代理走 `requestBodyLimit`（默认 128KiB）；转发 Worker 的 `/api/*` RPC、`/sidebar/api/*`、`/git/*` 走独立的 `proxyBodyLimit`（1MiB 至 512MiB，默认 300MiB），且不得小于上游 `/api` 桥为官方图片附件聚合容量设计的上限——否则浏览器多图提示词在授权前被 413 截断。生产缺失凭证 fail loud；测试通过内存 store/fake mail/fake OAuth，不读 `.env`。
+可校验配置至少包括：`listenHost`、`listenPort`、`workerBaseUrl`、`workerTokenEnv`、`adminBaseUrl`、`adminTokenEnv`、`databaseUrlEnv`、`credentialRollbackKeyEnv`、`credentialRollbackPath`、`approvalTtlMs`（60 秒至 60 分钟，默认 15 分钟）、`sessionTtlMs`（1 分钟至 30 天，默认 7 天；同源驱动服务端滑动会话过期与会话 Cookie `Max-Age`，登录态须跨浏览器重启持久化）、`sessionCookieSecure`、`trustedOrigins`、`userWorkspaceRoot`、`adminWorkspaceRoot`、`feishu`（app id/secret/redirect URI 的凭证引用）、`mail`（SMTP provider/凭证引用）、`desktopBodyLimit`（桌面推理请求体上限，默认 8MiB，上限 16MiB）、`desktopInferenceTimeoutMs`（桌面推理超时，默认 120 秒，1 秒至 10 分钟）、请求体和限流上限。请求体上限按路径分级：认证端点与 Admin/计费代理走 `requestBodyLimit`（默认 128KiB）；转发 Worker 的 `/api/*` RPC、`/sidebar/api/*`、`/git/*` 走独立的 `proxyBodyLimit`（1MiB 至 512MiB，默认 300MiB），且不得小于上游 `/api` 桥为官方图片附件聚合容量设计的上限——否则浏览器多图提示词在授权前被 413 截断。生产缺失凭证 fail loud；测试通过内存 store/fake mail/fake OAuth，不读 `.env`。
 
 `credentialRollbackKeyEnv` 只能引用独立的 32-byte AES-256-GCM 密钥（hex 或 base64url），不得复用数据库 URL、Worker/Admin Token 或其他服务凭证。`credentialRollbackPath` 必须是专用绝对目录；Auth Provider 创建目录为 `0700`、文件为 `0600`，以临时文件加 fsync 和原子链接方式落盘。回滚载荷全量加密，文件名仅为 `snapshotRef` 摘要；缺失、无效或与数据库凭证引用相同的配置在建立数据库连接前 fail loud。Provider dispose 时清零内存密钥并关闭持久化资源。
 
@@ -510,6 +522,7 @@ upstream、宿主端口或内部认证头。未知、过期和已撤销 ID 统�
 - 凭证补同步：create/merge mapping 均须绑定原 run；当前密码等价时零 snapshot、零密码写入、零 session 撤销；改密成功但迁移 checkpoint 未写入时，新批准重试可幂等收敛。
 - 对账：映射存在但目标用户缺失、资源缺失或资源 owner 改变时返回 mismatch。
 - 生命周期：dispose 与异步初始化竞态不 provide 且连接关闭；迁移 Consumer 缺失 `ctx.auth` 时不激活，`apps/auth` 直接构造兼容测试继续通过。
+- 桌面推理：请求体字段白名单、`model` 三种选择器解析（含带 `/` 的模型段）、审计 block/unavailable 拒绝、默认 profile 缺失 409、未知 profile/模型/共享项 404、密钥不出现在响应体、上游错误不透传、超时与客户端断开取消上游、共享路径 SSE 翻译（text/reasoning/tool_calls/finish/usage）与非文本部件拒绝。
 - 隔离回归：`tests/composition.test.ts`、OCI provider、lightweight overlay、Gateway allowlist 和 session-directory 原有测试继续通过。
 - E2E：fake worker + fake mail + fake Feishu OAuth 完成注册→验证→登录→创建会话→刷新→登出；不调用真实模型、飞书、邮件或外部服务。
 
