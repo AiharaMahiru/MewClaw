@@ -146,14 +146,7 @@ code { padding: 1px 6px; border-radius: 6px; background: var(--adm-muted-soft); 
 .adm-brand-name { font-size: 15px; font-weight: 650; letter-spacing: .01em; white-space: nowrap; background: linear-gradient(120deg, var(--adm-ink) 30%, var(--adm-accent-ink)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .adm-iconbtn { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; color: var(--adm-ink-2); }
 .adm-iconbtn:hover { background: var(--adm-muted-soft); color: var(--adm-ink); }
-.adm-back {
-  display: flex; align-items: center; justify-content: center; gap: 7px; height: 38px; margin: 8px 2px 12px;
-  border: 1px solid var(--adm-line); border-radius: var(--adm-radius-m);
-  background: var(--adm-glass-sub); color: var(--adm-ink); font-size: 13px; font-weight: 500; text-decoration: none;
-  transition: background .18s var(--adm-ease);
-}
-.adm-back:hover { background: var(--adm-glass-strong); }
-.adm-nav { flex: 1; min-height: 0; overflow-y: auto; }
+.adm-nav { flex: 1; min-height: 0; overflow-y: auto; margin-top: 8px; }
 .adm-nav-group + .adm-nav-group { margin-top: 14px; }
 .adm-nav-label { padding: 0 12px 5px; color: var(--adm-ink-3); font-size: 10px; font-weight: 600; letter-spacing: .1em; }
 .adm-nav-item {
@@ -200,8 +193,10 @@ code { padding: 1px 6px; border-radius: 6px; background: var(--adm-muted-soft); 
 
 /* 收起态 */
 .adm-shell-collapsed .adm-side { padding-right: 8px; padding-left: 8px; align-items: center; }
-.adm-shell-collapsed .adm-brand-name, .adm-shell-collapsed .adm-back span, .adm-shell-collapsed .adm-nav-label, .adm-shell-collapsed .adm-nav-text, .adm-shell-collapsed .adm-account-name { display: none; }
-.adm-shell-collapsed .adm-back { width: 38px; margin-right: 0; margin-left: 0; }
+.adm-shell-collapsed .adm-side-head { flex-direction: column; align-self: stretch; height: auto; gap: 8px; padding: 2px 0 12px; }
+.adm-shell-collapsed .adm-brand { justify-content: center; width: 100%; }
+.adm-shell-collapsed .adm-brand-name, .adm-shell-collapsed .adm-nav-label, .adm-shell-collapsed .adm-nav-text, .adm-shell-collapsed .adm-account-name { display: none; }
+.adm-shell-collapsed .adm-nav { margin-top: 10px; }
 .adm-shell-collapsed .adm-nav-item { justify-content: center; width: 40px; padding: 0; }
 .adm-shell-collapsed .adm-menu { right: auto; left: 52px; bottom: 4px; }
 
@@ -569,8 +564,10 @@ body[data-ds-dark-theme] .mewclaw-brand-mark { --mewclaw-mark-bg: #181717; --mew
 @media (max-width: 760px) {
   .adm-shell, .adm-shell-collapsed { grid-template-columns: 60px minmax(0, 1fr); }
   .adm-side { padding-right: 8px; padding-left: 8px; align-items: center; }
-  .adm-brand-name, .adm-back span, .adm-nav-label, .adm-nav-text, .adm-account-name { display: none; }
-  .adm-back { width: 38px; margin-right: 0; margin-left: 0; }
+  .adm-side-head { flex-direction: column; align-self: stretch; height: auto; gap: 8px; padding: 2px 0 12px; }
+  .adm-brand { justify-content: center; width: 100%; }
+  .adm-brand-name, .adm-nav-label, .adm-nav-text, .adm-account-name { display: none; }
+  .adm-nav { margin-top: 10px; }
   .adm-nav-item { justify-content: center; width: 40px; padding: 0; }
   .adm-menu { right: auto; left: 52px; bottom: 4px; }
   .adm-stats { grid-template-columns: 1fr 1fr; }

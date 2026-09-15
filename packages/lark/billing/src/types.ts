@@ -99,6 +99,9 @@ export interface BillingStore {
   setPrice(price: ModelPrice): Promise<ModelPrice>;
   getQuotaPolicy(scope: BillingUserScope): Promise<number | undefined>;
   setQuotaPolicy(scope: BillingUserScope, limit: number): Promise<void>;
+  getUsageEpoch(scope: BillingUserScope): Promise<string | undefined>;
+  setUsageEpoch(scope: BillingUserScope, epoch: string): Promise<void>;
+  listUsageEpochs(scope: Omit<BillingUserScope, "userId">): Promise<Array<{ userId: string; epoch: string }>>;
   findCharge(key: string): Promise<UsageCharge | undefined>;
   insertCharge(charge: UsageCharge): Promise<UsageCharge>;
   listCharges(filter: UsageAggregateFilter): Promise<UsageCharge[]>;

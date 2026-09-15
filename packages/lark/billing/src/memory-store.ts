@@ -22,6 +22,7 @@ function sameAnchor(scope: Scope, filter: UsageAggregateFilter): boolean {
 export class MemoryBillingStore implements BillingStore {
   readonly #prices = new Map<string, ModelPrice>();
   readonly #quotas = new Map<string, number>();
+  readonly #epochs = new Map<string, { scope: BillingUserScope; epoch: string }>();
   readonly #charges = new Map<string, UsageCharge>();
 
   constructor(private readonly defaultMonthlyLimitMicroCredits: number) {}
@@ -45,6 +46,20 @@ export class MemoryBillingStore implements BillingStore {
 
   async setQuotaPolicy(scope: BillingUserScope, limit: number): Promise<void> {
     this.#quotas.set(userScopeKey(scope), limit);
+  }
+
+  async getUsageEpoch(scope: BillingUserScope): Promise<string | undefined> {
+    return this.#epochs.get(userScopeKey(scope))?.epoch;
+  }
+
+  async setUsageEpoch(scope: BillingUserScope, epoch: string): Promise<void> {
+    this.#epochs.set(userScopeKey(scope), { scope: { ...scope }, epoch });
+  }
+
+  async listUsageEpochs(scope: Omit<BillingUserScope, "userId">): Promise<Array<{ userId: string; epoch: string }>> {
+    return [...this.#epochs.values()]
+      .filter((entry) => entry.scope.tenantId === scope.tenantId && entry.scope.botId === scope.botId && entry.scope.deploymentId === scope.deploymentId)
+      .map((entry) => ({ userId: entry.scope.userId, epoch: entry.epoch }));
   }
 
   async findCharge(key: string): Promise<UsageCharge | undefined> {
@@ -72,10 +87,12 @@ export class MemoryBillingStore implements BillingStore {
   }
 
   defaultQuota(scope: Scope, now = new Date()): QuotaSnapshot {
+    const epoch = this.#epochs.get(userScopeKey(scope));
+    const epochMs = epoch ? Date.parse(epoch.epoch) : undefined;
     const charges = [...this.#charges.values()].filter((charge) => userScopeKey(charge.scope) === userScopeKey(scope));
     const period = periodStartFor(now);
     const used = charges
-      .filter((charge) => charge.periodStart === period)
+      .filter((charge) => charge.periodStart === period && (epochMs === undefined || Date.parse(charge.recordedAt) >= epochMs))
       .reduce((total, charge) => total + charge.totalMicroCredits, 0);
     const limit = this.#quotas.get(userScopeKey(scope)) ?? this.defaultMonthlyLimitMicroCredits;
     return {

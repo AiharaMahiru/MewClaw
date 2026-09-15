@@ -17,6 +17,7 @@ import {
   getToken,
   searchMemory,
   setToken,
+  resetBillingUsage,
   revokeAdminUserSessions,
   unlinkAdminIdentity,
   updateAdminUser,
@@ -211,5 +212,20 @@ describe("admin-web API client", () => {
 
     await expect(addBillingCredit("u1", 10)).resolves.toMatchObject({ monthlyLimitUsd: 20 });
     expect(JSON.parse(String(request.mock.calls[1]?.[1]?.body))).toEqual({ userId: "u1", monthlyLimitUsd: 20 });
+  });
+
+  it("posts usage reset to the quota reset endpoint and decodes the snapshot", async () => {
+    vi.stubGlobal("document", { cookie: "dsh_csrf=csrf-reset" });
+    const request = vi.fn(async (..._args: Parameters<typeof fetch>) => new Response(JSON.stringify({
+      scope: { tenantId: "t", botId: "b", deploymentId: "d", userId: "u1" },
+      periodStart: "2026-09-01", monthlyLimitUsd: 20, usedUsd: 0, remainingUsd: 20,
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", request);
+
+    await expect(resetBillingUsage("u1")).resolves.toMatchObject({ usedUsd: 0, remainingUsd: 20 });
+    expect(request.mock.calls[0]?.[0]).toBe("/api/admin/billing/quota/reset");
+    expect(request.mock.calls[0]?.[1]?.method).toBe("POST");
+    expect(JSON.parse(String(request.mock.calls[0]?.[1]?.body))).toEqual({ userId: "u1" });
+    expect(new Headers(request.mock.calls[0]?.[1]?.headers).get("x-csrf-token")).toBe("csrf-reset");
   });
 });

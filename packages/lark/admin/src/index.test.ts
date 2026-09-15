@@ -437,6 +437,13 @@ describe("dsh-lark-admin · billing", () => {
         usedMicroCredits: 12,
         remainingMicroCredits: 188,
       })),
+      resetUsage: vi.fn(async (input: Scope) => ({
+        scope: { tenantId: input.tenantId, botId: input.botId, deploymentId: input.deploymentId, userId: input.userId },
+        periodStart: "2026-08-01",
+        monthlyLimitMicroCredits: 200,
+        usedMicroCredits: 0,
+        remainingMicroCredits: 200,
+      })),
       listPrices: vi.fn(async () => []),
       setPrice: vi.fn(async (input: unknown) => input),
       assertCanStart: vi.fn(async () => undefined),
@@ -488,6 +495,24 @@ describe("dsh-lark-admin · billing", () => {
     }));
     expect(invalidPrice.status).toBe(400);
     expect(JSON.parse(invalidPrice.body)).toMatchObject({ error: "INVALID_REQUEST" });
+
+    const reset = await dispatch("/api/admin/billing", mockRequest({
+      method: "POST",
+      url: "/api/admin/billing/quota/reset",
+      authorization: `Bearer ${ADMIN_TOKEN}`,
+      body: Buffer.from(JSON.stringify({ userId: "ou_user" })),
+    }));
+    expect(reset.status).toBe(200);
+    expect(JSON.parse(reset.body)).toMatchObject({ monthlyLimitUsd: 0.0002, usedUsd: 0, remainingUsd: 0.0002 });
+    expect(billing.resetUsage).toHaveBeenCalledWith(expect.objectContaining({ userId: "ou_user", tenantId: "t", botId: "b", deploymentId: "d" }));
+
+    const resetBad = await dispatch("/api/admin/billing", mockRequest({
+      method: "POST",
+      url: "/api/admin/billing/quota/reset",
+      authorization: `Bearer ${ADMIN_TOKEN}`,
+      body: Buffer.from(JSON.stringify({ userId: "ou_user", extra: true })),
+    }));
+    expect(resetBad.status).toBe(400);
   });
 
   it("当前用户用量只接受内部认证头并返回美元与 Token 聚合", async () => {

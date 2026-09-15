@@ -91,7 +91,6 @@ export default function App() {
         <button className="adm-brand" type="button" aria-label="回到管理总览" onClick={() => navigate("dashboard")}><BrandMark /><span className="adm-brand-name">MewClaw 管理</span></button>
         <button className="adm-iconbtn" type="button" aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"} title={collapsed ? "展开侧边栏" : "收起侧边栏"} onClick={() => setCollapsed((value) => !value)}><Icon name="menu" /></button>
       </div>
-      <a className="adm-back" href="/" aria-label="返回工作台"><Icon name="arrow-left" size={14} /><span>返回工作台</span></a>
       <nav className="adm-nav" aria-label="管理页面">
         {groups.map(([group, items]) => <div className="adm-nav-group" key={group}>
           <div className="adm-nav-label">{group}</div>

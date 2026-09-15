@@ -118,6 +118,10 @@ async function serveApi(request, response, url) {
     if (request.method === "PUT") return writeJson(response, 200, { price: await readBody(request) });
     return writeJson(response, 200, { prices: PRICES });
   }
+  if (path === "/api/admin/billing/quota/reset" && request.method === "POST") {
+    const body = await readBody(request);
+    return writeJson(response, 200, { scope: { tenantId: "t", botId: "b", deploymentId: "d", userId: body.userId }, periodStart: "2026-09-01", monthlyLimitUsd: 20, usedUsd: 0, remainingUsd: 20 });
+  }
   if (path === "/api/admin/billing/quota") {
     if (request.method === "PUT") { const body = await readBody(request); return writeJson(response, 200, { scope: { tenantId: "t", botId: "b", deploymentId: "d", userId: body.userId }, periodStart: "2026-09-01", monthlyLimitUsd: body.monthlyLimitUsd, usedUsd: 9.91, remainingUsd: Math.max(0, body.monthlyLimitUsd - 9.91) }); }
     return writeJson(response, 200, { scope: { tenantId: "t", botId: "b", deploymentId: "d", userId: url.searchParams.get("userId") }, periodStart: "2026-09-01", monthlyLimitUsd: 20, usedUsd: 9.91, remainingUsd: 10.09 });

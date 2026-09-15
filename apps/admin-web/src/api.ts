@@ -386,6 +386,14 @@ export function updateBillingQuota(userId: string, monthlyLimitUsd: number): Pro
   });
 }
 
+export function resetBillingUsage(userId: string): Promise<BillingQuota> {
+  return apiFetch("/api/admin/billing/quota/reset", decodeBillingQuota, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ userId }),
+  });
+}
+
 export function updateBillingPrice(price: BillingModelPrice): Promise<BillingModelPrice> {
   return apiFetch("/api/admin/billing/prices", decodeBillingPrice, {
     method: "PUT",

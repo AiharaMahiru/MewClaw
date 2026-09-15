@@ -7,6 +7,7 @@ import {
   fetchBillingPrices,
   fetchBillingQuota,
   fetchBillingSummary,
+  resetBillingUsage,
   updateBillingPrice,
   updateBillingQuota,
   type AdminUserSummary,
@@ -54,8 +55,9 @@ function PriceEditor(props: { price: BillingModelPrice; refresh: () => Promise<v
   </form>;
 }
 
-function QuotaPanel(props: { users: AdminUserSummary[]; onError: (message: string) => void }) {
-  const [userId, setUserId] = useState(props.users[0]?.id ?? "");
+function QuotaPanel(props: { users: AdminUserSummary[]; userId: string; onUserChange: (userId: string) => void; refresh: () => Promise<void>; onError: (message: string) => void }) {
+  const userId = props.userId;
+  const setUserId = props.onUserChange;
   const [quota, setQuota] = useState<BillingQuota | null>(null);
   const [limit, setLimit] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -75,7 +77,7 @@ function QuotaPanel(props: { users: AdminUserSummary[]; onError: (message: strin
   const save = async (): Promise<void> => {
     if (!userId || !Number.isFinite(limit) || limit < 0) return props.onError("额度必须是非负美元金额");
     setBusy(true);
-    try { setQuota(await updateBillingQuota(userId, limit)); }
+    try { setQuota(await updateBillingQuota(userId, limit)); await props.refresh(); }
     catch (cause) { props.onError(cause instanceof ApiError ? cause.code : "额度保存失败"); }
     finally { setBusy(false); }
   };
@@ -88,6 +90,7 @@ function QuotaPanel(props: { users: AdminUserSummary[]; onError: (message: strin
       setQuota(next);
       setLimit(next.monthlyLimitUsd);
       setCredit("");
+      await props.refresh();
     } catch (cause) { props.onError(cause instanceof ApiError ? cause.code : "充值失败"); }
     finally { setBusy(false); }
   };
@@ -105,6 +108,64 @@ function QuotaPanel(props: { users: AdminUserSummary[]; onError: (message: strin
         <button className="adm-btn adm-btn-sm" type="button" disabled={busy || !userId || !credit.trim()} onClick={() => void recharge(Number(credit))}>充值</button>
       </div>
     </div>
+  </Card>;
+}
+
+function UserUsagePanel(props: { users: AdminUserSummary[]; rows: BillingAggregate[]; refresh: () => Promise<void>; onError: (message: string) => void; onAdjust: (userId: string) => void }) {
+  const period = `${new Date().toISOString().slice(0, 7)}-01`;
+  const [quotas, setQuotas] = useState<Record<string, BillingQuota>>({});
+  const [busyId, setBusyId] = useState("");
+  useEffect(() => {
+    let alive = true;
+    void Promise.all(props.users.map(async (user) => {
+      try { return [user.id, await fetchBillingQuota(user.id)] as const; }
+      catch { return null; }
+    })).then((entries) => {
+      if (alive) setQuotas(Object.fromEntries(entries.filter((entry): entry is readonly [string, BillingQuota] => entry !== null)));
+    });
+    return () => { alive = false; };
+  }, [props.users, props.rows]);
+  const usage = new Map<string, { used: number; calls: number; tokens: number }>();
+  for (const row of props.rows) {
+    if (row.periodStart !== period) continue;
+    const entry = usage.get(row.userId) ?? { used: 0, calls: 0, tokens: 0 };
+    entry.used += row.totalUsd;
+    entry.calls += row.calls;
+    entry.tokens += row.inputTokens + row.outputTokens + row.cacheReadTokens + row.cacheWriteTokens + row.reasoningTokens;
+    usage.set(row.userId, entry);
+  }
+  const reset = async (user: AdminUserSummary): Promise<void> => {
+    if (!window.confirm(`确定将 ${user.displayName} 的本月已用金额重置为 $0 吗？\n历史账单保留可查，仅重新开始计数。`)) return;
+    setBusyId(user.id);
+    try {
+      const next = await resetBillingUsage(user.id);
+      setQuotas((prev) => ({ ...prev, [user.id]: next }));
+      await props.refresh();
+    } catch (cause) { props.onError(cause instanceof ApiError ? cause.code : "用量重置失败"); }
+    finally { setBusyId(""); }
+  };
+  return <Card title="用户本月用量" meta={`计费周期 ${period.slice(0, 7)}`}>
+    <div className="adm-table-scroll"><table className="adm-table"><thead><tr>
+      <th>用户</th><th>本月已用</th><th>月额度</th><th>剩余</th><th style={{ width: 140 }}>用量占比</th><th>调用</th><th>Token</th><th>操作</th>
+    </tr></thead><tbody>{props.users.map((user) => {
+      const entry = usage.get(user.id);
+      const quota = quotas[user.id];
+      const used = quota?.usedUsd ?? entry?.used ?? 0;
+      const pct = quota && quota.monthlyLimitUsd > 0 ? Math.min(100, (used / quota.monthlyLimitUsd) * 100) : 0;
+      return <tr key={user.id}>
+        <td><strong>{user.displayName}</strong><span className="adm-sub">{user.email}</span></td>
+        <td><strong>{usd(used)}</strong></td>
+        <td>{quota ? usd(quota.monthlyLimitUsd) : "—"}</td>
+        <td>{quota ? usd(quota.remainingUsd) : "—"}</td>
+        <td><div className="adm-progress"><i style={{ width: `${pct}%` }} /></div></td>
+        <td>{credits(entry?.calls ?? 0)}</td>
+        <td>{tokens(entry?.tokens ?? 0)}</td>
+        <td><div className="adm-actions">
+          <button className="adm-btn adm-btn-sm" type="button" onClick={() => props.onAdjust(user.id)}>调整额度</button>
+          <button className="adm-btn adm-btn-sm" type="button" disabled={busyId === user.id} onClick={() => void reset(user)}>{busyId === user.id ? "重置中" : "重置本月"}</button>
+        </div></td>
+      </tr>;
+    })}{!props.users.length && <tr><td className="adm-empty" colSpan={8}>暂无用户</td></tr>}</tbody></table></div>
   </Card>;
 }
 
@@ -126,6 +187,7 @@ export function BillingPage({ onUnauthorized }: { onUnauthorized: () => void }) 
   const [rows, setRows] = useState<BillingAggregate[]>([]);
   const [prices, setPrices] = useState<BillingModelPrice[]>([]);
   const [users, setUsers] = useState<AdminUserSummary[]>([]);
+  const [quotaUserId, setQuotaUserId] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const refresh = useCallback(async () => {
@@ -149,7 +211,8 @@ export function BillingPage({ onUnauthorized }: { onUnauthorized: () => void }) 
       { label: "Token 总量", value: tokens(totals.tokens), detail: "输入、输出与推理", icon: "activity" },
       { label: "计费用户", value: String(new Set(rows.map((row) => row.userId)).size), detail: `${users.length} 个注册账号`, tone: "success", icon: "users" },
     ]} />
-    <QuotaPanel users={users} onError={setError} />
+    <UserUsagePanel users={users} rows={rows} refresh={refresh} onError={setError} onAdjust={setQuotaUserId} />
+    <QuotaPanel users={users} userId={quotaUserId} onUserChange={setQuotaUserId} refresh={refresh} onError={setError} />
     <UsageTable rows={rows} users={users} />
     <Card title="模型价格" meta="每百万 token · USD">
       <div className="adm-pricelist">{prices.map((price) => <PriceEditor key={`${price.provider}-${price.model}`} price={price} refresh={refresh} onError={setError} />)}{!prices.length && !loading && <p className="adm-empty">暂无模型价格</p>}</div>

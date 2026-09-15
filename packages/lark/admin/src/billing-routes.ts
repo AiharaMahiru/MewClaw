@@ -117,6 +117,14 @@ async function handle(
     )));
     return;
   }
+  if (request.method === "POST" && path === "/quota/reset") {
+    const body = await readJsonBody(request, MAX_BODY_BYTES);
+    if (Object.keys(body).some((key) => key !== "userId")) {
+      throw new HttpInputError(400, "INVALID_REQUEST", "unknown reset field");
+    }
+    sendJson(response, 200, publicQuota(await billing.resetUsage(userScope(adminScope, body.userId))));
+    return;
+  }
   if (request.method === "GET" && path === "/prices") {
     sendJson(response, 200, { prices: (await billing.listPrices()).map(publicPrice) });
     return;
@@ -141,7 +149,7 @@ async function handle(
     }).then(publicPrice));
     return;
   }
-  if (request.method !== "GET" && request.method !== "PUT") return sendNoContent(response, 405);
+  if (request.method !== "GET" && request.method !== "PUT" && request.method !== "POST") return sendNoContent(response, 405);
   sendError(response, 404, "NOT_FOUND");
 }
 
