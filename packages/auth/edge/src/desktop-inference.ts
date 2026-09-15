@@ -37,7 +37,29 @@ export function parseDesktopInference(body: Record<string, unknown>): Record<str
       || !['system', 'developer', 'user', 'assistant', 'tool'].includes(message.role)) throw httpError(400, 'INVALID_INFERENCE_REQUEST');
   }
   if (body.tools !== undefined && (!Array.isArray(body.tools) || body.tools.length > 256)) throw httpError(400, 'INVALID_INFERENCE_REQUEST');
+  for (const key of ['max_tokens', 'max_completion_tokens'] as const) {
+    if (body[key] !== undefined && (!Number.isSafeInteger(body[key]) || (body[key] as number) <= 0)) throw httpError(400, 'INVALID_INFERENCE_REQUEST');
+  }
+  for (const key of ['temperature', 'top_p', 'frequency_penalty', 'presence_penalty'] as const) {
+    if (body[key] !== undefined && typeof body[key] !== 'number') throw httpError(400, 'INVALID_INFERENCE_REQUEST');
+  }
+  if (body.stop !== undefined && typeof body.stop !== 'string'
+    && !(Array.isArray(body.stop) && (body.stop as unknown[]).every(item => typeof item === 'string'))) throw httpError(400, 'INVALID_INFERENCE_REQUEST');
   return body;
+}
+
+/** 审计输入 = 最后一条 user 消息的文本（输入框语义）：历史消息只在其成为最新输入时审计过一次。 */
+function lastUserMessageText(messages: Array<{ role: string; content?: unknown }>): string {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const content = messages[index]!.content;
+    if (messages[index]!.role !== 'user') continue;
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+      const text = content.map(part => part && typeof part === 'object' && (part as { type?: unknown }).type === 'text' ? String((part as { text?: unknown }).text ?? '') : '').join('');
+      if (text.trim()) return text;
+    }
+  }
+  return '';
 }
 
 /** 共享路径请求内容不被支持（非文本部件等）；映射为 400 而非上游 502。 */
@@ -80,7 +102,7 @@ export async function desktopInference(req: IncomingMessage, res: ServerResponse
   const input = parseDesktopInference(await readJson(req, options.maxBytes));
   const selector = parseModelSelector(input.model);
   const messages = input.messages as Array<{ role: string; content?: unknown }>;
-  const text = messages.filter(message => message.role === 'user').map(message => typeof message.content === 'string' ? message.content : JSON.stringify(message.content)).join('\n');
+  const text = lastUserMessageText(messages);
   if (await options.audit(text).catch(() => 'unavailable') !== 'allow') { sendError(res, 403, 'PROMPT_AUDIT_REJECTED'); return; }
 
   const abort = new AbortController();

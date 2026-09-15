@@ -42,6 +42,15 @@ describe("网络安全审计契约", () => {
     expect(await auditor.audit("three")).toBe("allow");
   });
 
+  it("超时故障归类为稳定错误码 prompt audit: timeout", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const generate = vi.fn((_input: { signal: AbortSignal }) => new Promise<string>(() => {}));
+    const auditor = createPromptAuditor({ generate }, { timeoutMs: 10, maxConcurrent: 1 });
+    expect(await auditor.audit("test")).toBe("unavailable");
+    expect(warn).toHaveBeenCalledWith("[prompt-audit] prompt audit: timeout");
+    warn.mockRestore();
+  });
+
   it("模型异常失败关闭且不泄露异常内容", async () => {
     const auditor = createPromptAuditor({ generate: async () => { throw new Error("secret provider error"); } }, { timeoutMs: 100, maxConcurrent: 1 });
     expect(await auditor.audit("test")).toBe("unavailable");

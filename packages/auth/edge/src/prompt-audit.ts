@@ -28,7 +28,7 @@ export function createPromptAuditor(model: PromptAuditModel, options: { timeoutM
   let active = 0;
   return {
     async audit(text) {
-      if (active >= options.maxConcurrent) return "unavailable";
+      if (active >= options.maxConcurrent) { console.warn("[prompt-audit] prompt audit: concurrency"); return "unavailable"; }
       active += 1;
       const abort = new AbortController();
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -45,7 +45,8 @@ export function createPromptAuditor(model: PromptAuditModel, options: { timeoutM
         if (!isRecord(parsed) || Object.keys(parsed).length !== 1) return "unavailable";
         return parsed.decision === "allow" || parsed.decision === "block" ? parsed.decision : "unavailable";
       } catch (error) {
-        const category = error instanceof Error && /^prompt audit: [a-z0-9 _:-]+$/iu.test(error.message)
+        const category = error instanceof Error && error.message === "AUDIT_TIMEOUT" ? "prompt audit: timeout"
+          : error instanceof Error && /^prompt audit: [a-z0-9 _:-]+$/iu.test(error.message)
           ? error.message : "prompt audit: unavailable";
         console.warn(`[prompt-audit] ${category}`);
         return "unavailable";

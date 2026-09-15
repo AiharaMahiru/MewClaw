@@ -493,7 +493,7 @@ upstream、宿主端口或内部认证头。未知、过期和已撤销 ID 统�
 
 `profileId`/`provider` 段不含 `/`；`model` 段允许 `/`（供应商模型 ID 可带命名空间）。私有 profile 路径在服务端解析 `baseUrl + apiKey`，`assertPublicUserModelUrl` 校验通过后才发请求，`redirect: 'error'`，上游错误体与状态不透传（统一 `CLOUD_INFERENCE_FAILED`）。共享路径把 OpenAI 消息翻译为 provider 中立的 `Message[]` 后经 `ctx.llm.stream()` 调用，再把 `StreamChunk` 翻译回 OpenAI SSE delta（`text-delta→delta.content`、`reasoning-delta→delta.reasoning_content`、`tool-call-delta→delta.tool_calls`、finish 映射 `stop`/`tool_calls`/`length`）；工具消息映射为 `tool-result` 用户消息，非函数工具、`tool_choice`、`top_p` 等无对应槽位的字段不下发。图片/文件等内容部件私有路径原样转发，共享路径拒绝非文本部件。
 
-两条路径的密钥都只存在于服务器请求作用域，永不下发、不落盘、不进日志；审计（`promptAuditor`）结果为 `block` 或 `unavailable` 时一律拒绝（`PROMPT_AUDIT_REJECTED`）。默认 profile 缺失返回 `409 CLOUD_DEFAULT_MODEL_REQUIRED`；profile、模型或共享目录项不存在返回 `404 MODEL_UNAVAILABLE`；共享运行时未装配时 `shared/*` 选择器同样返回 `404`。`GET /auth/models` 响应附带 `sharedModels`（`{provider, model, name}` 数组，无凭证字段），供桌面模型选择器列出部署共享目录。
+两条路径的密钥都只存在于服务器请求作用域，永不下发、不落盘、不进日志；审计（`promptAuditor`）结果为 `block` 或 `unavailable` 时一律拒绝（`PROMPT_AUDIT_REJECTED`）。审计输入仅为最后一条 `user` 消息的文本（输入框语义，与 Web RPC 的"只审新提示词"一致），不重审历史消息——每条用户文本只在其成为最新输入时审计一次。共享运行时装配失败不阻塞 Auth 启动：记录告警后按未装配处理（`shared/*` fail-closed 404）；审计模型仍按 SPEC 在启用时缺失即启动失败。默认 profile 缺失返回 `409 CLOUD_DEFAULT_MODEL_REQUIRED`；profile、模型或共享目录项不存在返回 `404 MODEL_UNAVAILABLE`；共享运行时未装配时 `shared/*` 选择器同样返回 `404`。`GET /auth/models` 响应附带 `sharedModels`（`{provider, model, name}` 数组，无凭证字段），供桌面模型选择器列出部署共享目录。
 
 ## 7 配置与凭证
 
