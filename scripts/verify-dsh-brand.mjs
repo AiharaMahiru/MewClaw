@@ -91,7 +91,7 @@ requireMatch(adminIndexHtml, 'rel="icon" type="image/svg+xml" href="/favicon.svg
 requireMatch(adminApp, 'viewBox="0 0 512 512"', "管理台 MewClaw 商标几何");
 requireMatch(adminApp, 'className="mewclaw-mark-ink"', "管理台商标墨色分层");
 requireMatch(adminStyles, "body[data-ds-dark-theme] .mewclaw-brand-mark", "管理台商标自动深色反转");
-requireMatch(adminStyles, ".hHd-Xa_brandMark {", "管理台商标样式");
+requireMatch(adminStyles, ".mewclaw-brand-mark {", "管理台商标样式");
 
 if (failures.length > 0) {
   console.error("[verify-dsh-brand] MewClaw 品牌插件校验失败：");

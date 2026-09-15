@@ -1,6 +1,7 @@
 import type {
   AdminConversationSnapshot,
   AdminDashboardSnapshot,
+  AdminIdentity,
   AdminSessionSummary,
   AdminSummary,
   AdminUserSummary,
@@ -10,6 +11,11 @@ import type {
   IngestionRun,
   KnowledgeDocument,
   KnowledgeSnapshot,
+  MemoryCube,
+  MemoryEdge,
+  MemoryNode,
+  MemoryPart,
+  MemorySource,
   SessionOverview,
 } from "./api.js";
 
@@ -358,3 +364,136 @@ export function decodeDocument(value: unknown): KnowledgeDocument {
 
 export const MAX_ADMIN_RUN_QUERY = MAX_RUNS;
 export const DEFAULT_ADMIN_RUN_QUERY = 8;
+
+const MEMORY_VISIBILITIES = ["user_private", "project_shared", "agent_shared", "deployment_shared", "tenant_shared"] as const;
+const MEMORY_NODE_KINDS = ["preference", "fact", "goal", "profile", "episode", "tool_trace", "image", "document", "other"] as const;
+const MEMORY_MODALITIES = ["text", "image", "tool_trace", "persona"] as const;
+const MEMORY_STATUSES = ["active", "archived"] as const;
+const MEMORY_RELATIONS = ["supports", "contradicts", "derived_from", "related_to", "part_of"] as const;
+const MAX_MEMORY_ITEMS = 512;
+const MAX_MEMORY_TEXT = 16_384;
+
+function parseMemoryPart(value: unknown, path: string): MemoryPart {
+  const input = record(value, path);
+  const modality = enumValue(input.modality, MEMORY_MODALITIES, `${path}.modality`);
+  if (modality === "text") return { modality, text: stringValue(input.text, `${path}.text`, MAX_MEMORY_TEXT) };
+  if (modality === "image") {
+    return { modality, uri: stringValue(input.uri, `${path}.uri`, MAX_SHORT_TEXT * 8), ...(input.alt !== undefined ? { alt: optionalString(input.alt, `${path}.alt`, MAX_MEMORY_TEXT) } : {}), ...(input.sha256 !== undefined ? { sha256: optionalString(input.sha256, `${path}.sha256`, MAX_SHORT_TEXT) } : {}) };
+  }
+  if (modality === "persona") {
+    return { modality, trait: stringValue(input.trait, `${path}.trait`, MAX_SHORT_TEXT), value: stringValue(input.value, `${path}.value`, MAX_MEMORY_TEXT), ...(input.confidence !== undefined ? { confidence: usd(input.confidence, `${path}.confidence`) } : {}) };
+  }
+  return { modality, tool: stringValue(input.tool, `${path}.tool`, MAX_SHORT_TEXT), ...(input.input !== undefined ? { input: input.input } : {}), ...(input.output !== undefined ? { output: input.output } : {}), ...(input.ok !== undefined ? { ok: booleanValue(input.ok, `${path}.ok`) } : {}) };
+}
+
+function parseMemorySource(value: unknown, path: string): MemorySource | undefined {
+  if (value === undefined) return undefined;
+  const input = record(value, path);
+  return {
+    kind: enumValue(input.kind, ["conversation", "feedback", "tool", "import", "system"] as const, `${path}.kind`),
+    ...(input.reference !== undefined ? { reference: optionalString(input.reference, `${path}.reference`, MAX_SHORT_TEXT) } : {}),
+  };
+}
+
+export function parseMemoryNode(value: unknown, path: string): MemoryNode {
+  const input = record(value, path);
+  return {
+    id: stringValue(input.id, `${path}.id`, MAX_SHORT_TEXT),
+    cubeId: stringValue(input.cubeId, `${path}.cubeId`, MAX_SHORT_TEXT),
+    kind: enumValue(input.kind, MEMORY_NODE_KINDS, `${path}.kind`),
+    parts: list(input.parts, `${path}.parts`, MAX_MEMORY_ITEMS, (item, index) => parseMemoryPart(item, `${path}.parts[${index}]`)),
+    ...(input.metadata !== undefined ? { metadata: record(input.metadata, `${path}.metadata`) } : {}),
+    ...(input.confidence !== undefined ? { confidence: usd(input.confidence, `${path}.confidence`) } : {}),
+    ...(input.source !== undefined ? { source: parseMemorySource(input.source, `${path}.source`) } : {}),
+    revision: counter(input.revision, `${path}.revision`),
+    status: enumValue(input.status, MEMORY_STATUSES, `${path}.status`),
+    createdAt: stringValue(input.createdAt, `${path}.createdAt`, MAX_SHORT_TEXT),
+    updatedAt: stringValue(input.updatedAt, `${path}.updatedAt`, MAX_SHORT_TEXT),
+  };
+}
+
+function parseMemoryEdge(value: unknown, path: string): MemoryEdge {
+  const input = record(value, path);
+  return {
+    id: stringValue(input.id, `${path}.id`, MAX_SHORT_TEXT),
+    cubeId: stringValue(input.cubeId, `${path}.cubeId`, MAX_SHORT_TEXT),
+    fromId: stringValue(input.fromId, `${path}.fromId`, MAX_SHORT_TEXT),
+    toId: stringValue(input.toId, `${path}.toId`, MAX_SHORT_TEXT),
+    relation: enumValue(input.relation, MEMORY_RELATIONS, `${path}.relation`),
+    ...(input.metadata !== undefined ? { metadata: record(input.metadata, `${path}.metadata`) } : {}),
+    createdAt: stringValue(input.createdAt, `${path}.createdAt`, MAX_SHORT_TEXT),
+  };
+}
+
+export function parseMemoryCube(value: unknown, path: string): MemoryCube {
+  const input = record(value, path);
+  return {
+    id: stringValue(input.id, `${path}.id`, MAX_SHORT_TEXT),
+    key: stringValue(input.key, `${path}.key`, MAX_SHORT_TEXT),
+    name: stringValue(input.name, `${path}.name`, MAX_SHORT_TEXT),
+    visibility: enumValue(input.visibility, MEMORY_VISIBILITIES, `${path}.visibility`),
+    ...(input.projectKey !== undefined ? { projectKey: optionalString(input.projectKey, `${path}.projectKey`, MAX_SHORT_TEXT) } : {}),
+    ...(input.agentKey !== undefined ? { agentKey: optionalString(input.agentKey, `${path}.agentKey`, MAX_SHORT_TEXT) } : {}),
+    ownerUserId: stringValue(input.ownerUserId, `${path}.ownerUserId`, MAX_SHORT_TEXT),
+    revision: counter(input.revision, `${path}.revision`),
+    createdAt: stringValue(input.createdAt, `${path}.createdAt`, MAX_SHORT_TEXT),
+    updatedAt: stringValue(input.updatedAt, `${path}.updatedAt`, MAX_SHORT_TEXT),
+  };
+}
+
+export function decodeMemoryCubeList(value: unknown): { cubes: MemoryCube[] } {
+  const input = record(value, "memory.cubes");
+  if (input.op !== "cube_list") invalid("memory.cubes.op");
+  return { cubes: list(input.cubes, "memory.cubes.cubes", MAX_MEMORY_ITEMS, (item, index) => parseMemoryCube(item, `memory.cubes.cubes[${index}]`)) };
+}
+
+export function decodeMemoryCubeRead(value: unknown): { cube?: MemoryCube } {
+  const input = record(value, "memory.cube");
+  if (input.op !== "cube_read") invalid("memory.cube.op");
+  return { cube: input.cube === undefined || input.cube === null ? undefined : parseMemoryCube(input.cube, "memory.cube.cube") };
+}
+
+export function decodeMemorySearch(value: unknown): { nodes: MemoryNode[]; edges: MemoryEdge[] } {
+  const input = record(value, "memory.search");
+  if (input.op !== "search") invalid("memory.search.op");
+  return {
+    nodes: list(input.nodes, "memory.search.nodes", MAX_MEMORY_ITEMS, (item, index) => parseMemoryNode(item, `memory.search.nodes[${index}]`)),
+    edges: list(input.edges, "memory.search.edges", MAX_MEMORY_ITEMS, (item, index) => parseMemoryEdge(item, `memory.search.edges[${index}]`)),
+  };
+}
+
+export function decodeMemoryNodeRead(value: unknown): { node?: MemoryNode; edges: MemoryEdge[] } {
+  const input = record(value, "memory.read");
+  if (input.op !== "read") invalid("memory.read.op");
+  return {
+    node: input.node === undefined || input.node === null ? undefined : parseMemoryNode(input.node, "memory.read.node"),
+    edges: list(input.edges, "memory.read.edges", MAX_MEMORY_ITEMS, (item, index) => parseMemoryEdge(item, `memory.read.edges[${index}]`)),
+  };
+}
+
+export function decodeMemoryMutation(value: unknown): { op: string } {
+  const input = record(value, "memory.mutation");
+  return { op: stringValue(input.op, "memory.mutation.op", MAX_SHORT_TEXT) };
+}
+
+function parseAdminIdentity(value: unknown, path: string): AdminIdentity {
+  const input = record(value, path);
+  const user = record(input.user, `${path}.user`);
+  return {
+    provider: enumValue(input.provider, ["feishu"] as const, `${path}.provider`),
+    subject: stringValue(input.subject, `${path}.subject`, MAX_SHORT_TEXT),
+    unionId: nullableString(input.unionId, `${path}.unionId`, MAX_SHORT_TEXT),
+    createdAt: stringValue(input.createdAt, `${path}.createdAt`, MAX_SHORT_TEXT),
+    user: {
+      id: stringValue(user.id, `${path}.user.id`, MAX_SHORT_TEXT),
+      email: stringValue(user.email, `${path}.user.email`, MAX_SHORT_TEXT),
+      displayName: stringValue(user.displayName, `${path}.user.displayName`, MAX_SHORT_TEXT),
+      role: enumValue(user.role, ADMIN_ROLES, `${path}.user.role`),
+    },
+  };
+}
+
+export function decodeAdminIdentities(value: unknown): { identities: AdminIdentity[] } {
+  const input = record(value, "admin.identities");
+  return { identities: list(input.identities, "admin.identities.identities", MAX_USERS, (item, index) => parseAdminIdentity(item, `admin.identities.identities[${index}]`)) };
+}

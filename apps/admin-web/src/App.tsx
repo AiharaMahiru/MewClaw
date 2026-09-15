@@ -7,6 +7,7 @@ import { BillingPage } from "./pages/BillingPage.js";
 import { ConversationsPage } from "./pages/ConversationsPage.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
 import { KnowledgePage } from "./pages/KnowledgePage.js";
+import { MemoryPage } from "./pages/MemoryPage.js";
 import { SessionsPage } from "./pages/SessionsPage.js";
 import { UsersPage } from "./pages/UsersPage.js";
 import { pathForRoute, routeFromPath, type AppRoute } from "./route.js";
@@ -18,6 +19,7 @@ const NAVIGATION: Array<{ route: AppRoute; label: string; group: string; icon: I
   { route: "billing", label: "用量与额度", group: "管理", icon: "billing" },
   { route: "conversations", label: "运行观察", group: "运行", icon: "activity" },
   { route: "knowledge", label: "知识库", group: "运行", icon: "knowledge" },
+  { route: "memory", label: "记忆", group: "运行", icon: "memory" },
 ];
 
 function Page({ route, onUnauthorized }: { route: AppRoute; onUnauthorized: () => void }) {
@@ -26,6 +28,7 @@ function Page({ route, onUnauthorized }: { route: AppRoute; onUnauthorized: () =
   if (route === "billing") return <BillingPage onUnauthorized={onUnauthorized} />;
   if (route === "conversations") return <ConversationsPage onUnauthorized={onUnauthorized} />;
   if (route === "knowledge") return <KnowledgePage onUnauthorized={onUnauthorized} />;
+  if (route === "memory") return <MemoryPage onUnauthorized={onUnauthorized} />;
   return <DashboardPage onUnauthorized={onUnauthorized} />;
 }
 
@@ -35,11 +38,8 @@ function groupNavigation() {
   return [...groups.entries()];
 }
 
-function Brand() {
-  return <span className="hHd-Xa_brandIdentity" aria-hidden="true">
-    <span className="hHd-Xa_brandMark"><svg className="mewclaw-brand-mark" xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 512 512" shapeRendering="geometricPrecision"><circle className="mewclaw-mark-bg" cx="256" cy="256" r="256" /><path className="mewclaw-mark-ink" d="M256 132 C244 132 233 137 222 146 C208 136 196 120 184 96 C179 88 169 90 166 98 C154 130 142 172 134 200 C128 214 125 230 126 246 C123.8 281.9 38.5 324.3 51.2 351.5 A226 226 0 0 0 460.8 351.5 C473.5 324.3 388.2 281.9 386 246 C387 230 384 214 378 200 C358 130 370 172 346 98 C343 90 333 88 328 96 C316 120 304 136 290 146 C279 137 268 132 256 132 Z" /><path className="mewclaw-mark-cutout" fill="none" strokeWidth="62" strokeLinecap="round" d="M116.9 410.6 A208 208 0 0 0 234.2 462.8" /><path className="mewclaw-mark-ink" fill="none" strokeWidth="34" strokeLinecap="round" d="M116.9 410.6 A208 208 0 0 0 234.2 462.8" /><path className="mewclaw-mark-cutout" fill="none" strokeWidth="62" strokeLinecap="round" d="M366.2 432.4 A208 208 0 0 0 462.9 234.3" /><path className="mewclaw-mark-ink" fill="none" strokeWidth="34" strokeLinecap="round" d="M366.2 432.4 A208 208 0 0 0 462.9 234.3" /><g className="mewclaw-mark-ink" fill="none" strokeWidth="10" strokeLinecap="round"><path d="M128 276 L44 252" /><path d="M126 300 L50 296" /></g><g className="mewclaw-mark-cutout" fill="none" strokeWidth="15" strokeLinecap="round"><path d="M174 266 Q204 300 234 266" /><path d="M278 266 Q308 300 338 266" /></g><path className="mewclaw-mark-cutout" d="M247 312 L265 312 L256 325 Z" strokeWidth="7" strokeLinejoin="round" /></svg></span>
-    <span className="hHd-Xa_brandName">MewClaw Harness</span>
-  </span>;
+function BrandMark() {
+  return <svg className="mewclaw-brand-mark" xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 512 512" shapeRendering="geometricPrecision" aria-hidden="true"><circle className="mewclaw-mark-bg" cx="256" cy="256" r="256" /><path className="mewclaw-mark-ink" d="M256 132 C244 132 233 137 222 146 C208 136 196 120 184 96 C179 88 169 90 166 98 C154 130 142 172 134 200 C128 214 125 230 126 246 C123.8 281.9 38.5 324.3 51.2 351.5 A226 226 0 0 0 460.8 351.5 C473.5 324.3 388.2 281.9 386 246 C387 230 384 214 378 200 C358 130 370 172 346 98 C343 90 333 88 328 96 C316 120 304 136 290 146 C279 137 268 132 256 132 Z" /><path className="mewclaw-mark-cutout" fill="none" strokeWidth="62" strokeLinecap="round" d="M116.9 410.6 A208 208 0 0 0 234.2 462.8" /><path className="mewclaw-mark-ink" fill="none" strokeWidth="34" strokeLinecap="round" d="M116.9 410.6 A208 208 0 0 0 234.2 462.8" /><path className="mewclaw-mark-cutout" fill="none" strokeWidth="62" strokeLinecap="round" d="M366.2 432.4 A208 208 0 0 0 462.9 234.3" /><path className="mewclaw-mark-ink" fill="none" strokeWidth="34" strokeLinecap="round" d="M366.2 432.4 A208 208 0 0 0 462.9 234.3" /><g className="mewclaw-mark-ink" fill="none" strokeWidth="10" strokeLinecap="round"><path d="M128 276 L44 252" /><path d="M126 300 L50 296" /></g><g className="mewclaw-mark-cutout" fill="none" strokeWidth="15" strokeLinecap="round"><path d="M174 266 Q204 300 234 266" /><path d="M278 266 Q308 300 338 266" /></g><path className="mewclaw-mark-cutout" d="M247 312 L265 312 L256 325 Z" strokeWidth="7" strokeLinejoin="round" /></svg>;
 }
 
 function routeLabel(route: AppRoute): string {
@@ -61,7 +61,6 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
   useEffect(() => {
-    document.documentElement.dataset.adminTheme = theme;
     if (theme === "dark") document.body.setAttribute("data-ds-dark-theme", "");
     else document.body.removeAttribute("data-ds-dark-theme");
     localStorage.setItem("mewclaw-admin-theme", theme);
@@ -85,45 +84,37 @@ export default function App() {
     clearToken();
     window.location.assign("/");
   };
-  const accountInitial = account?.displayName.slice(0, 1) || (accountUnavailable ? "!" : "…");
 
-  return <div className={`pI_x6G_frame admin-frame ${collapsed ? "admin-frame-collapsed" : ""}`} data-sidebar-collapsed={collapsed ? "" : undefined}>
-    <div className="pI_x6G_sidebarCol">
-      <aside className={`hHd-Xa_root hHd-Xa_quietBars ${collapsed ? "hHd-Xa_collapsed" : ""}`} aria-label="管理导航">
-        <div className="hHd-Xa_logoRow">
-          <button className="hHd-Xa_brand hHd-Xa_wide" type="button" aria-label="回到管理总览" onClick={() => navigate("dashboard")}><Brand /></button>
-          <button className="hHd-Xa_iconButton hHd-Xa_toggle" type="button" aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"} title={collapsed ? "展开侧边栏" : "收起侧边栏"} onClick={() => setCollapsed((value) => !value)}><Icon name="menu" /></button>
-        </div>
-        <a className="hHd-Xa_newSession" href="/" aria-label="返回工作台"><Icon name="arrow-left" size={14} /><span className="hHd-Xa_newSessionLabel hHd-Xa_wide">返回工作台</span></a>
-        <div className="hHd-Xa_regionArea">
-          <nav className="qDHVXG_root admin-nav" aria-label="管理页面">
-            {groups.map(([group, items]) => <div className="admin-nav-group" key={group}>
-              <div className="qDHVXG_sectionHeader"><span className="qDHVXG_sectionLabel hHd-Xa_wide">{group}</span></div>
-              <div className="qDHVXG_listArea"><div className="qDHVXG_treeBody"><div className="admin-nav-list">
-                {items.map((item) => <a key={item.route} href={pathForRoute(item.route)} className="cBrkua_entry admin-nav-item" aria-current={route === item.route ? "page" : undefined} onClick={(event) => { event.preventDefault(); navigate(item.route); }}><span className="cBrkua_entryIcon"><Icon name={item.icon} size={14} /></span><span className="cBrkua_entryLabel hHd-Xa_wide">{item.label}</span></a>)}
-              </div></div></div>
-            </div>)}
-          </nav>
-        </div>
-        <div className="hHd-Xa_footArea">
-          <div className="hHd-Xa_settingsArea account-settings">
-            {accountMenuOpen && <div className="account-menu" role="menu">
-              <a href="/" role="menuitem" onClick={() => setAccountMenuOpen(false)}><Icon name="settings" size={15} />账户设置</a>
-              <button type="button" role="menuitem" onClick={() => { setTheme((value) => value === "light" ? "dark" : "light"); setAccountMenuOpen(false); }}><Icon name={theme === "light" ? "moon" : "sun"} size={15} />{theme === "light" ? "深色主题" : "浅色主题"}</button>
-              <button type="button" role="menuitem" onClick={() => void handleLogout()}><Icon name="logout" size={15} />退出登录</button>
-            </div>}
-            <button className="VOzbGW_trigger" type="button" aria-haspopup="menu" aria-expanded={accountMenuOpen} onClick={() => setAccountMenuOpen((value) => !value)}>
-              <span className="mewclaw-settings-trigger" title={account?.displayName ?? "账户"}><span className="mewclaw-account-avatar" aria-hidden="true">{accountInitial}</span><span className="mewclaw-account-label hHd-Xa_wide">{account?.displayName || (accountUnavailable ? "账户不可用" : "账户设置")}</span></span>
-            </button>
-          </div>
-        </div>
-      </aside>
-    </div>
-    <div className="pI_x6G_centerCol">
-      <main className="wSkVaW_root admin-main-root">
-        <header className="wSkVaW_header admin-header"><div className="admin-header-context"><span className="admin-header-kicker">MEWCLAW / CONTROL PLANE</span><nav className="admin-crumbs" aria-label="页面位置"><strong>{routeLabel(route)}</strong></nav></div><a className="admin-header-link" href="/"><span>返回工作台</span><Icon name="arrow-right" size={14} /></a></header>
-        <div className="wSkVaW_scrollBody admin-scroll-body"><div className="wSkVaW_viewArea"><div className="app-main"><Page route={route} onUnauthorized={handleUnauthorized} /></div></div></div>
-      </main>
+  return <div className={`adm-shell ${collapsed ? "adm-shell-collapsed" : ""}`}>
+    <aside className="adm-side" aria-label="管理导航">
+      <div className="adm-side-head">
+        <button className="adm-brand" type="button" aria-label="回到管理总览" onClick={() => navigate("dashboard")}><BrandMark /><span className="adm-brand-name">MewClaw 管理</span></button>
+        <button className="adm-iconbtn" type="button" aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"} title={collapsed ? "展开侧边栏" : "收起侧边栏"} onClick={() => setCollapsed((value) => !value)}><Icon name="menu" /></button>
+      </div>
+      <nav className="adm-nav" aria-label="管理页面">
+        {groups.map(([group, items]) => <div className="adm-nav-group" key={group}>
+          <div className="adm-nav-label">{group}</div>
+          {items.map((item) => <a key={item.route} href={pathForRoute(item.route)} className="adm-nav-item" aria-current={route === item.route ? "page" : undefined} onClick={(event) => { event.preventDefault(); navigate(item.route); }}><Icon name={item.icon} size={15} /><span className="adm-nav-text">{item.label}</span></a>)}
+        </div>)}
+      </nav>
+      <div className="adm-side-foot">
+        {accountMenuOpen && <div className="adm-menu" role="menu">
+          <a href="/" role="menuitem" onClick={() => setAccountMenuOpen(false)}><Icon name="settings" size={15} />账户设置</a>
+          <button type="button" role="menuitem" onClick={() => { setTheme((value) => value === "light" ? "dark" : "light"); setAccountMenuOpen(false); }}><Icon name={theme === "light" ? "moon" : "sun"} size={15} />{theme === "light" ? "深色主题" : "浅色主题"}</button>
+          <button type="button" role="menuitem" onClick={() => void handleLogout()}><Icon name="logout" size={15} />退出登录</button>
+        </div>}
+        <button className="adm-account" type="button" aria-haspopup="menu" aria-expanded={accountMenuOpen} onClick={() => setAccountMenuOpen((value) => !value)}>
+          <span className="adm-avatar" aria-hidden="true">{account?.displayName.slice(0, 1) || (accountUnavailable ? "!" : "…")}</span>
+          <span className="adm-account-name">{account?.displayName || (accountUnavailable ? "账户不可用" : "账户设置")}</span>
+        </button>
+      </div>
+    </aside>
+    <div className="adm-main">
+      <header className="adm-topbar">
+        <span className="adm-topbar-title">{routeLabel(route)}</span>
+        <a className="adm-topbar-link" href="/"><span>返回工作台</span><Icon name="arrow-right" size={13} /></a>
+      </header>
+      <div className="adm-scroll"><div className="adm-page"><Page route={route} onUnauthorized={handleUnauthorized} /></div></div>
     </div>
   </div>;
 }

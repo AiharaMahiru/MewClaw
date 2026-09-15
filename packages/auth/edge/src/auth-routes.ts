@@ -5,7 +5,7 @@ import type { AuthService, AuthUser } from "dsh-lark-auth";
 
 import type { AuthEdgeConfig } from "./config.js";
 import { appendCookie, CSRF_COOKIE, newCsrfToken, OAUTH_STATE_COOKIE, readCookie, sessionCookieName } from "./cookies.js";
-import { desktopInference } from "./desktop-inference.js";
+import { desktopInference, type DesktopSharedRuntime } from "./desktop-inference.js";
 import { buildFeishuAuthorizeUrl, exchangeFeishuCode } from "./feishu.js";
 import { handleBotAccount } from "./feishu-bots.js";
 import { httpError, readJson, sendError, sendHtml, sendJson, sessionToken } from "./http-utils.js";
@@ -38,7 +38,9 @@ export interface AuthRouteDeps {
   loginLimiter: RateLimiter;
   loginGuard: LoginGuard;
   generalLimiter: RateLimiter;
-  promptAuditor: PromptAuditor | undefined;
+  promptAuditor?: PromptAuditor | undefined;
+  /** 部署侧共享模型目录（apps/auth 装配）；未装配时 `shared/*` 选择器 404。 */
+  sharedModels?: DesktopSharedRuntime | undefined;
   current(req: IncomingMessage): Promise<{ user: AuthUser } | undefined>;
   ensureCsrf(req: IncomingMessage, cookies: string[]): void;
   refreshSessionCookie(req: IncomingMessage, cookies: string[]): void;
@@ -60,7 +62,7 @@ export class AuthRouteHandlers {
       const current = await this.deps.current(req);
       if (!current) { sendError(res, 401, "UNAUTHORIZED"); return; }
       if (!this.deps.generalLimiter.allow(`desktop-inference:${current.user.id}`)) throw httpError(429, "RATE_LIMITED");
-      return desktopInference(req, res, { userId: current.user.id, service,
+      return desktopInference(req, res, { userId: current.user.id, service, shared: this.deps.sharedModels,
         maxBytes: config.desktopBodyLimit ?? 8 * 1024 * 1024, timeoutMs: config.desktopInferenceTimeoutMs ?? 120000,
         audit: text => config.promptAudit?.enabled === false ? Promise.resolve('allow') : this.deps.promptAuditor?.audit(text) ?? Promise.resolve('unavailable'),
         assertPublicUrl: assertPublicUserModelUrl });
@@ -100,11 +102,12 @@ export class AuthRouteHandlers {
     const current = await this.deps.current(req);
     if (!current) { sendError(res, 401, "UNAUTHORIZED"); return; }
     if (req.method === "GET") {
-      const [profiles, defaultProfileId] = await Promise.all([
+      const [profiles, defaultProfileId, sharedModels] = await Promise.all([
         service.listMyModelProfiles(current.user.id),
         service.getMyDefaultModelProfileId(current.user.id),
+        this.deps.sharedModels?.listModels().catch(() => []) ?? Promise.resolve([]),
       ]);
-      sendJson(res, 200, { profiles, ...(defaultProfileId ? { defaultProfileId } : {}) });
+      sendJson(res, 200, { profiles, sharedModels, ...(defaultProfileId ? { defaultProfileId } : {}) });
       return;
     }
     const body = await readJson(req, config.requestBodyLimit);

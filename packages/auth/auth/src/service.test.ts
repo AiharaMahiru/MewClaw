@@ -117,6 +117,13 @@ describe("AuthService", () => {
       apiKey: "secret-api-key-never-returned",
       revision: 2,
     });
+    // 桌面推理路径：任意已声明 modelId 按当前版本解析；未声明模型与他人 profile 拒绝。
+    await expect(service.resolveMyProfileModelRoute(owner!.user.id, created.id, "chat-a")).resolves.toMatchObject({
+      model: "chat-a", apiKey: "secret-api-key-never-returned", revision: 2,
+    });
+    await expect(service.resolveMyProfileModelRoute(owner!.user.id, created.id)).resolves.toMatchObject({ model: "chat-b" });
+    await expect(service.resolveMyProfileModelRoute(owner!.user.id, created.id, "undeclared-model")).resolves.toBeUndefined();
+    await expect(service.resolveMyProfileModelRoute(other!.user.id, created.id, "chat-a")).resolves.toBeUndefined();
     await expect(service.updateMyModelProfile(owner!.user.id, created.id, { expectedRevision: 1 }, metadata)).resolves.toEqual({ status: "conflict" });
     await expect(service.getMyDefaultModelProfileId(owner!.user.id)).resolves.toBe(created.id);
     await expect(service.deleteMyModelProfile(owner!.user.id, created.id, 2, metadata)).resolves.toBe("deleted");
