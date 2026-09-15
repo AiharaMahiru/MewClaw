@@ -150,6 +150,32 @@ export class PostgresBillingStore implements BillingStore {
     );
   }
 
+  async getUsageEpoch(scope: BillingUserScope): Promise<string | undefined> {
+    const result = await this.database.query<{ epoch: Date | string }>(
+      "SELECT epoch FROM billing_usage_epochs WHERE tenant_id = $1 AND bot_id = $2 AND deployment_id = $3 AND user_id = $4",
+      [scope.tenantId, scope.botId, scope.deploymentId, scope.userId],
+    );
+    const value = result.rows[0]?.epoch;
+    return value === undefined ? undefined : new Date(value).toISOString();
+  }
+
+  async setUsageEpoch(scope: BillingUserScope, epoch: string): Promise<void> {
+    await this.database.query(
+      `INSERT INTO billing_usage_epochs (tenant_id, bot_id, deployment_id, user_id, epoch, updated_at)
+       VALUES ($1,$2,$3,$4,$5,now())
+       ON CONFLICT (tenant_id, bot_id, deployment_id, user_id) DO UPDATE SET epoch = EXCLUDED.epoch, updated_at = EXCLUDED.updated_at`,
+      [scope.tenantId, scope.botId, scope.deploymentId, scope.userId, epoch],
+    );
+  }
+
+  async listUsageEpochs(scope: Omit<BillingUserScope, "userId">): Promise<Array<{ userId: string; epoch: string }>> {
+    const result = await this.database.query<{ user_id: string; epoch: Date | string }>(
+      "SELECT user_id, epoch FROM billing_usage_epochs WHERE tenant_id = $1 AND bot_id = $2 AND deployment_id = $3",
+      [scope.tenantId, scope.botId, scope.deploymentId],
+    );
+    return result.rows.map((row) => ({ userId: row.user_id, epoch: new Date(row.epoch).toISOString() }));
+  }
+
   async findCharge(key: string): Promise<UsageCharge | undefined> {
     const parts = key.split("\0");
     if (parts.length !== 10) return undefined;

@@ -8,7 +8,7 @@ import {
   type AdminDashboardSnapshot,
 } from "../api.js";
 import { SessionSummary } from "../components/SessionSummary.js";
-import { MetricStrip, PageHeader, RefreshButton, SectionHeading } from "../components/AdminUi.js";
+import { Card, Dot, MetricStrip, PageHeader, RefreshButton, Select, Skeleton } from "../components/AdminUi.js";
 
 const MAX_GENERATION = 1_000_000;
 
@@ -78,30 +78,29 @@ export function ConversationsPage({ onUnauthorized }: { onUnauthorized: () => vo
     }
   };
 
-  return (
-    <section className="workspace">
-      <PageHeader eyebrow="只读控制面" title="运行观察" actions={<RefreshButton busy={loading} label="刷新目标" onClick={() => void loadTargets()} />} />
-      {error && <p className={`notice ${snapshot ? "stale" : "error"}`}>{error}</p>}
-      <MetricStrip label="运行摘要" items={[
-        { label: "Worker", value: worker ? "在线" : "离线", detail: worker ? "控制面已连接" : "等待连接", tone: worker ? "success" : "warning", icon: "pulse" },
-        { label: "配置目标", value: String(targets.length), detail: "当前部署", icon: "workspace" },
-        { label: "活动投影", value: String(targets.filter((item) => item.session.exists).length), detail: "包含会话数据", tone: "accent", icon: "activity" },
-        { label: "队列深度", value: worker ? String(worker.queueDepth) : "—", detail: "待执行项", icon: "sessions" },
-      ]} />
-      <section className="dashboard-panel observer-status-panel"><header className="dashboard-panel-heading"><h3>Worker 控制面</h3><span>{worker ? `读取于 ${new Date(worker.observedAt).toLocaleString("zh-CN", { hour12: false })}` : "等待检查"}</span></header><div className="health-status"><span className={`status-dot ${worker ? "online" : error ? "offline" : "pending"}`} /><strong>{worker ? "运行中" : error ? "不可用" : "检查中"}</strong><span>{worker ? "只读控制面已连接" : error || "正在读取 Worker 状态"}</span></div>{worker && <div className="health-list"><div><span>队列深度</span><strong>{worker.queueDepth}</strong></div><div><span>目标数量</span><strong>{targets.length}</strong></div><div><span>会话投影</span><strong>{targets.filter((item) => item.session.exists).length}</strong></div></div>}</section>
-      <form className="control-form" onSubmit={(event) => { event.preventDefault(); void loadSnapshot(); }}>
-        <label>会话目标<select value={selectedId} onChange={(event) => chooseTarget(event.target.value)} disabled={!targets.length}>
-          <option value="">选择已配置目标</option>
-          {targets.map((item) => <option key={item.target.id} value={item.target.id}>{item.target.label}</option>)}
-        </select></label>
-        <label>会话代次<input value={generation} inputMode="numeric" onChange={(event) => setGeneration(event.target.value)} /></label>
-        <button type="submit" disabled={loading || !selectedId}>读取</button>
+  return <>
+    <PageHeader title="运行观察" sub="Worker 只读控制面与会话投影" actions={<RefreshButton busy={loading} label="刷新目标" onClick={() => void loadTargets()} />} />
+    {error && <p className={`adm-notice ${snapshot ? "adm-notice-warn" : "adm-notice-err"}`}>{error}</p>}
+    <MetricStrip label="运行摘要" items={[
+      { label: "Worker", value: worker ? "在线" : "离线", detail: worker ? "控制面已连接" : "等待连接", tone: worker ? "success" : "warning", icon: "pulse" },
+      { label: "配置目标", value: String(targets.length), detail: "当前部署", icon: "workspace" },
+      { label: "活动投影", value: String(targets.filter((item) => item.session.exists).length), detail: "包含会话数据", tone: "accent", icon: "activity" },
+      { label: "队列深度", value: worker ? String(worker.queueDepth) : "—", detail: "待执行项", icon: "sessions" },
+    ]} />
+    <Card title="Worker 控制面" meta={worker ? `读取于 ${new Date(worker.observedAt).toLocaleString("zh-CN", { hour12: false })}` : "等待检查"}>
+      <div className="adm-health"><Dot tone={worker ? "ok" : error ? "err" : "warn"} /><strong>{worker ? "运行中" : error ? "不可用" : "检查中"}</strong><span>{worker ? "只读控制面已连接" : error || "正在读取 Worker 状态"}</span></div>
+      {worker && <div className="adm-statgrid" style={{ marginTop: 14 }}><div><strong>{worker.queueDepth}</strong><span>队列深度</span></div><div><strong>{targets.length}</strong><span>目标数量</span></div><div><strong>{targets.filter((item) => item.session.exists).length}</strong><span>会话投影</span></div></div>}
+    </Card>
+    <Card title="读取会话投影" meta="只读">
+      <form className="adm-form" onSubmit={(event) => { event.preventDefault(); void loadSnapshot(); }}>
+        <label className="adm-field"><span className="adm-label">会话目标</span><Select value={selectedId} onChange={chooseTarget} disabled={!targets.length} placeholder="选择已配置目标" options={targets.map((item) => ({ value: item.target.id, label: item.target.label }))} /></label>
+        <label className="adm-field adm-field-sm"><span className="adm-label">会话代次</span><input value={generation} inputMode="numeric" onChange={(event) => setGeneration(event.target.value)} /></label>
+        <button className="adm-btn adm-btn-primary" type="submit" disabled={loading || !selectedId}>读取</button>
       </form>
-      {loading && !snapshot && <p className="loading">正在读取可用目标...</p>}
-      {snapshot && <section className="section-block conversation-detail">
-        <SectionHeading title={snapshot.target.label} meta={`代次 ${snapshot.generation}`} />
-        <SessionSummary session={snapshot.session} />
-      </section>}
-    </section>
-  );
+    </Card>
+    {loading && !snapshot && <Skeleton lines={3} />}
+    {snapshot && <Card title={snapshot.target.label} meta={`代次 ${snapshot.generation}`}>
+      <SessionSummary session={snapshot.session} />
+    </Card>}
+  </>;
 }
