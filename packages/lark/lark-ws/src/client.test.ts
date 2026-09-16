@@ -4,7 +4,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createLarkWs, type LarkWsHandlers, type LarkWsLifecycle } from "./client.js";
+import { createLarkWs, isLarkWsHandshakeStrayError, type LarkWsHandlers, type LarkWsLifecycle } from "./client.js";
 
 const sdk = vi.hoisted(() => ({
   handlers: {} as Record<string, (event: unknown) => unknown>,
@@ -89,6 +89,36 @@ describe("start", () => {
     sdk.start.mockRejectedValue(new Error("handshake failed"));
     const ws = createLarkWs(options());
     await expect(ws.start()).rejects.toThrow("handshake failed");
+  });
+});
+
+describe("isLarkWsHandshakeStrayError", () => {
+  // 复刻生产崩溃栈形态：ws terminate → node-sdk 看门狗回调帧。
+  const stray = () => Object.assign(
+    new Error("WebSocket was closed before the connection was established"),
+    {
+      stack: [
+        "Error: WebSocket was closed before the connection was established",
+        "    at WebSocket.terminate (/app/node_modules/ws/lib/websocket.js:496:7)",
+        "    at Timeout.<anonymous> (/app/node_modules/@larksuiteoapi/node-sdk/lib/index.js:99696:36)",
+      ].join("\n"),
+    },
+  );
+
+  it("命中 SDK 握手超时残留错误", () => {
+    expect(isLarkWsHandshakeStrayError(stray())).toBe(true);
+  });
+
+  it("同文案但栈不在 node-sdk → 不吞（其他 ws 客户端的真实错误）", () => {
+    const other = stray();
+    other.stack = other.stack!.replace("@larksuiteoapi/node-sdk", "some-other-lib");
+    expect(isLarkWsHandshakeStrayError(other)).toBe(false);
+  });
+
+  it("其他错误 / 非 Error → 不吞", () => {
+    expect(isLarkWsHandshakeStrayError(new Error("boom"))).toBe(false);
+    expect(isLarkWsHandshakeStrayError("WebSocket was closed before the connection was established")).toBe(false);
+    expect(isLarkWsHandshakeStrayError(undefined)).toBe(false);
   });
 });
 

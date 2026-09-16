@@ -47,6 +47,26 @@ export interface LarkWsClient {
   stop(): void;
 }
 
+/**
+ * SDK 握手看门狗残留错误判定（SPEC lark-ws.md §6 失败模式表）。
+ *
+ * `@larksuiteoapi/node-sdk` 的 `connect()` 在 `handshakeTimeoutMs` 触发时先
+ * `removeAllListeners()` 再 `terminate()`；pre-open 的 ws 被 terminate 会发出
+ * "WebSocket was closed before the connection was established" 的 'error'
+ * 事件——此时监听已被移除，错误冒泡成未捕获异常杀死进程。
+ * 该次连接尝试已由 SDK 的 settleOnce(false) 判败、重连循环照常继续，错误本身
+ * 是噪声：吞掉它比进程重启更便宜。要求调用栈落在 node-sdk 帧上，避免吞掉
+ * 其他 ws 客户端（如未来同进程组件）碰巧同文案的真实错误。
+ */
+export function isLarkWsHandshakeStrayError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message === "WebSocket was closed before the connection was established" &&
+    typeof error.stack === "string" &&
+    error.stack.includes("larksuiteoapi")
+  );
+}
+
 /** 事件回调统一兜底：畸形帧只计数不重连（SPEC lark-ws.md §6）。 */
 function guard<T>(handlers: LarkWsHandlers, run: () => T): T | undefined {
   try {
