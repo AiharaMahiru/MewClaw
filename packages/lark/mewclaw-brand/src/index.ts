@@ -31,14 +31,14 @@ const DEDUPE_STYLE = `[aria-label="Open right sidebar"]{display:none!important}`
 // 会话头部顶栏在手机上溢出：隐藏桌面专属控件——外部编辑器入口、底部坞开关
 // （移动端无内容）、标题行内的模式徽标+云端位置选择器（"Standard mode ☁️云端"——
 // 移动 Web 只有云端）。顶栏仅剩面包屑、More actions 与坞簇 Expand sidebar。
-const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)!important}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}[class*="_centerCol"]{grid-column:1/-1}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}[aria-label="Open workspace in Cursor"],[aria-label="Choose an app to open in"],[aria-label="Expand bottom panel"],[class*="_titleRow"] [class*="_headerActions"]{display:none!important}}
-.mewclaw-rail-edge{display:none}
-@media(max-width:768px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}}`;
-// 移动端侧栏开合控制：左缘 16px 起笔右滑展开完整会话抽屉，抽屉上左滑或点遮罩
-// 收起并隐藏整条侧栏列。手势用 TouchEvent 而非 PointerEvent——左缘右滑会被浏览器
-// 声明为系统手势导致 pointermove 断流，touchmove 不受影响；起笔判定按触点坐标
-// （热区元素可能被下层输入控件遮挡）。脚本仅 DOM 开合，不读凭证、不发请求；
-// 桌面视口 matchMedia 短路。
+const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)!important}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}[class*="_centerCol"]{grid-column:1/-1}[class*="_titleRow"]{padding-left:48px!important}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}[aria-label="Open workspace in Cursor"],[aria-label="Choose an app to open in"],[aria-label="Expand bottom panel"],[class*="_titleRow"] [class*="_headerActions"]{display:none!important}}
+.mewclaw-rail-edge,.mewclaw-rail-fab{display:none}
+@media(max-width:768px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}.mewclaw-rail-fab{display:inline-flex;position:fixed;top:10px;left:10px;z-index:108;width:36px;height:36px;align-items:center;justify-content:center;border:0;border-radius:10px;background:transparent;color:inherit;cursor:pointer;padding:0}}`;
+// 移动端侧栏开合控制：左上角固定菜单键 + 左缘 16px 起笔右滑展开完整会话抽屉，
+// 抽屉上左滑或点遮罩收起并隐藏整条侧栏列。手势用 TouchEvent 而非 PointerEvent——
+// 左缘右滑会被浏览器声明为系统手势导致 pointermove 断流，touchmove 不受影响；
+// 起笔判定按触点坐标（热区元素可能被下层输入控件遮挡）。脚本仅 DOM 开合，
+// 不读凭证、不发请求；桌面视口 matchMedia 短路。
 const MOBILE_RAIL_SCRIPT = `<script data-mewclaw-rail>(function(){
 if(!matchMedia("(max-width:768px)").matches)return;
 var OPEN="mewclaw-rail-open";
@@ -46,6 +46,11 @@ function col(){return document.querySelector('[class*="_sidebarCol"]')}
 function toggleBtn(){var c=col();return c&&c.querySelector('[class*="_toggle"]')}
 function open(){document.documentElement.classList.add(OPEN);var t=toggleBtn();if(t&&t.getAttribute("aria-label")==="Open sidebar")t.click()}
 function close(){var c=col();if(c&&c.getBoundingClientRect().width>100){var t=toggleBtn();if(t)t.click()}document.documentElement.classList.remove(OPEN)}
+var fab=document.createElement("button");fab.type="button";fab.setAttribute("aria-label","Menu");
+fab.className="mewclaw-rail-fab";
+fab.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+fab.addEventListener("click",function(){document.documentElement.classList.contains(OPEN)?close():open()});
+document.body.appendChild(fab);
 var edge=document.createElement("div");edge.className="mewclaw-rail-edge";document.body.appendChild(edge);
 var sx=0,sy=0,track="";
 document.addEventListener("touchstart",function(e){var t=e.touches[0];if(!t)return;
@@ -55,7 +60,7 @@ document.addEventListener("touchmove",function(e){if(!track)return;var t=e.touch
 if(track==="open"&&dx>56&&dx>Math.abs(dy)*1.5){track="";open()}
 else if(track==="close"&&dx<-56&&-dx>Math.abs(dy)*1.5){track="";close()}},true);
 ["touchend","touchcancel"].forEach(function(t){document.addEventListener(t,function(){track=""},true)});
-document.addEventListener("pointerdown",function(e){if(!document.documentElement.classList.contains(OPEN))return;var c=col();if(c&&c.contains(e.target))return;close()},true);
+document.addEventListener("pointerdown",function(e){if(!document.documentElement.classList.contains(OPEN))return;var c=col();if(c&&c.contains(e.target))return;if(fab.contains(e.target))return;close()},true);
 document.addEventListener("click",function(e){var t=toggleBtn();if(t&&(t===e.target||t.contains(e.target))&&t.getAttribute("aria-label")==="Collapse sidebar")setTimeout(function(){var c=col();if(c&&c.getBoundingClientRect().width<100)document.documentElement.classList.remove(OPEN)},350)},true);
 })()</script>`;
 const BOOT_STYLE = `html.mewclaw-boot-seen .mewclaw-boot{display:none}.mewclaw-boot{position:fixed;z-index:2147483647;inset:0;display:grid;place-items:center;pointer-events:none;background:#f5f5f7;color:#181717;animation:mewclaw-boot-away .32s cubic-bezier(.4,0,1,1) 1.05s forwards}.mewclaw-boot-inner{display:grid;justify-items:center;gap:24px;animation:mewclaw-boot-arrive .52s cubic-bezier(.22,1,.36,1) both}.mewclaw-boot-logo{width:88px;height:88px;border-radius:50%;filter:drop-shadow(0 12px 24px rgb(0 0 0/.12))}.mewclaw-boot-track{width:112px;height:3px;overflow:hidden;border-radius:999px;background:rgb(24 23 23/.12)}.mewclaw-boot-progress{display:block;width:42%;height:100%;border-radius:inherit;background:currentColor;animation:mewclaw-boot-progress .82s cubic-bezier(.2,.8,.2,1) .14s both}@keyframes mewclaw-boot-arrive{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}@keyframes mewclaw-boot-progress{from{transform:translateX(-110%)}to{transform:translateX(250%)}}@keyframes mewclaw-boot-away{to{opacity:0;visibility:hidden}}body[data-ds-dark-theme] .mewclaw-boot{background:#18181a;color:#fff}@media(prefers-color-scheme:dark){html:not([data-ds-theme=light]) .mewclaw-boot{background:#18181a;color:#fff}}@media(prefers-reduced-motion:reduce){.mewclaw-boot,.mewclaw-boot-inner,.mewclaw-boot-progress{animation:none}.mewclaw-boot{opacity:0;visibility:hidden}}`;
