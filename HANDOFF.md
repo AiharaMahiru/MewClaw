@@ -2,7 +2,7 @@
 
 更新时间：2026-09-15
 工作分支：`desktop-dev`
-本地同步基线：已拉取并合入 `origin/desktop@c627dae`（merge master 带入 R32 计费纪元/管理端按用户用量 + R33 桌面推理三形态选择器与共享模型目录，均已部署生产），合并提交为 `889230f`。按交接约定 `packages/auth/edge` 下 `desktop-inference.ts`/`desktop-inference.test.ts`/`auth-routes.ts`/`server.ts`/`config.ts` 冲突全部取主线版本，本分支不再维护这些文件。
+本地同步基线：已合入 `origin/desktop@4719c46`（含 R32 计费纪元、R33 桌面推理三形态选择器与共享模型目录、R34-R37 品牌改名 `atw-brand→mewclaw-brand` 与 `mewclaw-brand-desktop` 桌面变体、移动端侧栏折叠、auth 审计修复）。途中远端 desktop-dev 已先行合入同一基线（`de12683`），本分支在其上再合最新 desktop（`f48f39c`）。按交接约定 `packages/auth/edge` 下 `desktop-inference.ts`/`desktop-inference.test.ts`/`auth-routes.ts`/`server.ts`/`config.ts` 冲突全部取主线版本，本分支不再维护这些文件。
 
 ## 当前唯一交付目录
 
@@ -91,8 +91,9 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 
 ## 推送状态与限制
 
-- 本轮改动基于 `origin/desktop@c627dae`，合并提交为 `889230f`，叠加无缝切换、同步边界修正、本地模式三形态模型 picker 接入、测试和文档更新。
-- `desktop` 远端现为 `c627dae`（含 R32/R33，均已部署生产；R33 提供三形态推理选择器与共享模型目录）。本分支推送后重新核验 `git ls-remote`（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成）。
+- 本轮改动基于 `origin/desktop@4719c46`，叠加远端 desktop-dev 合并（`de12683`）、无缝切换、同步边界修正、本地模式三形态模型 picker 接入、测试和文档更新。合并提交 `f48f39c`；edge typecheck 干净、151/151 edge 测试通过。
+- **Release 产物时间差**：上述产物哈希对应 picker 接入时的构建（`5f50412` 基线）；之后合入的品牌改名/桌面变体/移动端侧栏修复尚未进入候选构建——下次出包前需先把候选的 brand workspace 从 `dsh-lark-atw-brand` 同步为 `mewclaw-brand`/`mewclaw-brand-desktop` 命名并重跑全链路。
+- `desktop` 远端现为 `4719c46`，`desktop-dev` 推送后重新核验 `git ls-remote`（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成；注意 origin 的 fetch refspec 只覆盖 `desktop`，desktop-dev 需显式 `git fetch origin +refs/heads/desktop-dev:refs/remotes/origin/desktop-dev`）。
 - 后续若继续修改源码或交接文档，完成提交后重新执行：
 
   ```text
