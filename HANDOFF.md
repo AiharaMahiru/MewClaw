@@ -1,60 +1,28 @@
-# MewClaw Desktop 开发交接
+# 生产双 bug 修复交接（2026-09-16）
 
-更新时间：2026-09-10。适用分支：`desktop`。已按文件接收 `desktop-dev@62e0b09` 的桌面候选，并与 Web 共享能力集成；开发源码版本 `0.1.0-desktop.5`，不代表 Windows 安装包或生产已经发布。
+多用户报错的两个独立缺陷已修复上线，详细归档见 `docs/evidence/incident-ws-crash-and-bash-schema-20260916.md`（本地证据目录，不入 git）。
 
-Web `master` 已同步至 `9d17830`；本次共享合入包含液态玻璃主题、双色 SVG 背景以及标题/顶部标签无框样式。桌面端接入时需按本分支的 Electron 与桌面兼容门禁重新验证，不复制 Web 生产 release 或凭据。
+**Bug 1 — 网关 WS 崩溃（R48-ws-crashguard，`4b5cd26`）**：`@larksuiteoapi/node-sdk` 握手看门狗 `removeAllListeners()` 后 `terminate()`，pre-open ws 发出无监听 `'error'` → 未捕获异常杀进程（9/9 崩溃环 13 次、9/15 两次）。`dsh-lark-ws` 挂过滤式 `uncaughtException`：仅吞栈在 node-sdk 的该文案残留错误（SDK 重连循环继续），其余异常保持 `exit(1)`。判定函数 `isLarkWsHandshakeStrayError` 在 `packages/lark/lark-ws/src/client.ts`；SPEC `lark-ws.md` §6 已补失败模式行。
 
-## 1. 本轮变更与约束
+**Bug 2 — bash 工具 schema 400（R49-bash-schema，`94cc747`）**：`packages/bundle/web/agent-presets-oci/pipe-bash.mjs` 绕过 `defineTool` 裸 `ctx.tools.register`，`parameters` 传未编译字段表（根无 `type:"object"`），native 模式 53 工具全量上线路时被 provider 400 拒绝（PTC 只发 `run_code` 故长期未炸）。已补 object 根 JSON Schema + 注册形态断言。**教训：preset `.mjs` 直接注册工具时 `parameters` 必须是 object 根 JSON Schema，不是字段表**。
 
-- 用户明确修改旧首版约定：**加入本机 Shell 与目录双向同步**，不再仅限 list/read/write。
-- `master` 持有 `packages/desktop/host`、`packages/desktop/workspace`、Auth Edge 和部署 overlay；`desktop` 持有 Electron 原生授权、Cloud Provider、客户端及打包脚本。共享修改由 master 合入 desktop，禁止整分支反向合并 master。
-- 官方 DSH 包零修改；桌面继续固定社区子模块 `a1ddcda8e701a8490c619ce411ea8a3d6daa1453`，桌面官方依赖为 0.1.2-rc.1，Web 为 0.1.5-rc.1。共享 Host Consumer 在两套版本分别构建测试。
-- 本机目录选择只授权文件工具。Shell 与同步分别弹出原生授权对话框；模型和普通网页无法自己授予权限。Shell 是当前系统账号权限，cwd **不是沙箱**。
-- 本轮只交付源码分支；没有重启、切换或清理生产，没有复制会话数据库和生产密钥。
+另：`SSE stream ended without [DONE]`（STREAM_CLOSED）为上游 relay 瞬断，非缺陷，重发即可。
 
-## 2. 已实现的链路
+以下内容为历史交接。
 
-1. Auth Edge 在登录、Cookie、CSRF 后校验会话归属，生成完整 Scope；云端目录从认证资源派生，不接受客户端服务器路径。
-2. Cordis Worker 插件提供 `desktop_workspace`、`desktop_shell` 和同步端点；模型结果通过官方工具事件记录；状态在 append + flush 后生效。
-3. 本机文件与 Shell 复用官方 FileSystem / Shell Provider。长命令期间维持心跳，云端取消会传到本机 AbortSignal；退出或断线撤销本机授权，不重放命令。
-4. 同步按共同摘要基线双向复制文件，支持二进制、嵌套文件、条件更新与可恢复删除。两边同时修改保留冲突，首次同名异内容不覆盖；重启后重新扫描，不依据旧基线传播删除。
-5. 默认排除 .env*、.git、node_modules、.mewclaw-sync；符号链接、不便携路径、大小写碰撞和超限明确拒绝。空目录、权限位不复制。
-6. 普通 Web 只显示模式；桌面会话标题栏提供目录选择、Shell 授权/撤销、同步启停和冲突状态，不显示本机绝对路径或凭证。
+# Web 共享能力交接（2026-09-10）
 
-## 3. 文件归属与合并提示
+主题 `packages/ui/liquid-glass` 已随 `R3-title-nav-20260911` 发布 Linux 生产：官方双色 token、设置个人开关、自有 SVG 背景和 HTML/ARIA 语义材质；标题和横向标签保持透明无框，官方和其他包未改。49项测试及候选 Chromium 通过，六个生产服务均运行于当前 release，真实登录交互仍需用户实测。后续向 desktop 合入时保留共享包唯一实现，先核对桌面固定版 DSH 的主题 API，再创建独立候选验证；不可直接复制 Web 的官方版本锁定或修改社区子模块。当前尚未合入桌面分支，具体边界见 `packages/ui/liquid-glass/README.md`。
 
-- 共享唯一实现：`packages/desktop/host`、`packages/desktop/workspace`。
-- 桌面专属：`apps/desktop/plugins/cloud/src/{index,workspace-binding,workspace-controller,workspace-route,workspace-transport,workspace-client,boot}.ts`。
-- `apps/desktop/plugins/workspace` 仅保留旧路径兼容入口，不能继续维护另一套 Worker 实现。
-- 本机未提交的 Web/飞书代码不要混入桌面提交；冲突按文件职责解决，不对整个仓库执行 ours/theirs 覆盖。
-- SPEC：`docs/specs/desktop-workspace.md`。部署：`config/desktop-workspace.patch.yml`、`packages/desktop/workspace/README.md`。
+桌面工作区已从 desktop-dev 候选按文件迁入 `packages/desktop`，增加本机 Shell 和目录双向同步；桌面 Host/原生授权/打包仍由 `desktop` 分支维护。不要把 desktop-dev 整分支反向合并 master。
 
-## 4. 本地电脑下一步
+共享实现：`packages/desktop/host`、`packages/desktop/workspace`；认证入口：`packages/auth/edge/src/desktop-workspace.ts`；启用示例：`config/desktop-workspace.patch.yml`。默认禁用新绑定但保留持久化模式 guard；源码推送不等于生产启用。契约见 `docs/specs/desktop-workspace.md`。
 
-1. 保存当前桌面开发工作，`git fetch origin`，在自己的开发分支合并 `origin/desktop`；本轮不改写远端 desktop-dev，由本地电脑处理自己的合并冲突。
-2. 初始化子模块，使用 Node 24 创建**全新**候选；命令见 `apps/desktop/README.md`。不要复用旧候选的源码或依赖覆盖验证。
-3. 执行候选完整构建与 `node apps/desktop/verify-workspace.mjs <候选绝对路径>`；Web 包另外在根 pnpm 环境构建，不能把服务器 0.1.5 Worker 装进 0.1.2 Electron 来测试。
-4. Windows 实机验证：原生目录选择、取消/允许 Shell 对话框、PowerShell 命令、长命令撤销、同步二进制/嵌套文件、冲突和恢复副本；退出再登录必须重新授权。
-5. 实际云端管理员另行启用可选 overlay，部署 Auth Edge + Worker 后，使用普通测试账号完成真实模型→本机文件/Shell 和 Web/桌面同会话续聊。默认 `enabled:false` 不会开启桥接。
-6. 实机通过后再构建 Windows Setup/Portable/ZIP、验包、记录 SHA-256 与签名状态；本轮没有宣称生成新的安装包。
+本机目录授权不包含 Shell 或同步授权；两者分别原生确认。同步保留冲突和恢复副本，不离线重放写入。Shell 复用官方 Provider，不宣称目录沙箱。后续本地电脑从 desktop 拉取后合并自己的 desktop-dev，重点保留共享包唯一实现、单会话轮询与独立授权。生产启用和 Windows 实机验收仍须分别执行。
 
-## 5. 验证与回滚边界
+以下内容为历史附件交接，不代表本次未完成项或生产操作授权。
 
-- 本轮共享源码已同步至 `master@b999dca`，桌面已集成这些修改。最终源码验收：Web 17 个文件、100 项测试通过；桌面候选 12 个文件、36 项测试通过，输出 `WORKSPACE_OFFLINE_VERIFIED`。完整命令与覆盖范围见 [源码验收记录](docs/specs/desktop-workspace-verification.md)。
-- 收尾修复包括默认关闭桥接时的普通归档父会话兼容，以及 Auth Edge 向 Worker 传播桌面取消请求；本机会话父链的工具限制仍然继承，不因兼容修复而放开。
-- 已有隔离候选验证：严格 Host/Cloud 编译、HTTP 桥接到真实临时目录与官方 Shell、三种布局及客户端回归。
-- Web 门禁：build、typecheck、Auth/Worker/文件/Shell/同步定向测试、真实 Cordis overlay 合并与模块解析、品牌和官方完整性。
-- 未覆盖：本轮 Windows 实机、新版 Electron 安装包、生产真实模型链路。单测和离线集成不能替代这些证据。
-- 生产没有变更。将来关闭桥接应设置 `enabled:false` 并保留事件读取及 guard；不要删除插件或直接回滚到不认识 desktop/workspace 事件的旧版。
-- 恢复副本位于对应目录 `.mewclaw-sync/recovery`，不自动清理。不要批量清理用户数据、授权目录或其他候选。
-
----
-
-## 历史附件修复交接（2026-08-14）
-
-以下完整保留供追溯，不是桌面任务的行动指令；其中路径、生产状态、操作授权和任务记录限制均只适用于当时工作，不能覆盖上方桌面计划。
-
-### DSH Lark 附件格式处理修复转交
+# DSH Lark 附件格式处理修复转交
 
 更新时间：2026-08-14
 
@@ -284,11 +252,3 @@ pnpm service:status
 ```
 
 状态应显示 PostgreSQL 运行、Worker/Admin healthy、Gateway callback connected、profile 仍符合用户选择。最后由用户在飞书发送真实图片和多类文件进行验收。
-
-## 2026-09-12 DSH rc.2 升级与云端配置同步
-
-- `master` 与 `desktop` 已同步到 DSH `0.1.5-rc.2`（当前没有 `0.1.5` 正式版；npm `latest` 仍为 rc.1，rc.2 为最新发布候选）。桌面插件保留独立 Electron 依赖，通过 peer range 兼容 `0.1.2-rc.1` 与 `0.1.5-rc.2`。
-- 桌面账号、会话、模型目录、远程设置通过固定 `cloudOrigin` 代理到云端；真实 API key 只在 Auth Edge/Worker 使用，桌面仅接收 `keyConfigured` 和模型元数据。
-- 新增 `docs/specs/desktop-config-sync.md` 与 CloudProxy 路径转发测试，覆盖 `/api/dsh-web-ui-settings/describe`、`/auth/models`。
-- 源码已通过 lint、typecheck、build、Auth/Web 定向测试（152/152）、official-integrity 和 linux smoke。候选包：`/opt/dsh/incoming/R4-dsh-015-rc2-20260912/`，归档 SHA-256：`17f31414a436d60e7a00250410d1833ab585b4c3a8658d8067ce1e022d8a0346`。
-- 生产仍指向 `R3-title-nav-20260911`。切换时使用固定 Node 24.19.0，先备份 current，再原子更新 `/opt/dsh/current` 并重启六个 systemd 服务；保留 R3 作为回滚点。
