@@ -204,6 +204,15 @@ export class AuthEdgeServer {
       const sidebar = await authorizeSidebarRequest(this.#authz, req, url, user);
       if (sidebar.denied) { sendError(res, 403, sidebar.denied); return; }
       body = sidebar.body;
+      // 侧栏媒体路由（文件预览/下载、HTML 预览、客户端 chunk）可能返回超过
+      // 代理 32MB 缓冲上限的响应。这些 GET 无 RPC 决策参与，授权后直接流式转发；
+      // 上游的错误体（如 fs-error JSON）也原样透传，不再被改写成 INTERNAL_ERROR。
+      if (req.method === "GET"
+        && (url.pathname === "/sidebar/file" || url.pathname.startsWith("/sidebar/html") || url.pathname.startsWith("/sidebar/bundle"))) {
+        const headers = await this.workerHeaders();
+        await streamUpstream(this.#config.workerBaseUrl, req, res, headers);
+        return;
+      }
     }
     if (url.pathname.startsWith("/git/")) {
       const git = await authorizeGitRequest(this.#authz, req, url, user);
