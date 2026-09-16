@@ -9,11 +9,11 @@
 | 状态 | implementing（M2 实施中；容器核心 + 接线 + 实机 Podman e2e（含断网断言）已通过） |
 | 关联 ADR | ADR-6；[linux-production-runtime.md](linux-production-runtime.md) |
 | 依赖能力 | `ctx.sandbox`（宿主能力）、`ctx.subprocess` |
-| 提供能力 | 每 scope 一个非根 OCI 容器：读写根、降权、资源上限、单挂载、默认断网 |
+| 提供能力 | 每 scope 一个非根 OCI 容器：读写根、降权、资源上限、单挂载；网络默认断网（`network: none`），生产经 `network: bridge` 显式开启用户态 NAT 出站（只出不进，供 apt/pip/npm/cargo 拉依赖） |
 
 ## 1 目的与边界
 
-worker 允许任意代码执行时的可选强隔离 profile：镜像由仓库 `infra/sandbox` 构建（Node/npm、uv/Python、.NET、Rust、Git、C/C++ 工具链），容器以非根运行，读根文件系统、删除能力、CPU/内存/PID/tmpfs 上限、仅挂载 scope 工作区、默认无网络。默认生产使用不提供任意代码执行的 lightweight profile；选择 OCI 时本包不提供不安全降级。
+worker 允许任意代码执行时的可选强隔离 profile：镜像由仓库 `infra/sandbox` 构建（Node/npm、uv/Python、.NET、Rust、Git、C/C++ 工具链），容器以非根运行，读根文件系统、删除能力、CPU/内存/PID/tmpfs 上限、仅挂载 scope 工作区。网络默认无（`network: none`）；`network: bridge` 显式开启 podman rootless 用户态 NAT——仅出站、无入站监听，供容器内包管理与下载类任务使用。默认生产使用不提供任意代码执行的 lightweight profile；选择 OCI 时本包不提供不安全降级。
 
 非目标：镜像内容治理（infra/sandbox）；策略判定（DSH `sandboxPolicy` 负责模式与根目录解析，本包只执行）；Windows ACL（DSH 既有 `sandbox-windows-acl`）。
 

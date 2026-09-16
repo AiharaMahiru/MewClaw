@@ -63,5 +63,14 @@
 - id: sandbox-oci
   config:
     image: !!js process.env.DSH_SANDBOX_IMAGE
-    network: none
+    # bridge = podman rootless 用户态 NAT（pasta/slirp4netns）：只出不进，无入站监听；
+    # 供容器内 apt/pip/npm/cargo 拉依赖。oci.overlay.yml 默认行仍保持 none。
+    network: bridge
     workspaceRoot: /var/lib/dsh/workspaces
+
+# Files 面板 /sidebar/file 媒体路由（预览与 download=1 共用上限）默认 20MB 会挡住
+# 大产物文件并整页裸 JSON。生产放宽到 10GB；该路由整文件读入内存再回写，
+# 单请求内存峰值 ≈ 文件大小。
+- id: web-ui-better-sidebar
+  config:
+    mediaLimit: 10737418240
