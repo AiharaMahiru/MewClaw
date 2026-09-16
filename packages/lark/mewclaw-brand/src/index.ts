@@ -25,11 +25,13 @@ const HERO_STYLE = `.mewclaw-hero-brand{display:inline-flex;align-items:center;g
 // 整条侧栏列（含 55px 图标栏），由左缘滑动手势开合，展开时带暗色遮罩。
 // 桌面端侧栏背景是半透明（覆盖式抽屉会透出下层会话头部），移动端改为不透明——
 // 等优先级规则后被官方样式表覆盖，需 !important。
-// 会话头部顶栏在手机上溢出：隐藏桌面专属控件——外部编辑器入口、会话头部自带的
-// 右坞开关（与坞簇 Expand sidebar 重复）、底部坞开关（移动端无内容）、标题行内的
-// 模式徽标+云端位置选择器（"Standard mode ☁️云端"——移动 Web 只有云端）。顶栏仅剩
-// 面包屑、More actions 与坞簇 Expand sidebar。
-const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)!important}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}[class*="_centerCol"]{grid-column:1/-1}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}[aria-label="Open workspace in Cursor"],[aria-label="Choose an app to open in"],[aria-label="Open right sidebar"],[aria-label="Expand bottom panel"],[class*="_titleRow"] [class*="_headerActions"]{display:none!important}}
+// 右坞开关去重（全视口）：会话头部自带 "Open right sidebar" 与坞簇
+// "Expand sidebar" 是同一坞的两个入口——隐藏前者，坞簇开关作为默认右侧栏按钮。
+const DEDUPE_STYLE = `[aria-label="Open right sidebar"]{display:none!important}`;
+// 会话头部顶栏在手机上溢出：隐藏桌面专属控件——外部编辑器入口、底部坞开关
+// （移动端无内容）、标题行内的模式徽标+云端位置选择器（"Standard mode ☁️云端"——
+// 移动 Web 只有云端）。顶栏仅剩面包屑、More actions 与坞簇 Expand sidebar。
+const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)!important}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}[class*="_centerCol"]{grid-column:1/-1}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}[aria-label="Open workspace in Cursor"],[aria-label="Choose an app to open in"],[aria-label="Expand bottom panel"],[class*="_titleRow"] [class*="_headerActions"]{display:none!important}}
 .mewclaw-rail-edge{display:none}
 @media(max-width:768px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}}`;
 // 移动端侧栏开合控制：左缘 16px 起笔右滑展开完整会话抽屉，抽屉上左滑或点遮罩
@@ -70,7 +72,7 @@ export function apply(ctx: Context, options?: MewClawBrandOptions): void {
     .replace(/<title>[^<]*<\/title>/u, `<title>${PRODUCT_NAME}</title>`)
     .replace(/(<link\b[^>]*rel="icon"[^>]*href=")[^"]*(")/u, `$1${FAVICON_PATH}$2`)
     .replace(/(<link\b[^>]*rel="manifest"[^>]*href=")[^"]*(")/u, `$1${MANIFEST_PATH}$2`)
-    .replace("</head>", `${BOOT_HEAD_SCRIPT}<style data-mewclaw-brand>${BRAND_STYLE}${STROKE_ONLY_STYLE}${HERO_STYLE}${mobileStyle}${BOOT_STYLE}</style></head>`)
+    .replace("</head>", `${BOOT_HEAD_SCRIPT}<style data-mewclaw-brand>${BRAND_STYLE}${STROKE_ONLY_STYLE}${HERO_STYLE}${DEDUPE_STYLE}${mobileStyle}${BOOT_STYLE}</style></head>`)
     .replace(/<body([^>]*)>/u, `<body$1>${BOOT_MARKUP}`)
     .replace("</body>", `${options?.mobile === false ? "" : MOBILE_RAIL_SCRIPT}${BOOT_END_SCRIPT}</body>`)));
   ctx.effect(() => ctx.webServer.register({ kind: "exact", path: FAVICON_PATH, handler: (_req, res) => respond(res, "image/svg+xml; charset=utf-8", FAVICON_RESPONSE) }));
