@@ -24,9 +24,9 @@ D:\AI\dsh\MewClaw-desktop-candidate\release\MewClaw-1.0.0-win-x64
 
 | 产物 | 字节 | SHA-256 |
 | --- | ---: | --- |
-| `MewClaw-1.0.0-win-x64-Portable.exe` | 142871771 | `046abe19b50337504520716da0603fd92a52168acbf71b096ed0f816aa03759d` |
-| `MewClaw-1.0.0-win-x64-Setup.exe` | 143115724 | `7e64f94652cfa113c6a14ece5053ff8685caf5c28f2febc150e0a6e1d439d3c1` |
-| `MewClaw-1.0.0-win-x64.zip` | 187034664 | `4a35fcbf51274882ddddb087d7dab5325e69fa1714a1ebc1c5bfa341913dd3d5` |
+| `MewClaw-1.0.0-win-x64-Portable.exe` | 142872317 | `8c812915c89501f9f4e9a077ce11b28249029df7e1d88a43d1535836486c5906` |
+| `MewClaw-1.0.0-win-x64-Setup.exe` | 143116272 | `5d695da171e513b210ae2ed1f9218c0b097e6484cde6f7b44e842ff445e9ce3c` |
+| `MewClaw-1.0.0-win-x64.zip` | 187035087 | `36b19567a083d9a5a25af022fd8181ed0e66ec545ef317750dfd68e6d1d26c4d` |
 
 产物未签名。`win-unpacked` 与上述安装包位于同一 Release 目录，必须一起保留用于目录模式验收。
 
@@ -59,7 +59,7 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 - 本地会话经云端代理推理。桌面只发送 `model` 选择器和当前账号 Cookie/CSRF；Auth Edge 依据 userId 在服务端解析路由与密钥并代理 SSE，API Key 不下发、不落盘、不进入日志。R33 起 `model` 字段是服务端路由选择器，三种形态：`cloud-default`（账号默认 profile 默认模型）、`account/<profileId>[/<model>]`（本人 profile 内任意已声明 modelId，裸 id 回落 defaultModel）、`shared/<provider>/<model>`（部署共享目录，Edge 进程内独立 Cordis 上下文承载 LlmRuntime，服务端凭证）。
 - `/auth/models` GET 响应附带 `sharedModels`（`{provider, model, name}` 数组，无凭证字段）；未配置账号默认模型时 `cloud-default` 仍返回 `CLOUD_DEFAULT_MODEL_REQUIRED`，未知 profile/模型/共享项返回 `404 MODEL_UNAVAILABLE`。
 - 本地模式只授予用户原生选择的目录文件能力；旧云端 workspace、Shell、同步桥接由独立 Web overlay 控制，不因切换本地模式静默启用。
-- 切换到云端时释放本机目录 grant；切回本地只允许重新通过原生目录选择授权，Electron 进程仍保持运行。
+- 切换到云端时释放本机目录 grant；切回本地只允许重新通过原生目录选择授权，Electron 进程仍保持运行。授权失效或会话未绑定目录时 `desktop_workspace` 抛 `LOCAL_WORKSPACE_NOT_AUTHORIZED` 并附重新授权指引（区分两种形态，指出失效的规范化路径，提示经侧栏「打开本地目录」重新选择）；同一目录重选即恢复，`workspaceRegistry.create` 按规范化路径去重不产生重复工作区。
 - `electron-builder`、验包和 UI 冒烟按 `MewClaw-${version}-win-${arch}` 计算 Release 目录，避免版本并存和 `desktop.6` 歧义。
 - ASAR 场景的 DSH profile fallback 生成物理代理目录，避免 Windows Junction 无法读取 `app.asar` 内 `package.json` 导致标准 preset 失效。
 
@@ -93,7 +93,7 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 
 - 本轮改动基于 `origin/desktop@91bd7e6`，叠加远端 desktop-dev 合并（`de12683`）、无缝切换、同步边界修正、本地模式 picker 云端同构布局接入、右坞开关去重移植、测试和文档更新。合并提交 `f48f39c`、`3b527c7`；edge typecheck 干净、151/151 edge 测试通过。
 - **品牌改名已进候选**：候选 `mewclaw-brand` workspace 的包名/插件名/客户端模块 id 已从 `dsh-lark-atw-brand` 改为 `dsh-lark-mewclaw-brand-desktop`（桌面变体语义，候选只保留这一个品牌 workspace）；`verify-package.mjs` 的 ASAR 断言路径同步更新。上述产物哈希即改名后的构建。
-- `desktop` 远端现为 `91bd7e6`（与合并基线一致），`desktop-dev` 推送后核验为 `3b527c7`（合并提交，本轮 Release 的源码基线）（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成；注意 origin 的 fetch refspec 只覆盖 `desktop`，desktop-dev 需显式 `git fetch origin +refs/heads/desktop-dev:refs/remotes/origin/desktop-dev`）。
+- `desktop` 远端现为 `91bd7e6`（与合并基线一致），`desktop-dev` 推送后核验为待更新（本轮 Release 的源码基线为 `f0aa6e2` + docs 提交）（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成；注意 origin 的 fetch refspec 只覆盖 `desktop`，desktop-dev 需显式 `git fetch origin +refs/heads/desktop-dev:refs/remotes/origin/desktop-dev`）。
 - 后续若继续修改源码或交接文档，完成提交后重新执行：
 
   ```text
