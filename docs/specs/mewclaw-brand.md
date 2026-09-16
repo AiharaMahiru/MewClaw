@@ -82,11 +82,12 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   无碍但作为覆盖层会透出下层内容；`≤768px` 下 `sidebarCol` 背景改不透明
   （官方样式表同级规则在其后，须 `!important`）；
 - 移动端顶栏收纳：会话头部顶栏控件按桌面密度排列，390px 下溢出重叠。
-  `≤768px` 隐藏桌面专属/重复控件（按官方 `aria-label` 选择）：
+  `≤768px` 隐藏桌面专属/重复控件（按官方 `aria-label` 或稳定类后缀选择）：
   "Open workspace in Cursor"、"Choose an app to open in"（外部编辑器入口）、
   "Open right sidebar"（会话头部自带右坞开关，与坞簇 Expand sidebar 重复）、
-  "Expand bottom panel"（底部坞移动端无内容）。保留面包屑、More actions
-  与坞簇 Expand sidebar；
+  "Expand bottom panel"（底部坞移动端无内容）、`_titleRow` 内 `_headerActions`
+  （模式徽标 + "☁云端" 位置选择器——移动 Web 只有云端）。保留面包屑、
+  More actions 与坞簇 Expand sidebar；
 - 所有注册经 `ctx.effect()`/`ctx.slots.inject`，卸载即回收。
 
 ## 7 安全与信任

@@ -88,6 +88,7 @@ describe("dsh-lark-mewclaw-brand", () => {
     expect(html).toContain('[aria-label="Open workspace in Cursor"]');
     expect(html).toContain('[aria-label="Open right sidebar"]');
     expect(html).toContain('[aria-label="Expand bottom panel"]');
+    expect(html).toContain('[class*="_titleRow"] [class*="_headerActions"]');
     // 侧栏开合控制器（§6 移动适配）：左缘热区滑动手势 + 外点关闭，无菜单按钮
     expect(html).toContain("data-mewclaw-rail");
     expect(html).toContain("mewclaw-rail-edge");

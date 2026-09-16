@@ -26,9 +26,10 @@ const HERO_STYLE = `.mewclaw-hero-brand{display:inline-flex;align-items:center;g
 // 桌面端侧栏背景是半透明（覆盖式抽屉会透出下层会话头部），移动端改为不透明——
 // 等优先级规则后被官方样式表覆盖，需 !important。
 // 会话头部顶栏在手机上溢出：隐藏桌面专属控件——外部编辑器入口、会话头部自带的
-// 右坞开关（与坞簇 Expand sidebar 重复）、底部坞开关（移动端无内容）。顶栏仅剩
+// 右坞开关（与坞簇 Expand sidebar 重复）、底部坞开关（移动端无内容）、标题行内的
+// 模式徽标+云端位置选择器（"Standard mode ☁️云端"——移动 Web 只有云端）。顶栏仅剩
 // 面包屑、More actions 与坞簇 Expand sidebar。
-const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)!important}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}[class*="_centerCol"]{grid-column:1/-1}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}[aria-label="Open workspace in Cursor"],[aria-label="Choose an app to open in"],[aria-label="Open right sidebar"],[aria-label="Expand bottom panel"]{display:none!important}}
+const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)!important}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}[class*="_centerCol"]{grid-column:1/-1}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}[aria-label="Open workspace in Cursor"],[aria-label="Choose an app to open in"],[aria-label="Open right sidebar"],[aria-label="Expand bottom panel"],[class*="_titleRow"] [class*="_headerActions"]{display:none!important}}
 .mewclaw-rail-edge{display:none}
 @media(max-width:768px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}}`;
 // 移动端侧栏开合控制：左缘 16px 起笔右滑展开完整会话抽屉，抽屉上左滑或点遮罩
