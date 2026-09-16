@@ -83,10 +83,18 @@ describe("dsh-lark-mewclaw-brand", () => {
     expect(html).toContain('[class*="_centerCol"]{grid-column:1/-1}');
     expect(html).toContain("translateX(-110%)");
     expect(html).toContain("html.mewclaw-rail-open");
-    // 侧栏开合控制器（§6 移动适配）：悬浮菜单键 + 外点关闭
+    // 移动端抽屉不透明 + 顶栏收纳（隐藏桌面专属控件）
+    expect(html).toContain("background-color:rgb(28 28 35)!important");
+    expect(html).toContain('[aria-label="Open workspace in Cursor"]');
+    expect(html).toContain('[aria-label="Open right sidebar"]');
+    expect(html).toContain('[aria-label="Expand bottom panel"]');
+    // 侧栏开合控制器（§6 移动适配）：左缘热区滑动手势 + 外点关闭，无菜单按钮
     expect(html).toContain("data-mewclaw-rail");
-    expect(html).toContain("_toggleCluster");
-    expect(html).toContain('aria-label","Menu"');
+    expect(html).toContain("mewclaw-rail-edge");
+    expect(html).toContain("touch-action:pan-y");
     expect(html).toContain("pointerdown");
+    expect(html).toContain("touchstart");
+    expect(html).toContain("touchmove");
+    expect(html).not.toContain("mewclaw-rail-fab");
   });
 });
