@@ -93,7 +93,8 @@ describe("dsh-lark-mewclaw-brand", () => {
     expect(html).toContain("mewclaw-rail-edge");
     expect(html).toContain("touch-action:pan-y");
     expect(html).toContain("pointerdown");
-    expect(html).toContain("pointermove");
+    expect(html).toContain("touchstart");
+    expect(html).toContain("touchmove");
     expect(html).not.toContain("mewclaw-rail-fab");
   });
 });

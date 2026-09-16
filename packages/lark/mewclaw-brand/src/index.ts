@@ -32,8 +32,9 @@ const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fi
 .mewclaw-rail-edge{display:none}
 @media(max-width:768px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}}`;
 // 移动端侧栏开合控制：左缘 16px 热区右滑展开完整会话抽屉，抽屉上左滑或点遮罩
-// 收起并隐藏整条侧栏列。热区 touch-action:pan-y 把水平手势留给页面而非浏览器
-// 返回手势。脚本仅 DOM 开合，不读凭证、不发请求；桌面视口由 matchMedia 短路。
+// 收起并隐藏整条侧栏列。手势用 TouchEvent 而非 PointerEvent——左缘右滑会被浏览器
+// 声明为系统手势导致 pointermove 断流，touchmove 不受影响；热区 touch-action:pan-y
+// 抑制垂直滚动的竞争。脚本仅 DOM 开合，不读凭证、不发请求；桌面视口 matchMedia 短路。
 const MOBILE_RAIL_SCRIPT = `<script data-mewclaw-rail>(function(){
 if(!matchMedia("(max-width:768px)").matches)return;
 var OPEN="mewclaw-rail-open";
@@ -43,13 +44,13 @@ function open(){document.documentElement.classList.add(OPEN);var t=toggleBtn();i
 function close(){var c=col();if(c&&c.getBoundingClientRect().width>100){var t=toggleBtn();if(t)t.click()}document.documentElement.classList.remove(OPEN)}
 var edge=document.createElement("div");edge.className="mewclaw-rail-edge";document.body.appendChild(edge);
 var sx=0,sy=0,track="";
-document.addEventListener("pointerdown",function(e){if(e.pointerType==="mouse")return;
-if(document.documentElement.classList.contains(OPEN)){var c=col();if(c&&c.contains(e.target)){sx=e.clientX;sy=e.clientY;track="close"}}
-else if(edge===e.target){sx=e.clientX;sy=e.clientY;track="open"}},true);
-document.addEventListener("pointermove",function(e){if(!track)return;var dx=e.clientX-sx,dy=e.clientY-sy;
+document.addEventListener("touchstart",function(e){var t=e.touches[0];if(!t)return;
+if(document.documentElement.classList.contains(OPEN)){var c=col();if(c&&c.contains(e.target)){sx=t.clientX;sy=t.clientY;track="close"}}
+else if(edge===e.target){sx=t.clientX;sy=t.clientY;track="open"}},true);
+document.addEventListener("touchmove",function(e){if(!track)return;var t=e.touches[0];if(!t)return;var dx=t.clientX-sx,dy=t.clientY-sy;
 if(track==="open"&&dx>56&&dx>Math.abs(dy)*1.5){track="";open()}
 else if(track==="close"&&dx<-56&&-dx>Math.abs(dy)*1.5){track="";close()}},true);
-["pointerup","pointercancel"].forEach(function(t){document.addEventListener(t,function(){track=""},true)});
+["touchend","touchcancel"].forEach(function(t){document.addEventListener(t,function(){track=""},true)});
 document.addEventListener("pointerdown",function(e){if(!document.documentElement.classList.contains(OPEN))return;var c=col();if(c&&c.contains(e.target))return;close()},true);
 document.addEventListener("click",function(e){var t=toggleBtn();if(t&&(t===e.target||t.contains(e.target))&&t.getAttribute("aria-label")==="Collapse sidebar")setTimeout(function(){var c=col();if(c&&c.getBoundingClientRect().width<100)document.documentElement.classList.remove(OPEN)},350)},true);
 })()</script>`;

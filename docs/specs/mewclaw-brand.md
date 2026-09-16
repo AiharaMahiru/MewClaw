@@ -71,10 +71,12 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
 - 移动端侧栏折叠：`≤768px` 时整条 `sidebarCol`（含 55px 图标栏）默认
   `translateX(-110%)+visibility:hidden` 收起，`centerCol` 占满视口。注入的
   `data-mewclaw-rail` 脚本提供左缘滑动手势：body 末端挂 16px 热区
-  `mewclaw-rail-edge`（`touch-action:pan-y`，水平手势归页面而非浏览器返回），
-  触笔右滑 >56px 且明显横向即置 `html.mewclaw-rail-open` 并点开完整会话抽屉；
-  抽屉上左滑、`pointerdown` 落在列外（遮罩）或抽屉内折叠键即收起。脚本只做
-  DOM 开合，不读凭证、不发请求，`matchMedia` 在桌面视口短路；
+  `mewclaw-rail-edge`（`touch-action:pan-y`），触笔右滑 >56px 且明显横向即置
+  `html.mewclaw-rail-open` 并点开完整会话抽屉；抽屉上左滑、`pointerdown`
+  落在列外（遮罩）或抽屉内折叠键即收起。手势监听用 TouchEvent 而非
+  PointerEvent——左缘右滑会被浏览器声明为系统手势令 pointermove 断流，
+  touchmove 不受影响。脚本只做 DOM 开合，不读凭证、不发请求，
+  `matchMedia` 在桌面视口短路；
 - 移动端抽屉不透明：官方侧栏背景为半透明 `rgba(28 28 35 / .5)`，桌面内联
   无碍但作为覆盖层会透出下层内容；`≤768px` 下 `sidebarCol` 背景改不透明
   （官方样式表同级规则在其后，须 `!important`）；
