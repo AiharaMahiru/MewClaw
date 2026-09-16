@@ -1,3 +1,15 @@
+# 生产双 bug 修复交接（2026-09-16）
+
+多用户报错的两个独立缺陷已修复上线，详细归档见 `docs/evidence/incident-ws-crash-and-bash-schema-20260916.md`（本地证据目录，不入 git）。
+
+**Bug 1 — 网关 WS 崩溃（R48-ws-crashguard，`4b5cd26`）**：`@larksuiteoapi/node-sdk` 握手看门狗 `removeAllListeners()` 后 `terminate()`，pre-open ws 发出无监听 `'error'` → 未捕获异常杀进程（9/9 崩溃环 13 次、9/15 两次）。`dsh-lark-ws` 挂过滤式 `uncaughtException`：仅吞栈在 node-sdk 的该文案残留错误（SDK 重连循环继续），其余异常保持 `exit(1)`。判定函数 `isLarkWsHandshakeStrayError` 在 `packages/lark/lark-ws/src/client.ts`；SPEC `lark-ws.md` §6 已补失败模式行。
+
+**Bug 2 — bash 工具 schema 400（R49-bash-schema，`94cc747`）**：`packages/bundle/web/agent-presets-oci/pipe-bash.mjs` 绕过 `defineTool` 裸 `ctx.tools.register`，`parameters` 传未编译字段表（根无 `type:"object"`），native 模式 53 工具全量上线路时被 provider 400 拒绝（PTC 只发 `run_code` 故长期未炸）。已补 object 根 JSON Schema + 注册形态断言。**教训：preset `.mjs` 直接注册工具时 `parameters` 必须是 object 根 JSON Schema，不是字段表**。
+
+另：`SSE stream ended without [DONE]`（STREAM_CLOSED）为上游 relay 瞬断，非缺陷，重发即可。
+
+以下内容为历史交接。
+
 # Web 共享能力交接（2026-09-10）
 
 主题 `packages/ui/liquid-glass` 已随 `R3-title-nav-20260911` 发布 Linux 生产：官方双色 token、设置个人开关、自有 SVG 背景和 HTML/ARIA 语义材质；标题和横向标签保持透明无框，官方和其他包未改。49项测试及候选 Chromium 通过，六个生产服务均运行于当前 release，真实登录交互仍需用户实测。后续向 desktop 合入时保留共享包唯一实现，先核对桌面固定版 DSH 的主题 API，再创建独立候选验证；不可直接复制 Web 的官方版本锁定或修改社区子模块。当前尚未合入桌面分支，具体边界见 `packages/ui/liquid-glass/README.md`。
