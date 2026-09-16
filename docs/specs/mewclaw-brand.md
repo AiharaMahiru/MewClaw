@@ -66,9 +66,15 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
 - 移动适配：官方前端无移动断点，`≤768px` 视口下左侧栏列仍占 grid 轨侧推
   挤压主列。注入样式把 `[class*="_sidebarCol"]` 改为 `fixed` 覆盖层
   （`top/bottom/left:0`，`z-index:120`，`height:100dvh`）；侧栏脱离 grid 布局后
-  `centerCol` 会落进 56px 的首轨，须以 `grid-column:1/-1` 跨满全行再加
-  `margin-left:55px` 为收起态图标栏让位；选择器用 CSS Module 稳定后缀
-  （`<hash>_<name>`，重建仅哈希变化），不改官方包；
+  `centerCol` 会落进 56px 的首轨，须以 `grid-column:1/-1` 跨满全行；选择器用
+  CSS Module 稳定后缀（`<hash>_<name>`，重建仅哈希变化），不改官方包；
+- 移动端侧栏折叠：`≤768px` 时整条 `sidebarCol`（含 55px 图标栏）默认
+  `translateX(-110%)+visibility:hidden` 收起，`centerCol` 占满视口。注入的
+  `data-mewclaw-rail` 脚本向官方顶栏开关簇（`_toggleCluster`）前置一个同款
+  菜单键（`mewclaw-rail-fab`），点击置 `html.mewclaw-rail-open` 展开侧栏列并
+  直接点开会话抽屉；主列以 `::after` 暗色遮罩标示，`pointerdown` 落在列外或
+  再点菜单键即收起；抽屉内折叠键收起后整列隐藏。脚本只做 DOM 开合，
+  不读凭证、不发请求，`matchMedia` 在桌面视口短路；
 - 所有注册经 `ctx.effect()`/`ctx.slots.inject`，卸载即回收。
 
 ## 7 安全与信任
@@ -76,15 +82,17 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
 - 升级硬门禁（release.md §1.1）：`pnpm verify:dsh-brand` 验证本插件只占据公开
   slots/transform/route、官方包保持原样；未通过不得接受 DSH 升级；
 - 品牌资产为仓库内联常量，无外链脚本/图片，无供应链面；
-- 注入的 `<script>` 仅为启动屏自删逻辑，不读凭证、不发请求。
+- 注入的 `<script>` 仅为启动屏自删逻辑与移动端侧栏开合（DOM-only，
+  `data-mewclaw-rail`），不读凭证、不发请求。
 
 ## 8 测试契约
 
 - `unit`：使用指定 MewClaw 商标几何；不引用 DeepSeek 鱼形组件或外部资源；经
   WebServer 扩展点提供标题/语言/favicon/manifest；
 - `client`：等待官方 conversation 槽位声明后再注册占位者；
-- 移动适配以真实浏览器验收为准：390px 视口下侧栏展开为覆盖层、主列不被
-  挤压、无横向溢出（`scrollWidth ≤ 视口宽`）、关闭后恢复；
+- 移动适配以真实浏览器验收为准：390px 视口下侧栏默认收起、菜单键展开为
+  覆盖层抽屉、遮罩外点/菜单键可收起、主列不被挤压、无横向溢出
+  （`scrollWidth ≤ 视口宽`）；
 - 门禁：`pnpm verify:dsh-brand`（官方完整性 + 品牌 slot 白名单）。
 
 ## 9 迁移映射
