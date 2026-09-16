@@ -44,7 +44,8 @@ if(!matchMedia("(max-width:768px)").matches)return;
 var OPEN="mewclaw-rail-open";
 function col(){return document.querySelector('[class*="_sidebarCol"]')}
 function toggleBtn(){var c=col();return c&&c.querySelector('[class*="_toggle"]')}
-function open(){document.documentElement.classList.add(OPEN);var t=toggleBtn();if(t&&t.getAttribute("aria-label")==="Open sidebar")t.click()}
+function expand(){var c=col(),t=toggleBtn();if(c&&t&&c.getBoundingClientRect().width<100&&t.getAttribute("aria-label")!=="Collapse sidebar")t.click()}
+function open(){document.documentElement.classList.add(OPEN);expand();setTimeout(expand,320)}
 function close(){var c=col();if(c&&c.getBoundingClientRect().width>100){var t=toggleBtn();if(t)t.click()}document.documentElement.classList.remove(OPEN)}
 var fab=document.createElement("button");fab.type="button";fab.setAttribute("aria-label","Menu");
 fab.className="mewclaw-rail-fab";

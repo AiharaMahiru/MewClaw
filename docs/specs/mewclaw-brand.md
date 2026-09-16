@@ -74,7 +74,9 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   `mewclaw-rail-fab`（fixed top-left，`z-index` 低于抽屉/遮罩，抽屉展开时被
   覆盖；`_titleRow` 左 padding 让位）与左缘滑动手势——触笔起笔于左缘 16px 内
   （`clientX<=16`，热区 `mewclaw-rail-edge` 可能被下层控件遮挡，按坐标判定）
-  右滑 >56px 且明显横向即置 `html.mewclaw-rail-open` 并点开完整会话抽屉；
+  右滑 >56px 且明显横向即置 `html.mewclaw-rail-open` 并点开完整会话抽屉——
+  展开按列宽判定：列宽 <100px（rail 收起态）时点官方开关扩为完整抽屉，
+  立即 + 320ms 各检查一次，不依赖 aria 文案；
   抽屉上左滑、`pointerdown`
   落在列外（遮罩）或抽屉内折叠键即收起。手势监听用 TouchEvent 而非
   PointerEvent——左缘右滑会被浏览器声明为系统手势令 pointermove 断流，
