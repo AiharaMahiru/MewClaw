@@ -216,8 +216,16 @@ export function apply(ctx, config = {}) {
   ctx.tools.register({
     name: 'bash',
     description,
+    // 模型可见的是原始 JSON Schema（schemaOf 直接透传 definition.parameters），
+    // 不是 defineTool 的字段表——根必须是 type:"object"，否则 provider 侧
+    // 严格校验会以 "type: null" 拒掉整个请求。
     parameters: {
-      command: { type: 'string', required: true, description: 'The bash command to run.' },
+      type: 'object',
+      properties: {
+        command: { type: 'string', description: 'The bash command to run.' },
+      },
+      required: ['command'],
+      additionalProperties: false,
     },
     output: {
       schema: { type: 'string' },

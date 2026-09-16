@@ -57,6 +57,18 @@ describe('OCI 管道 Bash Consumer', () => {
     env = makeEnvironment()
   })
 
+  it('注册的 parameters 是 object 根的 JSON Schema（provider 严格校验拒绝字段表）', () => {
+    const tool = env.registered[0]
+    expect(tool.parameters).toEqual({
+      type: 'object',
+      properties: {
+        command: { type: 'string', description: 'The bash command to run.' },
+      },
+      required: ['command'],
+      additionalProperties: false,
+    })
+  })
+
   it('同一 Agent 复用 Bash 进程并返回退出状态', async () => {
     const tool = env.registered[0]
     expect(tool.description).toContain('never pass /workspace')
