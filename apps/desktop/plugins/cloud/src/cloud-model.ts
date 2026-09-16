@@ -182,10 +182,15 @@ export class CloudAccountModel extends LlmAdapter {
     try {
       for await (const chunk of adapter.stream({ ...options, provider: CLOUD_MODEL_PROVIDER, model: entry.selector })) {
         if (chunk.type === 'finish' && chunk.reason.kind === 'error') {
-          yield { ...chunk, reason: { kind: 'error', failure: { code: 'CLOUD_INFERENCE_UNAVAILABLE', message: '云端模型推理不可用，请检查登录、默认模型及云端推理服务。' } } };
+          yield { ...chunk, reason: { kind: 'error', failure: cloudFailure(chunk.reason.failure) } };
         } else yield chunk;
       }
-    } catch { throw new LlmError('云端模型推理不可用，请检查登录、默认模型及云端推理服务。', 'CLOUD_INFERENCE_UNAVAILABLE'); }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') throw error;
+      const failure = cloudFailure(error instanceof LlmError ? { code: error.code, message: error.message }
+        : { message: error instanceof Error ? error.message : String(error) });
+      throw new LlmError(failure.message, failure.code);
+    }
   }
 
   private isEnabled(): boolean { return this.options.enabled?.() ?? true; }
@@ -280,6 +285,43 @@ function gatewayProfile(origin: string, headers: Record<string, string>, entry: 
 function hasSession(cookie: string): boolean {
   return /(?:^|;\s*)(?:__Host-dsh_session|dsh_session)=[^;]+/.test(cookie)
     && /(?:^|;\s*)dsh_csrf=[^;]+/.test(cookie);
+}
+
+/**
+ * Edge `sendError` 产出 `{"error":"CODE"}`，pi-ai 以 `<status>: <body>` 带进 failure.message。
+ * 语义码原样透传（与本类自抛的 CLOUD_* 同一套用户指引）；HTTP 状态与 pi-ai 分类码兜底；
+ * TRANSPORT/STREAM_CLOSED 保留原码供 llm-retry 在步骤边界重试；真正未知的才收敛为通用码。
+ */
+const EDGE_ERROR_MESSAGES: Record<string, { code: string; message: string }> = {
+  PROMPT_AUDIT_REJECTED: { code: 'PROMPT_AUDIT_REJECTED', message: '云端安全审计拒绝了本次请求，请调整输入后重试。' },
+  MODEL_UNAVAILABLE: { code: 'MODEL_UNAVAILABLE', message: '所选模型在云端不可用，请重新选择模型。' },
+  CLOUD_DEFAULT_MODEL_REQUIRED: { code: 'CLOUD_DEFAULT_MODEL_REQUIRED', message: '云端账号尚未配置默认模型或密钥。' },
+  CLOUD_INFERENCE_FAILED: { code: 'CLOUD_INFERENCE_FAILED', message: '云端推理服务暂时失败，请稍后重试。' },
+  INVALID_INFERENCE_REQUEST: { code: 'INVALID_INFERENCE_REQUEST', message: '云端推理请求内容不被当前模型支持。' },
+};
+
+function cloudFailure(failure: { code?: string | undefined; message?: string | undefined; status?: number | undefined } | undefined): { code: string; message: string } {
+  const text = failure?.message ?? '';
+  // pi-ai 会把 Edge 的 {"error":"CODE"} 解包成 `<status> "CODE"` 带进 message；两种形态都认。
+  const edge = /"error"\s*:\s*"([A-Z0-9_]+)"/u.exec(text)?.[1] ?? /"([A-Z][A-Z0-9_]{5,})"/u.exec(text)?.[1];
+  const known = edge === undefined ? undefined : EDGE_ERROR_MESSAGES[edge];
+  if (known) return known;
+  const statusMatch = /\b([45]\d\d)\b/u.exec(text)?.[1];
+  const status = failure?.status ?? (statusMatch === undefined ? undefined : Number(statusMatch));
+  if (edge === 'CSRF_INVALID' || edge === 'UNAUTHORIZED' || status === 401 || status === 403 || failure?.code === 'AUTH')
+    return { code: 'CLOUD_LOGIN_REQUIRED', message: '云端会话已失效，请重新登录云端账号。' };
+  if (status === 404) return EDGE_ERROR_MESSAGES['MODEL_UNAVAILABLE']!;
+  if (status === 409) return EDGE_ERROR_MESSAGES['CLOUD_DEFAULT_MODEL_REQUIRED']!;
+  if (status === 429 || failure?.code === 'RATE_LIMIT') return { code: 'RATE_LIMIT', message: '云端推理请求过多，请稍后重试。' };
+  if ((status !== undefined && status >= 500) || failure?.code === 'SERVER') return EDGE_ERROR_MESSAGES['CLOUD_INFERENCE_FAILED']!;
+  if (failure?.code === 'TIMEOUT') return { code: 'TIMEOUT', message: '云端推理请求超时，请稍后重试。' };
+  // pi-ai 对上游断流报 TRANSPORT/"Stream ended without"；统一为 STREAM_CLOSED 与 llm-retry 约定一致。
+  if (failure?.code === 'STREAM_CLOSED' || /stream ended (?:before|without)/iu.test(text))
+    return { code: 'STREAM_CLOSED', message: '云端推理连接中断，请重试。' };
+  if (failure?.code === 'TRANSPORT' || /fetch failed|ECONN[A-Z]+|network|connection|terminated|premature close/iu.test(text))
+    return { code: 'TRANSPORT', message: '云端推理连接失败，请检查网络后重试。' };
+  if (failure?.code === 'CONTEXT_WINDOW_EXCEEDED' || failure?.code === 'EMPTY_RESPONSE') return { code: failure.code, message: text };
+  return { code: 'CLOUD_INFERENCE_UNAVAILABLE', message: '云端模型推理不可用，请检查登录、默认模型及云端推理服务。' };
 }
 
 function parseCatalog(value: unknown): CloudModelCatalog {

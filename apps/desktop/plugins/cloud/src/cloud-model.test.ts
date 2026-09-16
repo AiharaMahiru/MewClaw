@@ -141,6 +141,68 @@ it('未知选择器不发出推理请求', async () => {
   expect(requests.filter(url => url.endsWith('/chat/completions'))).toEqual([]);
 });
 
+it('Edge 语义错误码透传为用户指引而非通用兜底', async () => {
+  const cases: Array<[number, string, string]> = [
+    [404, 'MODEL_UNAVAILABLE', 'MODEL_UNAVAILABLE'],
+    [403, 'PROMPT_AUDIT_REJECTED', 'PROMPT_AUDIT_REJECTED'],
+    [409, 'CLOUD_DEFAULT_MODEL_REQUIRED', 'CLOUD_DEFAULT_MODEL_REQUIRED'],
+    [502, 'CLOUD_INFERENCE_FAILED', 'CLOUD_INFERENCE_FAILED'],
+    [403, 'CSRF_INVALID', 'CLOUD_LOGIN_REQUIRED'],
+  ];
+  for (const [status, edgeCode, expectCode] of cases) {
+    vi.stubGlobal('fetch', async (url: RequestInfo | URL) => {
+      if (String(url).endsWith('/auth/models')) return catalogResponse();
+      return new Response(JSON.stringify({ error: edgeCode }), { status, headers: { 'content-type': 'application/json' } });
+    });
+    const { adapter } = boundAdapter();
+    const chunks = await collect(adapter.stream({ provider: 'deepseek-official', model: 'deepseek-chat', messages: [] })) as Array<{ type: string; reason?: { failure?: { code?: string } } }>;
+    const finish = chunks.find(chunk => chunk.type === 'finish');
+    expect(finish?.reason?.failure?.code, `HTTP ${status} ${edgeCode}`).toBe(expectCode);
+  }
+});
+
+it('无 Edge 语义码时按 HTTP 状态兜底分类', async () => {
+  const cases: Array<[number, string]> = [
+    [401, 'CLOUD_LOGIN_REQUIRED'],
+    [429, 'RATE_LIMIT'],
+    [500, 'CLOUD_INFERENCE_FAILED'],
+  ];
+  for (const [status, expectCode] of cases) {
+    vi.stubGlobal('fetch', async (url: RequestInfo | URL) => {
+      if (String(url).endsWith('/auth/models')) return catalogResponse();
+      return new Response('upstream error', { status });
+    });
+    const { adapter } = boundAdapter();
+    const chunks = await collect(adapter.stream({ provider: 'deepseek-official', model: 'deepseek-chat', messages: [] })) as Array<{ type: string; reason?: { failure?: { code?: string } } }>;
+    expect(chunks.find(chunk => chunk.type === 'finish')?.reason?.failure?.code, `HTTP ${status}`).toBe(expectCode);
+  }
+});
+
+it('SSE 无 [DONE] 截断保留 STREAM_CLOSED 供 llm-retry 重试', async () => {
+  vi.stubGlobal('fetch', async (url: RequestInfo | URL) => {
+    if (String(url).endsWith('/auth/models')) return catalogResponse();
+    return new Response('data: {"id":"t","choices":[{"index":0,"delta":{"content":"hi"}}]}\n\n', { headers: { 'content-type': 'text/event-stream' } });
+  });
+  const { adapter } = boundAdapter();
+  const result = await collect(adapter.stream({ provider: 'deepseek-official', model: 'deepseek-chat', messages: [] }))
+    .then(chunks => (chunks as Array<{ type: string; reason?: { failure?: { code?: string } } }>).find(chunk => chunk.type === 'finish')?.reason?.failure?.code)
+    .catch((error: unknown) => (error as { code?: string }).code);
+  expect(result).toBe('STREAM_CLOSED');
+});
+
+it('推理端点传输层抛错保留 TRANSPORT 码并给出连接指引', async () => {
+  vi.stubGlobal('fetch', async (url: RequestInfo | URL) => {
+    if (String(url).endsWith('/auth/models')) return catalogResponse();
+    throw new TypeError('fetch failed');
+  });
+  const { adapter } = boundAdapter();
+  const result = await collect(adapter.stream({ provider: 'deepseek-official', model: 'deepseek-chat', messages: [] }))
+    .then(chunks => (chunks as Array<{ type: string; reason?: { failure?: { code?: string; message?: string } } }>).find(chunk => chunk.type === 'finish')?.reason?.failure)
+    .catch((error: unknown) => ({ code: (error as { code?: string }).code, message: (error as Error).message }));
+  expect(result?.code).toBe('TRANSPORT');
+  expect(result?.message).toContain('网络');
+});
+
 it('同步云端模型配置和密钥状态，但拒绝接收原始 API key', async () => {
   const request = vi.fn(async () => catalogResponse());
   vi.stubGlobal('fetch', request);

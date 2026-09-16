@@ -24,9 +24,9 @@ D:\AI\dsh\MewClaw-desktop-candidate\release\MewClaw-1.0.0-win-x64
 
 | 产物 | 字节 | SHA-256 |
 | --- | ---: | --- |
-| `MewClaw-1.0.0-win-x64-Portable.exe` | 155439842 | `b0b7c9eb552ab6ee42a2b4ba4ed2cc0e6db19e2a2238669b4f9eebf8c4275b1d` |
-| `MewClaw-1.0.0-win-x64-Setup.exe` | 155683796 | `6750c7c2fd249712bdd13a31e18838b958a60e3501fb3fcfef7fcb757e82b2a8` |
-| `MewClaw-1.0.0-win-x64.zip` | 197330706 | `2d3312bbb6b5c5179c46d961be0cb0a12a676dd541aba789f47ced5597371ee9` |
+| `MewClaw-1.0.0-win-x64-Portable.exe` | 155442804 | `f5d1de3280a4ddb070432ebaca4b59cae6d2629eaab10e747eaf1fce838fd716` |
+| `MewClaw-1.0.0-win-x64-Setup.exe` | 155686742 | `fa7bce6eea28dc8c0176159e6a83181b943b3bbaedd9ccf17d891402d16acdef` |
+| `MewClaw-1.0.0-win-x64.zip` | 197333768 | `276c86516552a87097d62741cf97476381b406fad0e76822412772bcbca2cb03` |
 
 产物未签名。`win-unpacked` 与上述安装包位于同一 Release 目录，必须一起保留用于目录模式验收。**自本轮起发行形态为 `asar:false`**（应用根是 `resources/app/` 目录而非 `app.asar` 归档），与上游 2.0.10 发行形态一致——体积变大属预期。
 
@@ -48,11 +48,12 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 - **上游同步**：`upstream/dsh-desktop` 子模块 pin 升至 `5510cb1203`（anywhere-labs master），候选 `dsh-plugin-desktop` 全量 re-vendor 至 **2.0.10**（含隔离 Host 进程、compatibility-chrome、远程控制 pill、会话迁移、`packaged-runtime-smoke`/`packaged-filesystem-smoke` 扩展）；嵌套 `deepseek-harness` 对齐上游 rc.2 pin。裁剪项：vendored `@agents-anywhere/dsh-bridge-next`（`aaEnabled` 默认关）、`dsh-community-market`（默认 `disabled`）、`fs-ext`/`@vscode/ripgrep` 的 afterPack 钩子（我们的 electron-builder.cjs 不走该钩子，ripgrep 经 `files`+`asarUnpack`→随 asar:false 直接落在 `resources/app/node_modules/`）。
 - **发行形态 `asar:false`**：上游 rc.2 起官方发行禁用 ASAR，我们跟随——实测 Electron 43 的 asar fs 补丁丢弃 `stat(path,{bigint:true})` 的 bigint 选项，`dsh-fs-local` 的 `mode & 511n` 在 asar 内必崩（`verifyBundledSkills` 与生产 skill 加载同路径），且 `require.resolve` 在 asar 内返回虚拟路径使 `rg.exe` 无法 spawn。`electron-builder.cjs` 改 `asar:false`（fuses 维持原配），`verify-package.mjs` 由归档断言改为目录遍历断言（`APP_ENTRYPOINTS_OK` 替代 `ASAR_ENTRYPOINTS_OK`）。
 - **vendored 补丁清单**（每次 re-vendor 需重放，共 4 处）：①`profile.ts` `MEWCLAW_DESKTOP_CLOUD` → `dsh-lark-desktop-cloud` webserver；②`packaged-runtime-smoke.ts` `applicationRoot` 锚点适配 npm 提升布局（上游假设嵌套 `node_modules`）；③同文件 `rgPath` 断言→物理资源断言；④`src/client/styles.ts` 追加侧栏 backdrop-filter 反制规则（见下）。
-- `verify-workspace`：22 个测试文件、69 个测试通过，输出 `WORKSPACE_OFFLINE_VERIFIED`。
+- `verify-workspace`：22 个测试文件、74 个测试通过，输出 `WORKSPACE_OFFLINE_VERIFIED`。
 - `verify-package`：`APP_ENTRYPOINTS_OK`、`OFFICIAL_RUNTIME_UNCHANGED 731`、`NATIVE_SPAWN_OK CLOUD_PROVIDER_IMPORT_OK`、Runtime smoke、`ZIP_PAYLOAD_MATCHES_VERIFIED_APP`、`MEWCLAW_PACKAGE_OK`。
 - Release UI 冒烟 + CDP 实测（复制用户 profile 起包，原目录未触碰）：本地/云端两模式 `data-mew-glass="on"`、BootGraph 含 `dsh-lark-liquid-glass`、设置对话框 `{x:240,w:800,vw:1280}` 居中（修复前云端被压进 279px 侧栏）、本地 picker 分组与云端 `/auth/models` 一致（`DeepSeek` 5 项 + `openai` 4 项，云端命名）、cloud↔local 往返无重启无白屏。
 - 已知噪声：切到本地后云端远端包里的 `dsh-better-sidebar` 客户端仍对本地端口重连 WS（`agent-terminals`/`agent-opens` 404），报"connection failed; stopping reconnect loop"后自停——无缝切换不换页的设计残留，无功能影响。
 - 依赖例外：`liquid-glass-react@1.1.1` peer 声明 `react>=19`，桌面栈锁 React 18.3.1——该依赖只在 `client.ts`（React 组件面）使用，桌面侧仅注入无依赖的宿主面（config bootstrap + surfaces/wallpaper 样式），候选 vendored 包已从依赖表裁剪；主仓 pnpm 宽松 peer 不受影响。
+- **云端推理错误分类**（2026-09-16 晚间修复）：`cloud-model.ts` 原先把一切上游失败收敛成 `CLOUD_INFERENCE_UNAVAILABLE`（R50/R52/R53 部署窗口用户报障即由此掩盖真实原因——当时 Auth Edge 重启约 20s 断档）。新增 `cloudFailure()` 分类：Edge 语义码从 pi-ai 文本两种形态提取（JSON `"error":"X"` 与裸 `403 "X"`），命中 `EDGE_ERROR_MESSAGES`（`PROMPT_AUDIT_REJECTED`/`MODEL_UNAVAILABLE`/`CLOUD_DEFAULT_MODEL_REQUIRED`/`CLOUD_INFERENCE_FAILED`）；无语义码按 HTTP 状态兜底（401/403/`AUTH`→`CLOUD_LOGIN_REQUIRED`、404→`MODEL_UNAVAILABLE`、409→`CLOUD_DEFAULT_MODEL_REQUIRED`、429→`RATE_LIMIT`、5xx→`CLOUD_INFERENCE_FAILED`）；`Stream ended without finish_reason` 归一为 `STREAM_CLOSED` 供 llm-retry 重试、`TRANSPORT` 保码、abort 原样透出不映射；`CLOUD_INFERENCE_UNAVAILABLE` 仅留未知兜底。用户面消息全部替换为安全中文文案，不透出上游 body。回归测试 4 个（语义码透传、状态兜底、截断 SSE、传输抛错），`cloud-model.test.ts` 16 项全绿。
 
 ## 行为与兼容性修复
 
