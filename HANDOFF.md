@@ -2,7 +2,7 @@
 
 更新时间：2026-09-15
 工作分支：`desktop-dev`
-本地同步基线：已合入 `origin/desktop@4719c46`（含 R32 计费纪元、R33 桌面推理三形态选择器与共享模型目录、R34-R37 品牌改名 `atw-brand→mewclaw-brand` 与 `mewclaw-brand-desktop` 桌面变体、移动端侧栏折叠、auth 审计修复）。途中远端 desktop-dev 已先行合入同一基线（`de12683`），本分支在其上再合最新 desktop（`f48f39c`）。按交接约定 `packages/auth/edge` 下 `desktop-inference.ts`/`desktop-inference.test.ts`/`auth-routes.ts`/`server.ts`/`config.ts` 冲突全部取主线版本，本分支不再维护这些文件。
+本地同步基线：已合入 `origin/desktop@91bd7e6`（含 R32 计费纪元、R33 桌面推理三形态选择器与共享模型目录、R34-R37 品牌改名 `atw-brand→mewclaw-brand` 与 `mewclaw-brand-desktop` 桌面变体、移动端侧栏折叠与左缘滑动手势、顶栏精简、右坞开关去重、auth 审计修复）。途中远端 desktop-dev 已先行合入同一基线（`de12683`），本分支在其上再合最新 desktop（`f48f39c`、`3b527c7`）。按交接约定 `packages/auth/edge` 下 `desktop-inference.ts`/`desktop-inference.test.ts`/`auth-routes.ts`/`server.ts`/`config.ts` 冲突全部取主线版本，本分支不再维护这些文件。候选 `mewclaw-brand` workspace 是桌面变体的**展开副本**（剥离移动代码、无 `mobile` 选项）：上游改动中仅全视口生效的 `DEDUPE_STYLE`（隐藏会话头部 "Open right sidebar"）已手工移植；`@media(max-width:768px)` 与 rail 脚本类改动按设计不进入桌面。
 
 ## 当前唯一交付目录
 
@@ -24,9 +24,9 @@ D:\AI\dsh\MewClaw-desktop-candidate\release\MewClaw-1.0.0-win-x64
 
 | 产物 | 字节 | SHA-256 |
 | --- | ---: | --- |
-| `MewClaw-1.0.0-win-x64-Portable.exe` | 142872719 | `2b9289a4329c6a92ab0f2b546f10d2a4cb5d5da217fda4746e17dae623576176` |
-| `MewClaw-1.0.0-win-x64-Setup.exe` | 143116657 | `398abac439cfa29d8eaa2af0d0a82b5b87e2a0bda5493a24c6166ba70dbeb5e5` |
-| `MewClaw-1.0.0-win-x64.zip` | 187034469 | `92f5cb9c7944d1bfed78b53fbd08a718185c29ad3a4a8b398348395555736bbf` |
+| `MewClaw-1.0.0-win-x64-Portable.exe` | 142871771 | `046abe19b50337504520716da0603fd92a52168acbf71b096ed0f816aa03759d` |
+| `MewClaw-1.0.0-win-x64-Setup.exe` | 143115724 | `7e64f94652cfa113c6a14ece5053ff8685caf5c28f2febc150e0a6e1d439d3c1` |
+| `MewClaw-1.0.0-win-x64.zip` | 187034664 | `4a35fcbf51274882ddddb087d7dab5325e69fa1714a1ebc1c5bfa341913dd3d5` |
 
 产物未签名。`win-unpacked` 与上述安装包位于同一 Release 目录，必须一起保留用于目录模式验收。
 
@@ -91,9 +91,9 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 
 ## 推送状态与限制
 
-- 本轮改动基于 `origin/desktop@4719c46`，叠加远端 desktop-dev 合并（`de12683`）、无缝切换、同步边界修正、本地模式 picker 云端同构布局接入、测试和文档更新。合并提交 `f48f39c`；edge typecheck 干净、151/151 edge 测试通过。
+- 本轮改动基于 `origin/desktop@91bd7e6`，叠加远端 desktop-dev 合并（`de12683`）、无缝切换、同步边界修正、本地模式 picker 云端同构布局接入、右坞开关去重移植、测试和文档更新。合并提交 `f48f39c`、`3b527c7`；edge typecheck 干净、151/151 edge 测试通过。
 - **品牌改名已进候选**：候选 `mewclaw-brand` workspace 的包名/插件名/客户端模块 id 已从 `dsh-lark-atw-brand` 改为 `dsh-lark-mewclaw-brand-desktop`（桌面变体语义，候选只保留这一个品牌 workspace）；`verify-package.mjs` 的 ASAR 断言路径同步更新。上述产物哈希即改名后的构建。
-- `desktop` 远端现为 `91bd7e6`（本轮推送后核验，较合并基线 `4719c46` 又前进了若干提交，本 Release 不含），`desktop-dev` 推送后核验为 `7305e8e`（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成；注意 origin 的 fetch refspec 只覆盖 `desktop`，desktop-dev 需显式 `git fetch origin +refs/heads/desktop-dev:refs/remotes/origin/desktop-dev`）。
+- `desktop` 远端现为 `91bd7e6`（与合并基线一致），`desktop-dev` 推送后核验为 `3b527c7`（合并提交，本轮 Release 的源码基线）（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成；注意 origin 的 fetch refspec 只覆盖 `desktop`，desktop-dev 需显式 `git fetch origin +refs/heads/desktop-dev:refs/remotes/origin/desktop-dev`）。
 - 后续若继续修改源码或交接文档，完成提交后重新执行：
 
   ```text
