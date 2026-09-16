@@ -80,6 +80,13 @@ describe("dsh-lark-mewclaw-brand", () => {
     // 移动适配覆盖层样式（§6 移动适配）
     expect(html).toContain("@media(max-width:768px)");
     expect(html).toContain('[class*="_sidebarCol"]{position:fixed');
-    expect(html).toContain('[class*="_centerCol"]{grid-column:1/-1;margin-left:55px}');
+    expect(html).toContain('[class*="_centerCol"]{grid-column:1/-1}');
+    expect(html).toContain("translateX(-110%)");
+    expect(html).toContain("html.mewclaw-rail-open");
+    // 侧栏开合控制器（§6 移动适配）：悬浮菜单键 + 外点关闭
+    expect(html).toContain("data-mewclaw-rail");
+    expect(html).toContain("_toggleCluster");
+    expect(html).toContain('aria-label","Menu"');
+    expect(html).toContain("pointerdown");
   });
 });
