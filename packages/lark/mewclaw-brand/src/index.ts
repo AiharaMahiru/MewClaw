@@ -31,10 +31,11 @@ const HERO_STYLE = `.mewclaw-hero-brand{display:inline-flex;align-items:center;g
 const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)!important}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}[class*="_centerCol"]{grid-column:1/-1}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}[aria-label="Open workspace in Cursor"],[aria-label="Choose an app to open in"],[aria-label="Open right sidebar"],[aria-label="Expand bottom panel"]{display:none!important}}
 .mewclaw-rail-edge{display:none}
 @media(max-width:768px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}}`;
-// 移动端侧栏开合控制：左缘 16px 热区右滑展开完整会话抽屉，抽屉上左滑或点遮罩
+// 移动端侧栏开合控制：左缘 16px 起笔右滑展开完整会话抽屉，抽屉上左滑或点遮罩
 // 收起并隐藏整条侧栏列。手势用 TouchEvent 而非 PointerEvent——左缘右滑会被浏览器
-// 声明为系统手势导致 pointermove 断流，touchmove 不受影响；热区 touch-action:pan-y
-// 抑制垂直滚动的竞争。脚本仅 DOM 开合，不读凭证、不发请求；桌面视口 matchMedia 短路。
+// 声明为系统手势导致 pointermove 断流，touchmove 不受影响；起笔判定按触点坐标
+// （热区元素可能被下层输入控件遮挡）。脚本仅 DOM 开合，不读凭证、不发请求；
+// 桌面视口 matchMedia 短路。
 const MOBILE_RAIL_SCRIPT = `<script data-mewclaw-rail>(function(){
 if(!matchMedia("(max-width:768px)").matches)return;
 var OPEN="mewclaw-rail-open";
@@ -46,7 +47,7 @@ var edge=document.createElement("div");edge.className="mewclaw-rail-edge";docume
 var sx=0,sy=0,track="";
 document.addEventListener("touchstart",function(e){var t=e.touches[0];if(!t)return;
 if(document.documentElement.classList.contains(OPEN)){var c=col();if(c&&c.contains(e.target)){sx=t.clientX;sy=t.clientY;track="close"}}
-else if(edge===e.target){sx=t.clientX;sy=t.clientY;track="open"}},true);
+else if(edge===e.target||t.clientX<=16){sx=t.clientX;sy=t.clientY;track="open"}},true);
 document.addEventListener("touchmove",function(e){if(!track)return;var t=e.touches[0];if(!t)return;var dx=t.clientX-sx,dy=t.clientY-sy;
 if(track==="open"&&dx>56&&dx>Math.abs(dy)*1.5){track="";open()}
 else if(track==="close"&&dx<-56&&-dx>Math.abs(dy)*1.5){track="";close()}},true);

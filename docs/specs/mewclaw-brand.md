@@ -70,9 +70,10 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   CSS Module 稳定后缀（`<hash>_<name>`，重建仅哈希变化），不改官方包；
 - 移动端侧栏折叠：`≤768px` 时整条 `sidebarCol`（含 55px 图标栏）默认
   `translateX(-110%)+visibility:hidden` 收起，`centerCol` 占满视口。注入的
-  `data-mewclaw-rail` 脚本提供左缘滑动手势：body 末端挂 16px 热区
-  `mewclaw-rail-edge`（`touch-action:pan-y`），触笔右滑 >56px 且明显横向即置
-  `html.mewclaw-rail-open` 并点开完整会话抽屉；抽屉上左滑、`pointerdown`
+  `data-mewclaw-rail` 脚本提供左缘滑动手势：触笔起笔于左缘 16px 内
+  （`clientX<=16`，热区 `mewclaw-rail-edge` 可能被下层控件遮挡，按坐标判定）
+  右滑 >56px 且明显横向即置 `html.mewclaw-rail-open` 并点开完整会话抽屉；
+  抽屉上左滑、`pointerdown`
   落在列外（遮罩）或抽屉内折叠键即收起。手势监听用 TouchEvent 而非
   PointerEvent——左缘右滑会被浏览器声明为系统手势令 pointermove 断流，
   touchmove 不受影响。脚本只做 DOM 开合，不读凭证、不发请求，
