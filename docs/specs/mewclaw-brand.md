@@ -70,7 +70,9 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   CSS Module 稳定后缀（`<hash>_<name>`，重建仅哈希变化），不改官方包；
 - 移动端侧栏折叠：`≤768px` 时整条 `sidebarCol`（含 55px 图标栏）默认
   `translateX(-110%)+visibility:hidden` 收起，`centerCol` 占满视口。注入的
-  `data-mewclaw-rail` 脚本提供左缘滑动手势：触笔起笔于左缘 16px 内
+  `data-mewclaw-rail` 脚本提供两种开合方式：左上角固定菜单键
+  `mewclaw-rail-fab`（fixed top-left，`z-index` 低于抽屉/遮罩，抽屉展开时被
+  覆盖；`_titleRow` 左 padding 让位）与左缘滑动手势——触笔起笔于左缘 16px 内
   （`clientX<=16`，热区 `mewclaw-rail-edge` 可能被下层控件遮挡，按坐标判定）
   右滑 >56px 且明显横向即置 `html.mewclaw-rail-open` 并点开完整会话抽屉；
   抽屉上左滑、`pointerdown`
@@ -107,8 +109,8 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
 - `client`：等待官方 conversation 槽位声明后再注册占位者；
 - 移动适配以真实浏览器验收为准：390px 视口下侧栏默认收起、左缘右滑展开为
   不透明覆盖层抽屉、抽屉左滑/遮罩外点可收起、主列不被挤压、无横向溢出
-  （`scrollWidth ≤ 视口宽`）；会话视图顶栏仅面包屑 + More actions +
-  坞簇 Expand sidebar，无重叠、无侧栏菜单按钮；
+  （`scrollWidth ≤ 视口宽`）；会话视图顶栏为左上角菜单键 + 面包屑 +
+  More actions + 坞簇 Expand sidebar，无重叠；
 - 门禁：`pnpm verify:dsh-brand`（官方完整性 + 品牌 slot 白名单）。
 
 ## 9 迁移映射
