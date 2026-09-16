@@ -12,7 +12,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import type { CredentialRef } from "@deepseek-ai/dsh-credentials";
 import z from "@deepseek-ai/schemastery";
 
-import { createLarkWs } from "./client.js";
+import { createLarkWs, isLarkWsHandshakeStrayError } from "./client.js";
 import { resolveLarkWsConfig } from "./config.js";
 import "./events.js";
 
@@ -108,9 +108,22 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     ctx.emit("lark/connection", { state });
   }, healthPublishMs);
 
-  // 关停：停健康心跳、失败窗口定时器与连接（迟到连接由 active 守卫兜住）。
+  // SDK 握手看门狗残留错误补偿（SPEC §6）：命中已知噪声记 warn 吞掉
+  // （SDK 重连循环照常），其余未捕获异常保持默认崩溃语义。
+  const onUncaughtException = (error: unknown): void => {
+    if (isLarkWsHandshakeStrayError(error)) {
+      ctx.logger.warn("lark-ws: 忽略握手超时残留的 ws error（重连循环继续）");
+      return;
+    }
+    console.error(error);
+    process.exit(1);
+  };
+  process.on("uncaughtException", onUncaughtException);
+
+  // 关停：摘除异常兜底、停健康心跳/失败窗口定时器与连接（迟到连接由 active 守卫兜住）。
   ctx.effect(() => () => {
     active = false;
+    process.removeListener("uncaughtException", onUncaughtException);
     clearInterval(healthTimer);
     if (failureTimer) clearTimeout(failureTimer);
     ws?.stop();

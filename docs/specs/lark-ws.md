@@ -74,6 +74,7 @@ interface Config {
 | 持续断连超窗口 | `lark/connection(failed)` | supervisor 视为服务失败（与 lark-claw 语义一致） |
 | 收到畸形帧 | 丢弃 + 计一次 `parseFailure`（日志仅计数） | 不重连（偶发帧损坏不视为连接故障） |
 | 服务端要求重连 | 按协议帧处理 | 自动 |
+| SDK 握手看门狗残留错误 | 插件挂过滤式 `uncaughtException`：仅当错误为 pre-open `terminate()` 发出的 `WebSocket was closed before the connection was established` 且调用栈落在 `@larksuiteoapi/node-sdk` 时记 warn 吞掉（该次尝试已由 SDK 判败、重连循环继续）；其余未捕获异常打印后 `exit(1)`，保持崩溃语义 | 自动；进程不因残留错误崩溃 |
 
 ## 7 安全与信任
 
