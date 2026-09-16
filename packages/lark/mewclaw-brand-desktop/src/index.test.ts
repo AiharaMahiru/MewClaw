@@ -19,9 +19,10 @@ describe("dsh-lark-mewclaw-brand-desktop", () => {
     expect(html).toContain("data-mewclaw-brand");
     expect(html).toContain("mewclaw-hero-copy");
     expect(html).toContain('class="mewclaw-boot"');
-    // 桌面变体不携带移动断点覆盖
+    // 桌面变体不携带移动断点覆盖与侧栏开合脚本
     expect(html).not.toContain("@media(max-width:768px)");
     expect(html).not.toContain("_sidebarCol");
+    expect(html).not.toContain("data-mewclaw-rail");
     expect(routes.map(({ path }) => path)).toEqual(["/mewclaw-brand/favicon.svg", "/mewclaw-brand/manifest.webmanifest"]);
   });
 });
