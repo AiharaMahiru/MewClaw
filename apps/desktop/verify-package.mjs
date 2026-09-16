@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { Script } from 'node:vm';
@@ -14,43 +14,55 @@ const candidate = process.argv[2];
 assert.ok(candidate && isAbsolute(candidate), '需要候选绝对路径');
 const root = resolve(candidate);
 const require = createRequire(join(root, 'package.json'));
-const asar = require('@electron/asar');
 const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
 const release = resolve(root, process.argv.find(value => value.startsWith('--release-dir='))?.slice('--release-dir='.length)
   ?? join('release', releaseDirectoryName(version)));
 const output = join(release, 'win-unpacked');
-const archive = join(output, 'resources', 'app.asar');
+// 上游 rc.2 起官方发行禁用 ASAR：应用根是 resources/app/ 目录而非归档。
+const appRoot = join(output, 'resources', 'app');
 const executable = join(output, 'MewClaw.exe');
 
-function verifyArchive() {
-  const files = asar.listPackage(archive).map(value => value.replaceAll('\\', '/'));
+function listAppFiles() {
+  const files = [];
+  const walk = (directory, prefix) => {
+    for (const name of readdirSync(directory)) {
+      const absolute = join(directory, name);
+      if (statSync(absolute).isDirectory()) walk(absolute, `${prefix}${name}/`);
+      else files.push(`${prefix}${name}`);
+    }
+  };
+  walk(appRoot, '');
+  return files;
+}
+
+function verifyLayout() {
+  const files = listAppFiles();
   for (const path of ['launcher.mjs', 'UPSTREAM-LICENSE',
     'node_modules/dsh-plugin-desktop/lib/main.js',
     'node_modules/dsh-lark-mewclaw-brand-desktop/client.js',
     'node_modules/dsh-lark-desktop-cloud/lib/index.js']) {
-    assert.ok(files.includes(`/${path}`), `缺少发行入口：${path}`);
+    assert.ok(files.includes(path), `缺少发行入口：${path}`);
   }
-  assert.ok(!files.some(value => /\/(?:\.env|\.git)(?:\/|$)/u.test(value)), '包含本地秘密或 Git 数据');
-  const manifest = JSON.parse(asar.extractFile(archive, 'package.json'));
+  assert.ok(!files.some(value => /(?:^|\/)(?:\.env|\.git)(?:\/|$)/u.test(value)), '包含本地秘密或 Git 数据');
+  const manifest = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8'));
   assert.equal(manifest.main, 'launcher.mjs');
-  const launcher = asar.extractFile(archive, 'launcher.mjs').toString();
+  const launcher = readFileSync(join(appRoot, 'launcher.mjs'), 'utf8');
   assert.match(launcher, /MEWCLAW_DESKTOP_CLOUD/u);
   for (const name of ['index.js', 'workspace-controller.js', 'workspace-client.js', 'location-client.js', 'location.js', 'location-route.js', 'local-workspaces.js', 'local-brand.js', 'cloud-model.js', 'session-boot.js', 'session-ui-state.js']) {
     const entry = 'node_modules/dsh-lark-desktop-cloud/lib/' + name;
-    const packed = asar.extractFile(archive, join(...entry.split('/')));
+    const packed = readFileSync(join(appRoot, entry));
     assert.ok(packed.equals(readFileSync(join(root, 'mewclaw-cloud/lib', name))), '桌面工作区构建不一致：' + name);
     if (name === 'workspace-client.js' || name === 'location-client.js') new Script(packed.toString().replace('\nexport {};', ''));
   }
-  console.log('ASAR_ENTRYPOINTS_OK');
+  console.log('APP_ENTRYPOINTS_OK');
 }
 
 function verifyOfficialFiles() {
-  const entries = asar.listPackage(archive).map(value => value.replaceAll('\\', '/').slice(1));
-  const scripts = entries.filter(value => value.startsWith('node_modules/@deepseek-ai/')
+  const scripts = listAppFiles().filter(value => value.startsWith('node_modules/@deepseek-ai/')
     && !value.slice('node_modules/'.length).includes('/node_modules/') && /\.[cm]?js$/u.test(value));
   assert.ok(scripts.length > 100, '官方运行时文件未完整收集');
   for (const entry of scripts) {
-    assert.ok(asar.extractFile(archive, join(...entry.split('/'))).equals(readFileSync(join(root, entry))),
+    assert.ok(readFileSync(join(appRoot, entry)).equals(readFileSync(join(root, entry))),
       `官方运行时在打包时发生变化：${entry}`);
   }
   console.log(`OFFICIAL_RUNTIME_UNCHANGED ${scripts.length}`);
@@ -62,7 +74,9 @@ function verifyNativeSpawn(home) {
     const { spawnSync } = require('node:child_process');
     const r = createRequire(process.argv[1] + '/package.json');
     const binary = r.resolve('@vscode/ripgrep-win32-x64/bin/rg.exe');
-    if (binary.includes('app.asar')) throw new Error('ripgrep 必须为物理资源');
+    if (binary.includes('app.asar') || !require('node:fs').existsSync(binary)) {
+      throw new Error('ripgrep 必须为物理资源：' + binary);
+    }
     const result = spawnSync(binary, ['--version'], { encoding: 'utf8', windowsHide: true });
     if (result.error || result.status !== 0 || !result.stdout.startsWith('ripgrep ')) {
       throw result.error ?? new Error('ripgrep spawn 失败');
@@ -72,7 +86,7 @@ function verifyNativeSpawn(home) {
       .then(() => console.log('CLOUD_PROVIDER_IMPORT_OK'))
       .catch(error => { console.error(error); process.exitCode = 1; });
   `;
-  const result = execFileSync(executable, ['-e', code, archive], {
+  const result = execFileSync(executable, ['-e', code, appRoot], {
     cwd: home, windowsHide: true, encoding: 'utf8', timeout: 30_000,
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1' },
   });
@@ -82,7 +96,7 @@ function verifyNativeSpawn(home) {
 }
 
 function runSmoke(home, entry, args, marker) {
-  const result = execFileSync(executable, ['--expose-internals', join(archive, entry), ...args], {
+  const result = execFileSync(executable, ['--expose-internals', join(appRoot, entry), ...args], {
     cwd: home, windowsHide: true, encoding: 'utf8', timeout: 120_000,
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1' },
     maxBuffer: 4 * 1024 * 1024,
@@ -117,8 +131,8 @@ function verifyArtifacts() {
   }
   const AdmZip = require('adm-zip');
   const zip = new AdmZip(join(release, artifacts.find(name => name.endsWith('.zip'))));
-  for (const entry of ['MewClaw.exe', 'resources/app.asar',
-    'resources/node_modules/@vscode/ripgrep-win32-x64/bin/rg.exe']) {
+  for (const entry of ['MewClaw.exe', 'resources/app/launcher.mjs',
+    'resources/app/node_modules/@vscode/ripgrep-win32-x64/bin/rg.exe']) {
     const data = zip.readFile(entry);
     assert.ok(data && data.equals(readFileSync(join(output, entry))), `ZIP 与已验证应用不一致：${entry}`);
   }
@@ -126,8 +140,9 @@ function verifyArtifacts() {
 }
 
 assert.ok(existsSync(executable), '缺少打包 EXE');
-verifyArchive();
+assert.ok(statSync(appRoot).isDirectory(), '应用根必须为 resources/app/ 目录（asar:false）');
+verifyLayout();
 verifyOfficialFiles();
 verifyRuntime();
-if (process.argv[3] !== '--runtime-only') verifyArtifacts();
-console.log(process.argv[3] === '--runtime-only' ? 'MEWCLAW_RUNTIME_OK' : 'MEWCLAW_PACKAGE_OK');
+verifyArtifacts();
+console.log('MEWCLAW_PACKAGE_OK');

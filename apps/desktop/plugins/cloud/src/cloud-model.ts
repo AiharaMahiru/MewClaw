@@ -17,7 +17,8 @@ const EMPTY_AUTH: PiAiAdapterOptions['auth'] = {
   credentials: { async read() { return undefined; }, async list() { return []; }, async modify(_id, fn) { return fn(undefined); }, async delete() {} },
   authContext: { async env() { return undefined; }, async fileExists() { return false; } },
 };
-const SHARED_PROVIDER_NAMES: Record<string, string> = { 'deepseek-official': 'DeepSeek', deepseek: 'DeepSeek', openai: 'OpenAI' };
+// 组名与云端 Worker 的 catalog 一致：官方适配器报 DeepSeek，pi-ai 系 provider 按原始 id 显示。
+const SHARED_PROVIDER_NAMES: Record<string, string> = { 'deepseek-official': 'DeepSeek' };
 
 interface CloudModelProfile {
   id: string;

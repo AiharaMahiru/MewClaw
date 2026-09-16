@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "dsh-lark-desktop-host": "0.1.0",
+    "dsh-lark-liquid-glass": "0.1.0",
     "dsh-lark-mewclaw-brand-desktop": "0.1.0"
   },
   "peerDependencies": {
@@ -28,6 +29,6 @@
     "@deepseek-ai/dsh-tools": "0.1.5-rc.2",
     "@earendil-works/pi-ai": "0.85.1",
     "@deepseek-ai/schemastery": "3.18.2",
-    "dsh-plugin-desktop": "2.0.6"
+    "dsh-plugin-desktop": "2.0.10"
   }
 }

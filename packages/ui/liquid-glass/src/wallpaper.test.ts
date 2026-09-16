@@ -18,4 +18,9 @@ describe("双色SVG壁纸与语义材质", () => {
     expect(SURFACE_STYLES).toContain("forced-colors");
     expect(SURFACE_STYLES).not.toMatch(/MutationObserver|!important|\[class/u);
   });
+  it("结构容器不使用背景模糊，fixed 弹层不被困进侧栏", () => {
+    const blurred = SURFACE_STYLES.split("}").filter((rule) => rule.includes("backdrop-filter:blur"));
+    expect(blurred.length).toBeGreaterThan(0);
+    for (const rule of blurred) expect(rule).not.toMatch(/aside|\bnav\b/u);
+  });
 });

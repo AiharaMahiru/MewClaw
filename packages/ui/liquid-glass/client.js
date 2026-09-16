@@ -721,13 +721,15 @@ function wallpaper(dark) {
 // packages/ui/liquid-glass/src/surfaces.ts
 var root = 'html[data-mew-glass="on"]';
 var panels = ':is(dialog,[role="dialog"],[role="alertdialog"],[role="menu"],[role="listbox"],nav:not(header nav),aside)';
+var floaters = ':is(dialog,[role="dialog"],[role="alertdialog"],[role="menu"],[role="listbox"])';
 var controls = ':is(button,input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),textarea,select,[role="combobox"])';
 var SURFACE_STYLES = `
 ${root}{--mew-wallpaper:${wallpaper(false)};--mew-canvas:#edf1f7;--mew-glass-fill:rgb(248 250 255 / 58%);--mew-glass-edge:rgb(255 255 255 / 72%);--mew-glass-shadow:rgb(29 43 75 / 14%);--mew-glass-accent:#4b62b8}
 ${root}[data-mew-glass-scheme="dark"]{--mew-wallpaper:${wallpaper(true)};--mew-canvas:#171b27;--mew-glass-fill:rgb(26 31 46 / 62%);--mew-glass-edge:rgb(224 232 255 / 18%);--mew-glass-shadow:rgb(0 0 0 / 34%);--mew-glass-accent:#aab8ff}
 ${root} body{background-color:var(--mew-canvas);background-image:var(--mew-wallpaper);background-size:cover;background-position:center;background-attachment:fixed}
 ${root} body::before{position:fixed;inset:0;z-index:-1;content:"";pointer-events:none;background:linear-gradient(120deg,rgb(255 255 255 / 12%),transparent 42%,rgb(99 117 190 / 8%));}
-${root} ${panels}{background-color:var(--mew-glass-fill);box-shadow:inset 0 1px 0 var(--mew-glass-edge),0 12px 36px var(--mew-glass-shadow);-webkit-backdrop-filter:blur(24px) saturate(135%);backdrop-filter:blur(24px) saturate(135%)}
+${root} ${panels}{background-color:var(--mew-glass-fill);box-shadow:inset 0 1px 0 var(--mew-glass-edge),0 12px 36px var(--mew-glass-shadow)}
+${root} ${floaters}{-webkit-backdrop-filter:blur(24px) saturate(135%);backdrop-filter:blur(24px) saturate(135%)}
 ${root} ${controls}{transition:background-color .18s ease, border-color .18s ease, box-shadow .18s ease}
 ${root} :is(dialog,[role="dialog"],[role="alertdialog"]){border-radius:24px}
 ${root} :is([role="menu"],[role="listbox"]){border-radius:18px;padding:8px;scroll-padding:8px}

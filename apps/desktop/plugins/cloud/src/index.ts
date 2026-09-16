@@ -16,6 +16,7 @@ import type { ControllerOptions } from './workspace-controller.js';
 import { LocationPreference } from './location.js';
 import { locationRoute } from './location-route.js';
 import { installLocalBrand } from './local-brand.js';
+import { installLocalGlass } from './local-glass.js';
 import { sessionLocationHtml } from './session-boot.js';
 import { LocalHarnessWorkspaces } from './local-workspaces.js';
 import type {} from '@deepseek-ai/dsh-agent-default-model';
@@ -68,6 +69,7 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
   private accountCookie = '';
   private readonly location = new LocationPreference(resolveDshHome());
   private localBrandRevision = '';
+  private localGlassRevision = '';
 
   constructor(ctx: Context, config: Config) {
     cloudOrigin(config.cloudOrigin);
@@ -84,6 +86,7 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
       inject: manifest.dsh.client.inject as string[],
     };
     this.localBrandRevision = installLocalBrand(ctx);
+    this.localGlassRevision = installLocalGlass(ctx);
     this.cloud = new CloudProxy({ origin: config.cloudOrigin, timeoutMs: config.cloudTimeoutMs,
       sessionRetentionSeconds: config.cloudSessionRetentionSeconds ?? 2592000,
       maxIndexBytes: config.cloudMaxIndexBytes ?? 2097152,
@@ -211,13 +214,13 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     const transformed = desktopCloudHtml(html, client, this.desktopParameters);
     const options: Parameters<typeof sessionLocationHtml>[1] = { location, locationRevision: client.locationRevision };
     if (location === 'cloud') options.workspaceRevision = client.workspaceRevision;
-    if (location === 'local') options.brandRevision = this.localBrandRevision;
+    if (location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; }
     return sessionLocationHtml(transformed, options);
   }
 
   private transformLocalIndex(html: string, revision: string): string {
     const options: Parameters<typeof sessionLocationHtml>[1] = { location: this.location.location, locationRevision: revision };
-    if (this.location.location === 'local') options.brandRevision = this.localBrandRevision;
+    if (this.location.location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; }
     return sessionLocationHtml(html, options);
   }
 

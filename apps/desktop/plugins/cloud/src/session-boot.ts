@@ -17,6 +17,7 @@ export function sessionLocationHtml(html: string, options: {
   locationRevision: string;
   workspaceRevision?: string;
   brandRevision?: string;
+  glassRevision?: string;
 }): string {
   const prefix = 'globalThis["__DSH_BOOT__"] = ';
   const start = html.indexOf(prefix);
@@ -46,6 +47,14 @@ export function sessionLocationHtml(html: string, options: {
     const url = '/_dsh/desktop/brand-client.js';
     graph.entries.push({ id, url, rev: options.brandRevision, inject: [LOCATION_CLIENT, SIDEBAR, '@deepseek-ai/dsh-client-ui-renderer'] });
     graph.batches.push({ phase: 'application', url, rev: options.brandRevision, entries: [id] });
+  }
+  if (options.location === 'local' && options.glassRevision) {
+    // 与云端部署同一主题插件；inject 顺序即上游 dsh.client.inject 声明。
+    const id = 'dsh-lark-liquid-glass';
+    const url = '/_dsh/desktop/glass-client.js';
+    graph.entries.push({ id, url, rev: options.glassRevision,
+      inject: ['@deepseek-ai/dsh-client-ui-theme', '@deepseek-ai/dsh-client-ui-renderer', '@deepseek-ai/dsh-client-ui-settings-general'] });
+    graph.batches.push({ phase: 'application', url, rev: options.glassRevision, entries: [id] });
   }
   graph.rev = createHash('sha256').update(JSON.stringify(graph)).digest('hex').slice(0, 16);
   // 复用官方 boot script 的 CSP nonce，不额外注入无 nonce 的脚本。

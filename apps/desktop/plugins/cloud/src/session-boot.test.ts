@@ -23,6 +23,17 @@ it('本地复用Web品牌时停用官方品牌Consumer，避免同优先级重�
   expect(sessionLocationHtml(html, { location: 'cloud', locationRevision: 'next' })).toContain(id);
 });
 
+it('本地模式注入液态玻璃客户端，云端依赖远端部署自带条目', () => {
+  const entries = [{ id: '@deepseek-ai/dsh-client-ui-sidebar', rev: 'a', url: '/sidebar' }];
+  const html = '<script>globalThis["__DSH_BOOT__"] = ' + JSON.stringify({ rev: 'a', entries, batches: [{ entries: entries.map(x => x.id), rev: 'a', url: '/batch', phase: 'application' }] }) + ';</script>';
+  const output = sessionLocationHtml(html, { location: 'local', locationRevision: 'next', glassRevision: 'glass' });
+  expect(output).toContain('"id":"dsh-lark-liquid-glass"');
+  expect(output).toContain('/_dsh/desktop/glass-client.js');
+  expect(output).not.toContain('dsh-lark-liquid-glass".js');
+  const cloud = sessionLocationHtml(html, { location: 'cloud', locationRevision: 'next', glassRevision: 'glass' });
+  expect(cloud).not.toContain('dsh-lark-liquid-glass');
+});
+
 it('本地模式停用云端工作区桥接并拒绝重复位置客户端', () => {
   const entries = [
     { id: '@deepseek-ai/dsh-client-ui-sidebar', rev: 'a', url: '/sidebar' },
