@@ -24,9 +24,9 @@ D:\AI\dsh\MewClaw-desktop-candidate\release\MewClaw-1.0.0-win-x64
 
 | 产物 | 字节 | SHA-256 |
 | --- | ---: | --- |
-| `MewClaw-1.0.0-win-x64-Portable.exe` | 142872654 | `1a153b18e76feb3acb95dc782936fceddfe34d7177c438287f1f11752e1054da` |
-| `MewClaw-1.0.0-win-x64-Setup.exe` | 143116593 | `dfb5309aba184374c1f0c73050991f7f2bb7e73dad8d2624a9b9e018136e57c9` |
-| `MewClaw-1.0.0-win-x64.zip` | 187032428 | `a001c314cdcb621161028f0358d2150e57c0dbab6684ff4e1235b226760fbc66` |
+| `MewClaw-1.0.0-win-x64-Portable.exe` | 142873305 | `f7af1036f36cda24f83619cff9a7a0e030f442a15587fbb5522ed0356d71d4e9` |
+| `MewClaw-1.0.0-win-x64-Setup.exe` | 143117245 | `101bfa8768ae41568f7a0a7e1afaee6d6a1c9de951b93c35c91f8758f50755cf` |
+| `MewClaw-1.0.0-win-x64.zip` | 187032327 | `924bfe02e4fd1b8e35a0bb8d3b85268be1a917079fae7130d1ab8c34c56d9d35` |
 
 产物未签名。`win-unpacked` 与上述安装包位于同一 Release 目录，必须一起保留用于目录模式验收。
 
@@ -92,7 +92,7 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 ## 推送状态与限制
 
 - 本轮改动基于 `origin/desktop@4719c46`，叠加远端 desktop-dev 合并（`de12683`）、无缝切换、同步边界修正、本地模式三形态模型 picker 接入、测试和文档更新。合并提交 `f48f39c`；edge typecheck 干净、151/151 edge 测试通过。
-- **Release 产物时间差**：上述产物哈希对应 picker 接入时的构建（`5f50412` 基线）；之后合入的品牌改名/桌面变体/移动端侧栏修复尚未进入候选构建——下次出包前需先把候选的 brand workspace 从 `dsh-lark-atw-brand` 同步为 `mewclaw-brand`/`mewclaw-brand-desktop` 命名并重跑全链路。
+- **品牌改名已进候选**：候选 `mewclaw-brand` workspace 的包名/插件名/客户端模块 id 已从 `dsh-lark-atw-brand` 改为 `dsh-lark-mewclaw-brand-desktop`（桌面变体语义，候选只保留这一个品牌 workspace）；`verify-package.mjs` 的 ASAR 断言路径同步更新。上述产物哈希即改名后的构建。
 - `desktop` 远端现为 `4719c46`，`desktop-dev` 推送后重新核验 `git ls-remote`（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成；注意 origin 的 fetch refspec 只覆盖 `desktop`，desktop-dev 需显式 `git fetch origin +refs/heads/desktop-dev:refs/remotes/origin/desktop-dev`）。
 - 后续若继续修改源码或交接文档，完成提交后重新执行：
 

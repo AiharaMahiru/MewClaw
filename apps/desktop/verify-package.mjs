@@ -26,7 +26,7 @@ function verifyArchive() {
   const files = asar.listPackage(archive).map(value => value.replaceAll('\\', '/'));
   for (const path of ['launcher.mjs', 'UPSTREAM-LICENSE',
     'node_modules/dsh-plugin-desktop/lib/main.js',
-    'node_modules/dsh-lark-atw-brand/client.js',
+    'node_modules/dsh-lark-mewclaw-brand-desktop/client.js',
     'node_modules/dsh-lark-desktop-cloud/lib/index.js']) {
     assert.ok(files.includes(`/${path}`), `缺少发行入口：${path}`);
   }
