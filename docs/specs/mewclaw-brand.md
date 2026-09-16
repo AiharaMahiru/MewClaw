@@ -75,6 +75,14 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   直接点开会话抽屉；主列以 `::after` 暗色遮罩标示，`pointerdown` 落在列外或
   再点菜单键即收起；抽屉内折叠键收起后整列隐藏。脚本只做 DOM 开合，
   不读凭证、不发请求，`matchMedia` 在桌面视口短路；
+- 移动端抽屉不透明：官方侧栏背景为半透明 `rgba(28 28 35 / .5)`，桌面内联
+  无碍但作为覆盖层会透出下层内容；`≤768px` 下 `sidebarCol` 背景改不透明；
+- 移动端顶栏收纳：会话头部顶栏控件按桌面密度排列，390px 下溢出重叠。
+  `≤768px` 隐藏桌面专属/重复控件（按官方 `aria-label` 选择）：
+  "Open workspace in Cursor"、"Choose an app to open in"（外部编辑器入口）、
+  "Open right sidebar"（会话头部自带右坞开关，与坞簇 Expand sidebar 重复）、
+  "Expand bottom panel"（底部坞移动端无内容）。保留面包屑、More actions、
+  菜单键与坞簇 Expand sidebar；
 - 所有注册经 `ctx.effect()`/`ctx.slots.inject`，卸载即回收。
 
 ## 7 安全与信任
@@ -91,8 +99,9 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   WebServer 扩展点提供标题/语言/favicon/manifest；
 - `client`：等待官方 conversation 槽位声明后再注册占位者；
 - 移动适配以真实浏览器验收为准：390px 视口下侧栏默认收起、菜单键展开为
-  覆盖层抽屉、遮罩外点/菜单键可收起、主列不被挤压、无横向溢出
-  （`scrollWidth ≤ 视口宽`）；
+  覆盖层抽屉、抽屉背景不透明不透出下层、遮罩外点/菜单键可收起、主列不被
+  挤压、无横向溢出（`scrollWidth ≤ 视口宽`）；会话视图顶栏仅面包屑 +
+  More actions + 菜单键 + 坞簇 Expand sidebar，无重叠；
 - 门禁：`pnpm verify:dsh-brand`（官方完整性 + 品牌 slot 白名单）。
 
 ## 9 迁移映射

@@ -23,7 +23,11 @@ const HERO_STYLE = `.mewclaw-hero-brand{display:inline-flex;align-items:center;g
 // （<hash>_<name>，重建仅哈希变化）把侧栏改为 fixed 覆盖；侧栏脱离 grid 后
 // centerCol 会掉进 56px 的第一轨，需 grid-column:1/-1 跨全行。移动端默认收起
 // 整条侧栏列（含 55px 图标栏），由注入的悬浮菜单键开合，展开时带暗色遮罩。
-const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}[class*="_centerCol"]{grid-column:1/-1}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}}
+// 桌面端侧栏背景是半透明（覆盖式抽屉会透出下层会话头部），移动端改为不透明。
+// 会话头部顶栏在手机上溢出：隐藏桌面专属控件——外部编辑器入口、会话头部自带的
+// 右坞开关（与坞簇 Expand sidebar 重复）、底部坞开关（移动端无内容）。顶栏仅剩
+// 面包屑、More actions、菜单键与坞簇 Expand sidebar。
+const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}[class*="_centerCol"]{grid-column:1/-1}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}[aria-label="Open workspace in Cursor"],[aria-label="Choose an app to open in"],[aria-label="Open right sidebar"],[aria-label="Expand bottom panel"]{display:none!important}}
 .mewclaw-rail-fab{display:none}
 @media(max-width:768px){.mewclaw-rail-fab{display:inline-flex}}`;
 // 移动端侧栏开合控制：往官方顶栏开关簇（_toggleCluster）前置一个同款的菜单键；
