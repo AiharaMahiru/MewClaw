@@ -693,6 +693,32 @@ describe("AuthEdgeServer", () => {
     expect(forwarded).toHaveLength(3);
   });
 
+  it("streams sidebar media responses beyond the buffered proxy cap", async () => {
+    // 媒体/下载体可超过 requestUpstream 的 32MB 缓冲上限；该路由必须走
+    // streamUpstream 透传，否则用户侧表现为 INTERNAL_ERROR 而非文件内容。
+    const size = 33 * 1024 * 1024;
+    const worker = await listen((_req, res) => {
+      res.writeHead(200, { "content-type": "application/octet-stream", "content-length": String(size) });
+      res.end(Buffer.alloc(size, 7));
+    });
+    const store = new MemoryAuthStore();
+    const mail = new FakeMail();
+    const service = new AuthService({ store, mail });
+    await service.register("media-owner@example.com", "correct horse battery staple", "Owner", { requestId: "test" });
+    const user = await verifyLatest(service, mail, "media-owner@example.com");
+    await service.saveResource({ resourceType: "session", resourceId: "media-session", userId: user!.user.id, resourcePath: "D:/workspaces/users/owner", createdAt: "2026-08-20T00:00:00.000Z" });
+    const edgeConfig = config(worker.port);
+    const edge = createAuthEdgeServer({ config: edgeConfig, service });
+    const base = await listenEdge(edge, edgeConfig);
+    servers.push({ close: () => edge.close() });
+
+    const response = await fetch(`${base}/sidebar/file?sessionId=media-session&path=${encodeURIComponent("D:/workspaces/users/owner/big.bin")}&download=1`, { headers: { cookie: `dsh_session=${user!.token}` } });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("application/octet-stream");
+    const body = await response.arrayBuffer();
+    expect(body.byteLength).toBe(size);
+  });
+
 	it("requires a Web account before consuming a Feishu pairing link", async () => {
     const worker = await listen((_req, res) => { res.writeHead(200); res.end("worker"); });
     const store = new MemoryAuthStore();
