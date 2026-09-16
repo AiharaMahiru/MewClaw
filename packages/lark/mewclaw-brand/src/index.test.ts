@@ -19,7 +19,7 @@ const fakeReact = {
   },
 };
 
-describe("dsh-lark-atw-brand", () => {
+describe("dsh-lark-mewclaw-brand", () => {
   it("使用指定的 MewClaw 商标几何", () => {
     const mark = renderMewClawBrandMark(fakeReact, { size: 104, className: "hero-mark" }) as ElementNode;
 
@@ -77,5 +77,9 @@ describe("dsh-lark-atw-brand", () => {
     expect(html).toContain('sessionStorage.setItem("mewclaw.boot.v1","1")');
     expect(html).toContain("setTimeout(remove,1600)");
     expect(html).toContain("pointer-events:none");
+    // 移动适配覆盖层样式（§6 移动适配）
+    expect(html).toContain("@media(max-width:768px)");
+    expect(html).toContain('[class*="_sidebarCol"]{position:fixed');
+    expect(html).toContain('[class*="_centerCol"]{grid-column:1/-1;margin-left:55px}');
   });
 });

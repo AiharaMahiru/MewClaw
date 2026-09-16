@@ -127,7 +127,13 @@ export async function startAuthApp(options: StartAuthAppOptions): Promise<AuthAp
       ...(config.sessionTtlMs !== undefined ? { sessionTtlMs: config.sessionTtlMs } : {}),
     });
     if (config.promptAudit?.enabled && !options.bootCheck) auditModel = await dependencies.createAuditModel();
-    if (!options.bootCheck) sharedModels = await dependencies.createSharedModels?.();
+    // 共享目录是可选能力：装配失败（如 provider 设置损坏）不拖垮整个认证服务，Edge 侧 fail-closed 404。
+    if (!options.bootCheck && dependencies.createSharedModels) {
+      sharedModels = await dependencies.createSharedModels().catch((error: unknown) => {
+        console.warn(`[auth] shared models runtime unavailable: ${error instanceof Error ? error.message : String(error)}`);
+        return undefined;
+      });
+    }
     const promptAuditor = auditModel && config.promptAudit ? createPromptAuditor(auditModel, config.promptAudit) : undefined;
     edge = dependencies.createEdgeServer({ config, service, ...(promptAuditor ? { promptAuditor } : {}), ...(sharedModels ? { sharedModels } : {}) });
     await edge.listen();

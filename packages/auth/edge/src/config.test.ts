@@ -14,7 +14,8 @@ describe("resolveAuthConfig", () => {
     expect(resolveAuthConfig({ ...base, LARK_APP_ID: "cli_1234567890abcdef", LARK_APP_SECRET: "fake-old-secret" })).toEqual(resolveAuthConfig(base));
   });
   it("默认开启审计并严格校验开关和资源限制", () => {
-    expect(resolveAuthConfig(base).promptAudit).toEqual({ enabled: true, timeoutMs: 15_000, maxConcurrent: 4 });
+    expect(resolveAuthConfig(base).promptAudit).toEqual({ enabled: true, timeoutMs: 10_000, maxConcurrent: 4 });
+    expect(() => resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_TIMEOUT_MS: "60000" })).toThrow();
     expect(resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_ENABLED: "false" }).promptAudit?.enabled).toBe(false);
     expect(() => resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_ENABLED: "FALSE" })).toThrow("AUTH_PROMPT_AUDIT_ENABLED");
     expect(() => resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_TIMEOUT_MS: "0" })).toThrow();

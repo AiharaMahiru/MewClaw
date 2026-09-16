@@ -114,6 +114,26 @@ it('共享路径不支持的内容部件映射 400', async () => {
   expect(await response.json()).toEqual({ error: 'INVALID_INFERENCE_REQUEST' });
 });
 
+it('审计仅覆盖最后一条 user 消息文本，不重审历史', async () => {
+  const audited: string[] = [];
+  const { url } = await fixture({ audit: async text => { audited.push(text); return 'allow'; } });
+  const response = await fetch(url, { method: 'POST', body: JSON.stringify({ ...input, messages: [
+    { role: 'user', content: '历史输入不再重审' },
+    { role: 'assistant', content: '历史回复' },
+    { role: 'user', content: [{ type: 'text', text: '最新' }, { type: 'text', text: '输入' }] },
+  ] }) });
+  expect(response.status).toBe(200);
+  expect(audited).toEqual(['最新输入']);
+});
+
+it('stop/max_tokens/温度等字段类型非法时 400，不触碰上游', async () => {
+  const { url, upstream } = await fixture();
+  for (const patch of [{ stop: 42 }, { stop: ['ok', 1] }, { max_tokens: 'x' }, { max_tokens: 0 }, { max_completion_tokens: -1 }, { temperature: 'hot' }]) {
+    expect((await fetch(url, { method: 'POST', body: JSON.stringify({ ...input, ...patch }) })).status).toBe(400);
+  }
+  expect(upstream).not.toHaveBeenCalled();
+});
+
 it.each(['block', 'unavailable'] as const)('审计%s时不解析或请求上游', async result => {
   const { url, upstream } = await fixture({ audit: async () => result });
   expect((await fetch(url, { method: 'POST', body: JSON.stringify(input) })).status).toBe(403);

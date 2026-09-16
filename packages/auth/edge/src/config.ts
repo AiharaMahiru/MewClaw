@@ -113,7 +113,7 @@ export function resolveAuthConfig(environment: Record<string, string | undefined
     desktopInferenceTimeoutMs: boundedInteger(environment.AUTH_DESKTOP_INFERENCE_TIMEOUT_MS, 120_000, 1_000, 600_000),
     promptAudit: {
       enabled: auditEnabled(environment.AUTH_PROMPT_AUDIT_ENABLED),
-      timeoutMs: boundedInteger(environment.AUTH_PROMPT_AUDIT_TIMEOUT_MS, 15_000, 100, 60_000),
+      timeoutMs: boundedInteger(environment.AUTH_PROMPT_AUDIT_TIMEOUT_MS, 10_000, 100, 10_000),
       maxConcurrent: boundedInteger(environment.AUTH_PROMPT_AUDIT_MAX_CONCURRENT, 4, 1, 32),
     },
     userModelEncryptionKey: required(environment.AUTH_USER_MODEL_ENCRYPTION_KEY, "AUTH_USER_MODEL_ENCRYPTION_KEY"),
