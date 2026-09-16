@@ -168,14 +168,13 @@ export class CloudAccountModel extends LlmAdapter {
   }
 }
 
-/** picker 条目：账号默认（无默认时占位提示）+ 每个私有 profile 的每个 modelId + 部署共享目录。 */
+/** picker 条目：账号默认（无默认 profile 时不列，避免被默认选取命中）+ 每个私有 profile 的每个 modelId + 部署共享目录。 */
 function catalogEntries(catalog: CloudModelCatalog): CatalogEntry[] {
   const profile = defaultProfile(catalog);
-  const entries: CatalogEntry[] = [{
-    selector: MODEL,
-    name: profile?.displayName ?? '云端默认模型',
-    description: profile ? `云端默认模型：${profile.defaultModel}` : '云端默认模型（账号未配置默认模型）',
-  }];
+  const entries: CatalogEntry[] = [];
+  if (profile) {
+    entries.push({ selector: MODEL, name: profile.displayName, description: `云端默认模型：${profile.defaultModel}` });
+  }
   for (const item of catalog.profiles) {
     if (!item.keyConfigured) continue;
     for (const model of item.modelIds) {

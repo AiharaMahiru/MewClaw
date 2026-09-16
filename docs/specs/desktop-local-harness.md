@@ -51,7 +51,7 @@ GET /api/mewclaw-desktop/location 返回 {location}。POST 只接受 {location}�
 
 本地会话的云端模型桥接使用云端 Cookie/CSRF 调用 POST /auth/desktop-inference/chat/completions，`model` 字段透传服务端路由选择器（`auth.md` §6：`cloud-default` / `account/<profileId>[/<model>]` / `shared/<provider>/<model>`）。Edge 使用已认证 userId 在服务端解析路由与密钥并代理 SSE；上游 API Key 仅在服务器请求期间使用，禁止重定向和透传错误正文。使用现有用户限流及 PromptAuditor；审计不可用拒绝请求。AUTH_DESKTOP_INFERENCE_TIMEOUT_MS 默认 120000，范围 1000–600000，客户端断开取消上游。
 
-本地 picker 的模型目录由 `mewclaw-cloud` 桥接适配器从 `/auth/models` 展开：`cloud-default`（账号默认条目，无默认 profile 时仍列出并在选择时报 CLOUD_DEFAULT_MODEL_REQUIRED）+ 每个已配密钥 profile 的每个 `modelIds`（`account/<pid>/<model>`）+ `sharedModels` 目录（`shared/<provider>/<model>`）。适配器对目录条目做本地校验，未知选择器不发推理请求；目录缓存 5s，`/auth/models` 非 GET 请求后失效。本机不保存供应商密钥。云端模式的原有模型选择不变。
+本地 picker 的模型目录由 `mewclaw-cloud` 桥接适配器从 `/auth/models` 展开：`cloud-default`（账号默认条目，**仅在存在已配密钥的默认 profile 时列出**，避免占位条目被会话默认选取命中；显式解析仍报 CLOUD_DEFAULT_MODEL_REQUIRED）+ 每个已配密钥 profile 的每个 `modelIds`（`account/<pid>/<model>`）+ `sharedModels` 目录（`shared/<provider>/<model>`）。适配器对目录条目做本地校验，未知选择器不发推理请求；目录缓存 5s，`/auth/models` 非 GET 请求后失效。本机不保存供应商密钥。云端模式的原有模型选择不变。
 
 ## 7 安全与信任
 

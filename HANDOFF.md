@@ -24,9 +24,9 @@ D:\AI\dsh\MewClaw-desktop-candidate\release\MewClaw-1.0.0-win-x64
 
 | 产物 | 字节 | SHA-256 |
 | --- | ---: | --- |
-| `MewClaw-1.0.0-win-x64-Portable.exe` | 142873305 | `f7af1036f36cda24f83619cff9a7a0e030f442a15587fbb5522ed0356d71d4e9` |
-| `MewClaw-1.0.0-win-x64-Setup.exe` | 143117245 | `101bfa8768ae41568f7a0a7e1afaee6d6a1c9de951b93c35c91f8758f50755cf` |
-| `MewClaw-1.0.0-win-x64.zip` | 187032327 | `924bfe02e4fd1b8e35a0bb8d3b85268be1a917079fae7130d1ab8c34c56d9d35` |
+| `MewClaw-1.0.0-win-x64-Portable.exe` | 142873483 | `111a9b5486f9ee966be23ca86ffdbe45902c302461a4e1e7c99e4dc31eafdf18` |
+| `MewClaw-1.0.0-win-x64-Setup.exe` | 143117423 | `c409eb5b58909c9b630279b785481a343db2c0d3387fb25a87387cec3a4ff3fc` |
+| `MewClaw-1.0.0-win-x64.zip` | 187031889 | `82c9c7e66f4b69f5813c7fd7a3538af45ef525272a0244e5e7fe558558db3841` |
 
 产物未签名。`win-unpacked` 与上述安装包位于同一 Release 目录，必须一起保留用于目录模式验收。
 
@@ -75,7 +75,7 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 
 ### 1. 本地模式模型选项——已完成（服务端 R33 + 桌面端 picker 均已接入）
 
-**状态更新（2026-09-15，接入完成）**：主线 `master@38795d2` 把 Edge `desktop-inference` 扩展为三形态选择器、`/auth/models` 附 `sharedModels` 目录（生产 `R33-desktop-inference-20260915` 已上线）。桌面端 picker 接入已完成：`apps/desktop/plugins/cloud/src/cloud-model.ts` 改为缓存整个 `/auth/models` 目录并展开三类条目——`cloud-default`（始终列出，无默认时条目描述提示、选中时才报 `CLOUD_DEFAULT_MODEL_REQUIRED`）、`account/<profileId>/<model>`（每个 keyConfigured profile 的全部 modelIds，显示名 `<displayName> · <model>`）、`shared/<provider>/<model>`（显示名用服务端 `name`）。`resolveEntry` 本地校验选择器（未知 → `MODEL_NOT_FOUND`，不发推理请求）；`stream` 把选择器原样透传为 `model` 字段，密钥仍全部在服务端。目录缓存 TTL 5s，`/auth/models` 非 GET 变更即失效。测试 11 例覆盖三形态展开、选择器透传、未知选择器拒绝、API Key 拒收。
+**状态更新（2026-09-15，接入完成）**：主线 `master@38795d2` 把 Edge `desktop-inference` 扩展为三形态选择器、`/auth/models` 附 `sharedModels` 目录（生产 `R33-desktop-inference-20260915` 已上线）。桌面端 picker 接入已完成：`apps/desktop/plugins/cloud/src/cloud-model.ts` 改为缓存整个 `/auth/models` 目录并展开三类条目——`cloud-default`（仅在默认 profile 存在时列出）、`account/<profileId>/<model>`（每个 keyConfigured profile 的全部 modelIds，显示名 `<displayName> · <model>`）、`shared/<provider>/<model>`（显示名用服务端 `name`）。`resolveEntry` 本地校验选择器（未知 → `MODEL_NOT_FOUND`，不发推理请求）；`stream` 把选择器原样透传为 `model` 字段，密钥仍全部在服务端。目录缓存 TTL 5s，`/auth/models` 非 GET 变更即失效。测试 11 例覆盖三形态展开、选择器透传、未知选择器拒绝、API Key 拒收。**修正（同日）**：`cloud-default` 占位条目曾无条件列在首位，无默认 profile 的账号会被默认选取命中报 `CLOUD_DEFAULT_MODEL_REQUIRED`——现改为仅在默认 profile 存在时列出；显式解析 `cloud-default` 仍返回明确错误。
 
 **仍确认的事实**（picker 数据源结构不变）：本地 picker 的选项来自本机 `session/modelCatalog` = 已注册 llm 适配器；`mewclaw-cloud` 桥接适配器负责把账号侧目录投影为本地模型条目。
 

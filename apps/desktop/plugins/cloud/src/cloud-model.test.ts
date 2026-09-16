@@ -60,11 +60,11 @@ it('resolveModel 校验选择器并接受裸 account/<pid>', async () => {
   await expect(adapter.resolveModel(CLOUD_MODEL_PROVIDER, 'arbitrary-model')).rejects.toMatchObject({ code: 'MODEL_NOT_FOUND' });
 });
 
-it('无默认私有模型时 cloud-default 报 CLOUD_DEFAULT_MODEL_REQUIRED，共享条目仍可用', async () => {
+it('无默认私有模型时不列出 cloud-default，共享条目仍可用；显式解析报 CLOUD_DEFAULT_MODEL_REQUIRED', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => catalogResponse({ profiles: [], sharedModels: catalog.sharedModels })));
   const adapter = new CloudAccountModel({ origin: 'https://cloud.example', cookie: () => cookie });
   const models = await adapter.listModels();
-  expect(models.map(item => item.id)).toEqual(['cloud-default', 'shared/deepseek/deepseek-chat']);
+  expect(models.map(item => item.id)).toEqual(['shared/deepseek/deepseek-chat']);
   await expect(adapter.resolveModel(CLOUD_MODEL_PROVIDER, 'cloud-default')).rejects.toMatchObject({ code: 'CLOUD_DEFAULT_MODEL_REQUIRED' });
   await expect(adapter.resolveModel(CLOUD_MODEL_PROVIDER, 'shared/deepseek/deepseek-chat')).resolves.toMatchObject({ id: 'shared/deepseek/deepseek-chat' });
   await expect(collect(adapter.stream(options))).rejects.toMatchObject({ code: 'CLOUD_DEFAULT_MODEL_REQUIRED' });
