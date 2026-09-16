@@ -33,10 +33,10 @@ export class LocalHarnessWorkspaces {
 
   async execute(sessionId: string, operation: unknown, signal: AbortSignal): Promise<unknown> {
     const session = this.ctx.sessions.get(sessionId as Parameters<typeof this.ctx.sessions.get>[0]);
-    if (!session?.header.cwd) throw new Error('LOCAL_WORKSPACE_NOT_AUTHORIZED');
+    if (!session?.header.cwd) throw new Error('LOCAL_WORKSPACE_NOT_AUTHORIZED：会话未绑定本地目录。请让用户通过侧栏「打开本地目录」选择工作目录并创建会话。');
     const root = await realpath(session.header.cwd);
     const grant = this.grants.get(root);
-    if (!grant) throw new Error('LOCAL_WORKSPACE_NOT_AUTHORIZED');
+    if (!grant) throw new Error(`LOCAL_WORKSPACE_NOT_AUTHORIZED：${root} 的目录授权已失效（授权不跨重启、登出或模式切换保留）。请让用户通过侧栏「打开本地目录」重新选择该目录。`);
     return grant.execute(operation, signal);
   }
 
@@ -48,7 +48,7 @@ export class LocalHarnessWorkspaces {
   install(ctx: Context): void {
     ctx.effect(() => () => this.dispose());
     ctx.effect(() => ctx.tools.register(defineTool({
-      name: 'desktop_workspace', description: '读取、列出或按版本写入本机会话已通过原生选择授权的目录。仅接受相对路径。',
+      name: 'desktop_workspace', description: '读取、列出或按版本写入本机会话已通过原生选择授权的目录。仅接受相对路径。授权不跨重启或模式切换保留，报 LOCAL_WORKSPACE_NOT_AUTHORIZED 时提示用户重新选择目录。',
       parameters: {
         action: { type: 'string', enum: ['list', 'read', 'write'], required: true },
         path: { type: 'string', required: true }, content: { type: 'string' }, version: { type: 'string' },

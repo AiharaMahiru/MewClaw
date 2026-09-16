@@ -39,7 +39,7 @@ GET /api/mewclaw-desktop/location 返回 {location}。POST 只接受 {location}�
 
 本地文件能力复用 LocalWorkspaceFiles 与官方 FileSystem。用户通过原生目录选择授权，普通网页路径不能授予权限。本地模式仅允许 desktop_workspace 文件工具，Agent 创建时收窄工具目录并以全局 guard 拒绝其他工具。旧云端 workspace HTTP 控制面在本地模式返回 409；Shell、子代理及同步不在本地模式开放。目录 cwd 不构成沙箱。
 
-授权属于当前 OS 用户的本地 Host 和规范化目录，同一目录的本地会话共享授权；不宣称云端账号级隔离。授权不落盘，退出登录、关闭或切换后需重新选择目录。本地历史会话保留。
+授权属于当前 OS 用户的本地 Host 和规范化目录，同一目录的本地会话共享授权；不宣称云端账号级隔离。授权不落盘，退出登录、关闭或切换后需重新选择目录。本地历史会话保留。授权失效或未绑定目录时 `desktop_workspace` 抛 `LOCAL_WORKSPACE_NOT_AUTHORIZED` 并附重新授权指引（侧栏「打开本地目录」），由模型转达用户。
 
 ## 6 行为契约
 

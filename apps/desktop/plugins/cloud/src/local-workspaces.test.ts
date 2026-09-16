@@ -15,20 +15,21 @@ it('本机授权与工具执行不访问云端，取消、越界和撤销明确�
   let selected: string | null = null;
   ctx.provide('desktopRuntime', { pickDirectory: async () => selected });
   ctx.provide('workspaceRegistry', { create: async () => ({ id: 'workspace' }) });
-  ctx.provide('sessions', { get: () => ({ header: { cwd: root } }) });
+  ctx.provide('sessions', { get: (id: string) => ({ header: { cwd: id === 'unbound' ? undefined : root } }) });
   await ctx.plugin(LocalFileSystem, { cwd: root });
   const workspaces = new LocalHarnessWorkspaces(ctx, { maxBytes: 1024, maxEntries: 20 });
   const signal = new AbortController().signal;
   try {
     expect(await workspaces.pick()).toBeNull();
-    await expect(workspaces.execute('session', { action: 'list', path: '.' }, signal)).rejects.toThrow('LOCAL_WORKSPACE_NOT_AUTHORIZED');
+    await expect(workspaces.execute('unbound', { action: 'list', path: '.' }, signal)).rejects.toThrow(/LOCAL_WORKSPACE_NOT_AUTHORIZED.*未绑定本地目录/);
+    await expect(workspaces.execute('session', { action: 'list', path: '.' }, signal)).rejects.toThrow(/LOCAL_WORKSPACE_NOT_AUTHORIZED.*授权已失效.*打开本地目录/);
     selected = root;
     expect(await workspaces.pick()).toMatchObject({ workspaceId: 'workspace' });
     await workspaces.execute('session', { action: 'write', path: 'hello.txt', content: '本地 Harness' }, signal);
     expect(await readFile(join(root, 'hello.txt'), 'utf8')).toBe('本地 Harness');
     await expect(workspaces.execute('session', { action: 'read', path: '../outside' }, signal)).rejects.toThrow('LOCAL_PATH_NOT_ALLOWED');
     workspaces.dispose();
-    await expect(workspaces.execute('session', { action: 'list', path: '.' }, signal)).rejects.toThrow('LOCAL_WORKSPACE_NOT_AUTHORIZED');
+    await expect(workspaces.execute('session', { action: 'list', path: '.' }, signal)).rejects.toThrow(/LOCAL_WORKSPACE_NOT_AUTHORIZED.*授权已失效/);
   } finally { workspaces.dispose(); await ctx.fiber.dispose(); await rm(root, { recursive: true, force: true }); }
 });
 
