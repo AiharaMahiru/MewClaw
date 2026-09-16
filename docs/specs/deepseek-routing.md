@@ -57,6 +57,12 @@ interface Config extends OfficialDeepSeekConfig {
 可见集时自动生成一条继承条目；`apiKeyEnv` 仍是凭证引用，解析不到 key 抛
 `MISSING_CREDENTIAL`（`assertUsableApiKey` 复用官方校验）。
 
+重试策略：worker patch 给本适配器配置 `retryPolicy`（normal mode），在官方默认
+`EMPTY_RESPONSE/RATE_LIMIT/SERVER/TIMEOUT/TRANSPORT` 上补 `STREAM_CLOSED`——上游
+relay 偶发不发 `[DONE]` 直接断流是独立 code，默认集合不含它则整轮即败（R49 后
+实发）。`dsh-llm-retry` 随 dsh-base 挂载，在 agent loop 步骤边界持久化重试；
+pi-ai profile 的同名策略在 `settings.production.yaml` 逐 provider 配置。
+
 ## 4 事件契约
 
 无自有事件。

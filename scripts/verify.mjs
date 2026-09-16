@@ -14,6 +14,7 @@ const commands = [
   [process.execPath, ["scripts/verify-capability-matrix.mjs"], false],
   [process.execPath, ["scripts/verify-official-integrity.mjs"], false],
   [process.execPath, ["scripts/verify-plugin-boundaries.mjs"], false],
+  [process.execPath, ["scripts/verify-tool-schemas.mjs"], false],
   ["git", ["diff", "--check"], false],
 ];
 

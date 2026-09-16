@@ -1,3 +1,22 @@
+# 举一反三防回归：schema 门禁 + STREAM_CLOSED 重试 + 审计重试（2026-09-16）
+
+针对上一轮两个生产 bug 做的**类级**防回归（不只修实例）：
+
+**1. 工具 schema 类（bash `type:null` 400）三层防线**
+- `packages/bundle/web/tool-schema.mjs`：新共享 helper `registerModelTool(ctx, def)`——注册前断言 `parameters` 是 object 根 JSON Schema（含 required⊆properties、可 JSON 序列化），不合法在**插件装载期**抛错（boot-check 烟测即拦），而不是请求时被 provider 400。`pipe-bash.mjs` 与 `liangshen/custom-bash.mjs` 均已迁移。
+- `scripts/verify-tool-schemas.mjs`（接入 `verify.mjs` 链）：`.mjs` 插件禁止直接 `tools.register(`；`.ts` 禁止 `tools.register({...})` 内联字面量。
+- `tests/agent-tool-schemas.test.ts`：自动 glob `packages/bundle/web/**/*.mjs` 全部插件，代理 ctx 实际 apply，校验每个注册 definition——未来新增 .mjs 插件自动覆盖。
+
+**2. STREAM_CLOSED 类（上游断流透到用户）**
+- 根因补强：`dsh-llm-retry` 已随 dsh-base 挂载，但官方默认 `retryableCodes` 不含 `STREAM_CLOSED`——`worker/cordis.patch.yml` 的 `lark-deepseek-routing` 与 `settings.production.yaml` 的 `llm-deepseek` + pi-ai `openai` profile 三处都补上，瞬断在步骤边界持久化重试，整轮不再即败。
+- 注意：审计模型直连 `ctx.llm.stream()` **不吃** llm-retry（重试只在 agent loop 内生效）。
+
+**3. 审计瞬态失败类（用户可见"审计不可用"）**
+- `createPromptAuditor` 加有界重试：快失败（传输/5xx/STREAM_CLOSED/解析残渣）重试一次；`AUDIT_TIMEOUT`（预算已耗尽）与确定性 finish code（AUTH/INVALID_*/QUOTA_EXCEEDED/MODEL_DISABLED/NO_CODE）不重试；仍 fail-closed。
+- SPEC `prompt-security-audit.md`、`deepseek-routing.md` 已同步；composition 测试钉住 retryPolicy 配置。
+
+**仍遗留**：lark-ws 的 SDK 残留错误兜底是实例级修复；同类模式（SDK 自持重连循环 + teardown 后 error 事件）的通则已写进 AGENTS.md「已验证经验」。Worker/审计的上游凭证失效属密钥轮换窗口，无代码侧修法。
+
 # 生产双 bug 修复交接（2026-09-16）
 
 多用户报错的两个独立缺陷已修复上线，详细归档见 `docs/evidence/incident-ws-crash-and-bash-schema-20260916.md`（本地证据目录，不入 git）。
