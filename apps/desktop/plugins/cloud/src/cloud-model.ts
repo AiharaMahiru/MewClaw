@@ -24,20 +24,34 @@ interface CloudModelProfile {
   keyConfigured: boolean;
 }
 
+interface CloudSharedModel {
+  provider: string;
+  model: string;
+  name: string;
+}
+
 interface CloudModelCatalog {
   profiles: CloudModelProfile[];
+  sharedModels: CloudSharedModel[];
   defaultProfileId: string | null;
 }
 
-interface CachedProfile {
+/** `model` 字段是服务端路由选择器：cloud-default / account/<pid>[/<model>] / shared/<provider>/<model>。 */
+interface CatalogEntry {
+  selector: string;
+  name: string;
+  description: string;
+}
+
+interface CachedCatalog {
   cookie: string;
   expiresAt: number;
-  profile: CloudModelProfile;
+  catalog: CloudModelCatalog;
 }
 
 export class CloudAccountModel extends LlmAdapter {
-  private cached: CachedProfile | undefined;
-  private pending: Promise<CloudModelProfile> | undefined;
+  private cached: CachedCatalog | undefined;
+  private pending: Promise<CloudModelCatalog> | undefined;
   private pendingCookie: string | undefined;
 
   constructor(private readonly options: {
@@ -51,19 +65,18 @@ export class CloudAccountModel extends LlmAdapter {
   invalidateCatalog(): void { this.cached = undefined; }
   override async listModels() {
     if (!this.isEnabled()) return [];
-    try { return [this.info(await this.profile())]; } catch { return []; }
+    try { return catalogEntries(await this.catalog()).map(entry => this.info(entry)); } catch { return []; }
   }
   override async resolveModel(_provider: string, model: string): Promise<LlmResolvedModelInfo> {
     if (!this.isEnabled()) throw new LlmError('当前模式未启用云端账号模型桥接。', 'MODEL_NOT_FOUND');
-    if (model !== MODEL) throw new LlmError('云端模型选择无效', 'MODEL_NOT_FOUND');
-    return this.info(await this.profile());
+    return this.info(this.entry(await this.catalog(), model));
   }
-  private info(profile: CloudModelProfile): LlmResolvedModelInfo {
+  private info(entry: CatalogEntry): LlmResolvedModelInfo {
     return {
       provider: CLOUD_MODEL_PROVIDER,
-      id: MODEL,
-      name: profile.displayName,
-      description: `云端默认模型：${profile.defaultModel}`,
+      id: entry.selector,
+      name: entry.name,
+      description: entry.description,
       inputModalities: ['text'],
       context: { contextWindow: CONTEXT_WINDOW },
       defaultMaxTokens: MAX_TOKENS,
@@ -79,8 +92,8 @@ export class CloudAccountModel extends LlmAdapter {
     if (!csrf || !/(?:^|;\s*)(?:__Host-dsh_session|dsh_session)=/.test(cookie)) {
       throw new LlmError('请先在云端登录账号后再使用本地会话模型。', 'CLOUD_LOGIN_REQUIRED');
     }
-    const accountProfile = await this.profile();
-    const profile = gatewayProfile(this.options.origin, { cookie, origin: this.options.origin, 'x-csrf-token': decodeURIComponent(csrf) }, accountProfile);
+    const entry = this.entry(await this.catalog(), options.model);
+    const profile = gatewayProfile(this.options.origin, { cookie, origin: this.options.origin, 'x-csrf-token': decodeURIComponent(csrf) }, entry);
     const adapter = new PiAiAdapter({ profiles: () => new Map([[CLOUD_MODEL_PROVIDER, profile]]),
       // 协议占位符不是凭证；服务器仅验证 Cookie/CSRF，不接受此 Bearer。
       resolveApiKey: async () => 'desktop-session', auth: EMPTY_AUTH });
@@ -95,13 +108,37 @@ export class CloudAccountModel extends LlmAdapter {
 
   private isEnabled(): boolean { return this.options.enabled?.() ?? true; }
 
-  private async profile(): Promise<CloudModelProfile> {
+  /** 把目录条目与选择器互查收敛到一处；未知选择器与无默认的 cloud-default 在此分流。 */
+  private entry(catalog: CloudModelCatalog, selector: string): CatalogEntry {
+    if (selector === MODEL) {
+      const profile = defaultProfile(catalog);
+      if (!profile) throw new LlmError('云端账号尚未配置默认模型或密钥。', 'CLOUD_DEFAULT_MODEL_REQUIRED');
+      return { selector, name: profile.displayName, description: `云端默认模型：${profile.defaultModel}` };
+    }
+    const account = /^account\/([^/]+)(?:\/(.+))?$/.exec(selector);
+    if (account) {
+      const profile = catalog.profiles.find(item => item.id === account[1] && item.keyConfigured);
+      const model = account[2] ?? profile?.defaultModel;
+      if (profile && model !== undefined && profile.modelIds.includes(model)) {
+        return { selector, name: `${profile.displayName} · ${model}`, description: '账号私有模型' };
+      }
+      throw new LlmError('云端模型选择无效', 'MODEL_NOT_FOUND');
+    }
+    const shared = /^shared\/([^/]+)\/(.+)$/.exec(selector);
+    if (shared) {
+      const entry = catalog.sharedModels.find(item => item.provider === shared[1] && item.model === shared[2]);
+      if (entry) return { selector, name: entry.name, description: '部署共享模型' };
+    }
+    throw new LlmError('云端模型选择无效', 'MODEL_NOT_FOUND');
+  }
+
+  private async catalog(): Promise<CloudModelCatalog> {
     const cookie = this.options.cookie();
     if (!hasSession(cookie)) throw new LlmError('请先在云端登录账号后再使用本地会话模型。', 'CLOUD_LOGIN_REQUIRED');
     const now = Date.now();
-    if (this.cached && this.cached.cookie === cookie && this.cached.expiresAt > now) return this.cached.profile;
+    if (this.cached && this.cached.cookie === cookie && this.cached.expiresAt > now) return this.cached.catalog;
     if (this.pending && this.pendingCookie === cookie) return this.pending;
-    const pending = this.fetchProfile(cookie);
+    const pending = this.fetchCatalog(cookie);
     this.pending = pending;
     this.pendingCookie = cookie;
     // 清理回调不能再生成一个未被消费的 rejected promise。
@@ -109,11 +146,11 @@ export class CloudAccountModel extends LlmAdapter {
     return pending;
   }
 
-  private clearPending(pending: Promise<CloudModelProfile>): void {
+  private clearPending(pending: Promise<CloudModelCatalog>): void {
     if (this.pending === pending) { this.pending = undefined; this.pendingCookie = undefined; }
   }
 
-  private async fetchProfile(cookie: string): Promise<CloudModelProfile> {
+  private async fetchCatalog(cookie: string): Promise<CloudModelCatalog> {
     let response: Response;
     try {
       response = await (this.options.fetch ?? globalThis.fetch)(new URL('/auth/models', this.options.origin), {
@@ -126,18 +163,41 @@ export class CloudAccountModel extends LlmAdapter {
     if (!response.ok) throw new LlmError('云端模型配置暂不可用，请稍后重试。', 'CLOUD_MODEL_UNAVAILABLE');
     let catalog: CloudModelCatalog;
     try { catalog = parseCatalog(await response.json()); } catch { throw new LlmError('云端模型配置响应无效。', 'CLOUD_MODEL_UNAVAILABLE'); }
-    const profile = catalog.defaultProfileId === null ? undefined : catalog.profiles.find(item => item.id === catalog.defaultProfileId);
-    if (!profile || !profile.keyConfigured) throw new LlmError('云端账号尚未配置默认模型或密钥。', 'CLOUD_DEFAULT_MODEL_REQUIRED');
-    this.cached = { cookie, expiresAt: Date.now() + (this.options.catalogTtlMs ?? CATALOG_TTL_MS), profile };
-    return profile;
+    this.cached = { cookie, expiresAt: Date.now() + (this.options.catalogTtlMs ?? CATALOG_TTL_MS), catalog };
+    return catalog;
   }
 }
 
-function gatewayProfile(origin: string, headers: Record<string, string>, accountProfile: CloudModelProfile): ResolvedPiAiProviderProfile {
+/** picker 条目：账号默认（无默认时占位提示）+ 每个私有 profile 的每个 modelId + 部署共享目录。 */
+function catalogEntries(catalog: CloudModelCatalog): CatalogEntry[] {
+  const profile = defaultProfile(catalog);
+  const entries: CatalogEntry[] = [{
+    selector: MODEL,
+    name: profile?.displayName ?? '云端默认模型',
+    description: profile ? `云端默认模型：${profile.defaultModel}` : '云端默认模型（账号未配置默认模型）',
+  }];
+  for (const item of catalog.profiles) {
+    if (!item.keyConfigured) continue;
+    for (const model of item.modelIds) {
+      entries.push({ selector: `account/${item.id}/${model}`, name: `${item.displayName} · ${model}`, description: '账号私有模型' });
+    }
+  }
+  for (const item of catalog.sharedModels) {
+    entries.push({ selector: `shared/${item.provider}/${item.model}`, name: item.name, description: '部署共享模型' });
+  }
+  return entries;
+}
+
+function defaultProfile(catalog: CloudModelCatalog): CloudModelProfile | undefined {
+  return catalog.defaultProfileId === null ? undefined
+    : catalog.profiles.find(item => item.id === catalog.defaultProfileId && item.keyConfigured);
+}
+
+function gatewayProfile(origin: string, headers: Record<string, string>, entry: CatalogEntry): ResolvedPiAiProviderProfile {
   const baseURL = `${origin}/auth/desktop-inference`;
-  const model: Model<'openai-completions'> = { id: MODEL, name: accountProfile.displayName, api: 'openai-completions', provider: CLOUD_MODEL_PROVIDER,
+  const model: Model<'openai-completions'> = { id: entry.selector, name: entry.name, api: 'openai-completions', provider: CLOUD_MODEL_PROVIDER,
     baseUrl: baseURL, reasoning: false, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: CONTEXT_WINDOW, maxTokens: MAX_TOKENS };
-  return { provider: CLOUD_MODEL_PROVIDER, displayName: accountProfile.displayName, api: 'openai-completions', baseURL, headers,
+  return { provider: CLOUD_MODEL_PROVIDER, displayName: entry.name, api: 'openai-completions', baseURL, headers,
     streamIdleTimeoutMs: 300000, maxRequestImageBytes: 20 * 1024 * 1024, requestImagePixelBudget: 4194304, requestImageMaxBytes: 1048576,
     retryPolicy: NO_RETRY, configuredMaxTokens: new Map(), modelErrors: new Map(),
     piProvider: createProvider({ id: CLOUD_MODEL_PROVIDER, name: '云端账号模型', baseUrl: baseURL,
@@ -154,7 +214,8 @@ function hasSession(cookie: string): boolean {
 function parseCatalog(value: unknown): CloudModelCatalog {
   if (!isRecord(value) || !Array.isArray(value.profiles)) throw new Error('INVALID_CLOUD_MODEL_CATALOG');
   const defaultProfileId = value.defaultProfileId === null || value.defaultProfileId === undefined ? null : readString(value.defaultProfileId);
-  return { defaultProfileId, profiles: value.profiles.map(parseProfile) };
+  const sharedModels = Array.isArray(value.sharedModels) ? value.sharedModels.map(parseSharedModel) : [];
+  return { defaultProfileId, sharedModels, profiles: value.profiles.map(parseProfile) };
 }
 
 function parseProfile(value: unknown): CloudModelProfile {
@@ -166,6 +227,14 @@ function parseProfile(value: unknown): CloudModelProfile {
   };
   if (!profile.id || !profile.displayName || !profile.baseUrl || !profile.defaultModel || !modelIds.includes(profile.defaultModel)) throw new Error('INVALID_CLOUD_MODEL_PROFILE');
   return profile;
+}
+
+/** provider 段不得含 `/`（否则选择器无法被服务端解析回原始条目）。 */
+function parseSharedModel(value: unknown): CloudSharedModel {
+  if (!isRecord(value) || Object.hasOwn(value, 'apiKey')) throw new Error('INVALID_CLOUD_MODEL_PROFILE');
+  const entry = { provider: readString(value.provider), model: readString(value.model), name: readString(value.name) };
+  if (!entry.provider || entry.provider.includes('/') || !entry.model || !entry.name) throw new Error('INVALID_CLOUD_MODEL_PROFILE');
+  return entry;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
