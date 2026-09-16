@@ -39,6 +39,8 @@
 import { access } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
+import { registerModelTool } from '../../tool-schema.mjs'
+
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'custom-bash'
 
@@ -143,7 +145,8 @@ export function apply(ctx, config) {
     }
   }
 
-  ctx.tools.register({
+  // 裸注册经 registerModelTool：schema 校验失败在装载期抛错（R49 教训）。
+  registerModelTool(ctx, {
     name: 'bash',
     description: [
       'Run commands in a bash shell (Git Bash on Windows)',

@@ -23,36 +23,63 @@ export const PROMPT_AUDIT_SYSTEM = `你是独立的网络安全请求审计器�
 
 const IMAGE_MEDIA_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
-/** 有界并发和总截止时间避免模型故障耗尽认证服务连接。 */
+/** 确定性失败的 finish code：凭证/配额/模型禁用/截断重试无意义，立即 fail-closed。 */
+const NON_RETRYABLE_AUDIT_CODES = new Set(["AUTH", "INVALID_REQUEST", "INVALID_CREDENTIAL", "MISSING_CREDENTIAL", "MODEL_DISABLED", "QUOTA_EXCEEDED", "NO_CODE"]);
+
+/**
+ * 只有「快失败」值得重试：传输断流、5xx、STREAM_CLOSED 这类瞬态抖动；
+ * AUDIT_TIMEOUT 已烧完整段预算（relay 正慢），确定性 code 重试也不会变。
+ */
+function retryableAuditFailure(error: unknown): boolean {
+  if (!(error instanceof Error) || error.message === "AUDIT_TIMEOUT") return false;
+  const code = /^prompt audit: finish \S+ ([A-Z0-9_]+)$/u.exec(error.message)?.[1];
+  return code === undefined || !NON_RETRYABLE_AUDIT_CODES.has(code);
+}
+
+/** 有界并发和总截止时间避免模型故障耗尽认证服务连接。瞬态失败允许一次重试。 */
 export function createPromptAuditor(model: PromptAuditModel, options: { timeoutMs: number; maxConcurrent: number }): PromptAuditor {
   let active = 0;
+  const attemptOnce = async (text: string): Promise<PromptAuditResult> => {
+    const abort = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const expired = new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => { abort.abort(); reject(new Error("AUDIT_TIMEOUT")); }, options.timeoutMs);
+      });
+      const output = await Promise.race([model.generate({ system: PROMPT_AUDIT_SYSTEM, text, signal: abort.signal }), expired]);
+      if (output.length > 256) return "unavailable";
+      // 仅兼容完整 JSON 围栏；不能从任意文本、嵌套对象或冲突判定中挑选 allow。
+      const trimmed = output.trim();
+      const fenced = /^```(?:json)?\s*\n([\s\S]*?)\n```$/iu.exec(trimmed);
+      const parsed: unknown = JSON.parse(fenced?.[1] ?? trimmed);
+      if (!isRecord(parsed) || Object.keys(parsed).length !== 1) return "unavailable";
+      return parsed.decision === "allow" || parsed.decision === "block" ? parsed.decision : "unavailable";
+    } finally {
+      if (timer) clearTimeout(timer);
+      abort.abort();
+    }
+  };
   return {
     async audit(text) {
       if (active >= options.maxConcurrent) { console.warn("[prompt-audit] prompt audit: concurrency"); return "unavailable"; }
       active += 1;
-      const abort = new AbortController();
-      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
-        const expired = new Promise<never>((_resolve, reject) => {
-          timer = setTimeout(() => { abort.abort(); reject(new Error("AUDIT_TIMEOUT")); }, options.timeoutMs);
-        });
-        const output = await Promise.race([model.generate({ system: PROMPT_AUDIT_SYSTEM, text, signal: abort.signal }), expired]);
-        if (output.length > 256) return "unavailable";
-        // 仅兼容完整 JSON 围栏；不能从任意文本、嵌套对象或冲突判定中挑选 allow。
-        const trimmed = output.trim();
-        const fenced = /^```(?:json)?\s*\n([\s\S]*?)\n```$/iu.exec(trimmed);
-        const parsed: unknown = JSON.parse(fenced?.[1] ?? trimmed);
-        if (!isRecord(parsed) || Object.keys(parsed).length !== 1) return "unavailable";
-        return parsed.decision === "allow" || parsed.decision === "block" ? parsed.decision : "unavailable";
-      } catch (error) {
-        const category = error instanceof Error && error.message === "AUDIT_TIMEOUT" ? "prompt audit: timeout"
-          : error instanceof Error && /^prompt audit: [a-z0-9 _:-]+$/iu.test(error.message)
-          ? error.message : "prompt audit: unavailable";
-        console.warn(`[prompt-audit] ${category}`);
-        return "unavailable";
+        for (let attempt = 0; ; attempt += 1) {
+          try {
+            return await attemptOnce(text);
+          } catch (error) {
+            if (attempt === 0 && retryableAuditFailure(error)) {
+              console.warn("[prompt-audit] 瞬态审计失败，重试一次");
+              continue;
+            }
+            const category = error instanceof Error && error.message === "AUDIT_TIMEOUT" ? "prompt audit: timeout"
+              : error instanceof Error && /^prompt audit: [a-z0-9 _:-]+$/iu.test(error.message)
+              ? error.message : "prompt audit: unavailable";
+            console.warn(`[prompt-audit] ${category}`);
+            return "unavailable";
+          }
+        }
       } finally {
-        if (timer) clearTimeout(timer);
-        abort.abort();
         active -= 1;
       }
     },

@@ -671,4 +671,22 @@ describe("官方 dsh Web 组合", () => {
       agentPresetId: "lark-lightweight",
     });
   });
+
+  it("两条生产模型路的 retryPolicy 都覆盖 STREAM_CLOSED 上游断流", () => {
+    // llm-retry 已随 dsh-base 挂载，但官方默认可重试集合不含
+    // STREAM_CLOSED——relay 不发 [DONE] 的断流没有它整轮即败。
+    const rows = overlayRows("packages/bundle/worker/cordis.patch.yml");
+    expect(rows).toContainEqual(expect.objectContaining({
+      id: "lark-deepseek-routing",
+      config: expect.objectContaining({
+        retryPolicy: expect.objectContaining({
+          mode: "normal",
+          retryableCodes: expect.arrayContaining(["EMPTY_RESPONSE", "TRANSPORT", "STREAM_CLOSED"]),
+        }),
+      }),
+    }));
+    const settings = readFileSync(repositoryPath("infra/linux/config/settings.production.yaml"), "utf8");
+    // deepseek-official 与 pi-ai 的 openai profile 两处都显式补齐。
+    expect(settings.match(/STREAM_CLOSED/gu)?.length).toBeGreaterThanOrEqual(2);
+  });
 });

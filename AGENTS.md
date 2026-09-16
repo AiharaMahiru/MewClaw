@@ -57,6 +57,22 @@
 
 ## 已验证经验
 
+### 裸 tools.register 的 parameters 必须是 object 根 JSON Schema（R49 事故）
+
+- **根因**：`schemaOf` 原样透传 `definition.parameters`；字段表只在 `defineTool` 内编译。preset `.mjs` 直接传字段表 → wire 缺根 `type` → provider 严格校验以 `type: null` 400 拒掉整轮（PTC 模式只发 `run_code` 会长期掩盖，native 模式全量上线才暴露）。
+- **规则**：`.mjs` 插件一律经 `packages/bundle/web/tool-schema.mjs` 的 `registerModelTool` 注册（装载期断言，boot-check 可拦）；`.ts` 禁止 `tools.register({...})` 内联字面量（走 `defineTool` 或命名引用）。
+- **门禁**：`scripts/verify-tool-schemas.mjs`（在 `verify` 链内）做静态规则；`tests/agent-tool-schemas.test.ts` 实际装载全部随包 `.mjs` 插件校验注册结果，新插件自动覆盖。
+
+### 上游 STREAM_CLOSED 断流需显式纳入 retryPolicy
+
+- `dsh-llm-retry` 随 dsh-base 挂载，但默认 `retryableCodes`（`EMPTY_RESPONSE/RATE_LIMIT/SERVER/TIMEOUT/TRANSPORT`）**不含 `STREAM_CLOSED`**（relay 不发 `[DONE]` 的断流是独立 code）——必须在 provider 适配器 `retryPolicy` 显式补齐，否则整轮即败。worker patch 的 `lark-deepseek-routing` 与 `settings.production.yaml` 的 `llm-deepseek`、pi-ai `openai` profile 均已配置。
+- 直连 `ctx.llm.stream()` 的路径（如 prompt 审计模型）不吃 llm-retry——重试只发生在 agent loop 的 `agent/request-error` 扩展点；此类调用方需自有有界重试（见 `createPromptAuditor`）。
+
+### 第三方 SDK 长连接的 teardown 后残留错误
+
+- 触发信号：SDK 自持重连循环的组件（如 `@larksuiteoapi/node-sdk` WSClient）在握手超时路径 `removeAllListeners` + `terminate` 后，pre-open 资源仍可发出无监听 `'error'` 事件 → `uncaughtException` 杀进程。
+- 规则：进程级兜底只能是**精确匹配**（错误文案 + 栈归属包名）的过滤式 handler，命中记 warn 吞掉、未命中保持 `exit(1)`；必须经 `ctx.effect` 在 dispose 时摘除。禁止宽泛吞错。参考实现 `packages/lark/lark-ws/src/index.ts` + `isLarkWsHandshakeStrayError`。
+
 ### Windows OpenSSH 在 VPS banner 阶段触发 WSASendCB
 
 - **触发信号**：目标 SSH 端口可建立 TCP，但 Windows 系统 `ssh.exe` 在发送 client identification 后报 `WSASendCB - ERROR: broken assumption`，并以 `banner exchange ... eother` 退出。
