@@ -58,6 +58,10 @@
   disabled: false
 - id: web-ui-skill-explorer
   disabled: false
+# 官方工作区文件树与 dsh-better-sidebar 的 Files 页签功能重复（后者含
+# 搜索/上传/Git/终端，能力更全），只保留第三方实现。
+- id: ui-sidebar-files
+  disabled: true
 
 # 外部控制、SSH、实验 preset 和 pet 不属于默认 full/OCI roster。
 - id: web-ui-remote-web-ui
