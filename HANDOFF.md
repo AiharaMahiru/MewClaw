@@ -93,7 +93,7 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 
 - 本轮改动基于 `origin/desktop@91bd7e6`，叠加远端 desktop-dev 合并（`de12683`）、无缝切换、同步边界修正、本地模式 picker 云端同构布局接入、右坞开关去重移植、测试和文档更新。合并提交 `f48f39c`、`3b527c7`；edge typecheck 干净、151/151 edge 测试通过。
 - **品牌改名已进候选**：候选 `mewclaw-brand` workspace 的包名/插件名/客户端模块 id 已从 `dsh-lark-atw-brand` 改为 `dsh-lark-mewclaw-brand-desktop`（桌面变体语义，候选只保留这一个品牌 workspace）；`verify-package.mjs` 的 ASAR 断言路径同步更新。上述产物哈希即改名后的构建。
-- `desktop` 远端现为 `91bd7e6`（与合并基线一致），`desktop-dev` 推送后核验为待更新（本轮 Release 的源码基线为 `f0aa6e2` + docs 提交）（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成；注意 origin 的 fetch refspec 只覆盖 `desktop`，desktop-dev 需显式 `git fetch origin +refs/heads/desktop-dev:refs/remotes/origin/desktop-dev`）。
+- `desktop` 远端现为 `c9a1971`（较合并基线 `91bd7e6` 又前进，本 Release 不含），`desktop-dev` 推送后核验为 `d75627f`（本轮 Release 的源码基线 `f0aa6e2` + docs 提交）（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成；注意 origin 的 fetch refspec 只覆盖 `desktop`，desktop-dev 需显式 `git fetch origin +refs/heads/desktop-dev:refs/remotes/origin/desktop-dev`）。
 - 后续若继续修改源码或交接文档，完成提交后重新执行：
 
   ```text
