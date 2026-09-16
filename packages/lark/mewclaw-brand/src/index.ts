@@ -22,13 +22,23 @@ const HERO_STYLE = `.mewclaw-hero-brand{display:inline-flex;align-items:center;g
 // 官方前端无移动断点：侧栏列在手机上是侧推挤压而非覆盖。利用 CSS Module 稳定后缀
 // （<hash>_<name>，重建仅哈希变化）把侧栏改为 fixed 覆盖；侧栏脱离 grid 后
 // centerCol 会掉进 56px 的第一轨，需 grid-column:1/-1 跨全行。移动端默认收起
-// 整条侧栏列（含 55px 图标栏），由注入的悬浮菜单键开合，展开时带暗色遮罩。
-const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}[class*="_centerCol"]{grid-column:1/-1}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}}
-.mewclaw-rail-fab{display:none}
-@media(max-width:768px){.mewclaw-rail-fab{display:inline-flex}}`;
-// 移动端侧栏开合控制：往官方顶栏开关簇（_toggleCluster）前置一个同款的菜单键；
-// 点开直接展开会话抽屉，点遮罩/菜单键收起并隐藏整条侧栏列。脚本仅 DOM 开合，
-// 不读凭证、不发请求；桌面视口由 matchMedia 直接短路。
+// 整条侧栏列（含 55px 图标栏），由左缘滑动手势开合，展开时带暗色遮罩。
+// 桌面端侧栏背景是半透明（覆盖式抽屉会透出下层会话头部），移动端改为不透明——
+// 等优先级规则后被官方样式表覆盖，需 !important。
+// 右坞开关去重（全视口）：会话头部自带 "Open right sidebar" 与坞簇
+// "Expand sidebar" 是同一坞的两个入口——隐藏前者，坞簇开关作为默认右侧栏按钮。
+const DEDUPE_STYLE = `[aria-label="Open right sidebar"]{display:none!important}`;
+// 会话头部顶栏在手机上溢出：隐藏桌面专属控件——外部编辑器入口、底部坞开关
+// （移动端无内容）、标题行内的模式徽标+云端位置选择器（"Standard mode ☁️云端"——
+// 移动 Web 只有云端）。顶栏仅剩面包屑、More actions 与坞簇 Expand sidebar。
+const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)!important}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}[class*="_centerCol"]{grid-column:1/-1}[class*="_titleRow"]{padding-left:48px!important}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}[aria-label="Open workspace in Cursor"],[aria-label="Choose an app to open in"],[aria-label="Expand bottom panel"],[class*="_titleRow"] [class*="_headerActions"]{display:none!important}}
+.mewclaw-rail-edge,.mewclaw-rail-fab{display:none}
+@media(max-width:768px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}.mewclaw-rail-fab{display:inline-flex;position:fixed;top:10px;left:10px;z-index:108;width:36px;height:36px;align-items:center;justify-content:center;border:0;border-radius:10px;background:transparent;color:inherit;cursor:pointer;padding:0}}`;
+// 移动端侧栏开合控制：左上角固定菜单键 + 左缘 16px 起笔右滑展开完整会话抽屉，
+// 抽屉上左滑或点遮罩收起并隐藏整条侧栏列。手势用 TouchEvent 而非 PointerEvent——
+// 左缘右滑会被浏览器声明为系统手势导致 pointermove 断流，touchmove 不受影响；
+// 起笔判定按触点坐标（热区元素可能被下层输入控件遮挡）。脚本仅 DOM 开合，
+// 不读凭证、不发请求；桌面视口 matchMedia 短路。
 const MOBILE_RAIL_SCRIPT = `<script data-mewclaw-rail>(function(){
 if(!matchMedia("(max-width:768px)").matches)return;
 var OPEN="mewclaw-rail-open";
@@ -36,18 +46,22 @@ function col(){return document.querySelector('[class*="_sidebarCol"]')}
 function toggleBtn(){var c=col();return c&&c.querySelector('[class*="_toggle"]')}
 function open(){document.documentElement.classList.add(OPEN);var t=toggleBtn();if(t&&t.getAttribute("aria-label")==="Open sidebar")t.click()}
 function close(){var c=col();if(c&&c.getBoundingClientRect().width>100){var t=toggleBtn();if(t)t.click()}document.documentElement.classList.remove(OPEN)}
-var fab;
-function ensure(){var host=document.querySelector('[class*="_toggleCluster"]');if(!host)return;
-if(fab&&fab.isConnected&&fab.parentElement===host)return;
-fab=document.createElement("button");fab.type="button";fab.setAttribute("aria-label","Menu");
-fab.className=(host.querySelector("button")?.className||"")+" mewclaw-rail-fab";
+var fab=document.createElement("button");fab.type="button";fab.setAttribute("aria-label","Menu");
+fab.className="mewclaw-rail-fab";
 fab.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
-fab.addEventListener("click",function(e){e.stopPropagation();document.documentElement.classList.contains(OPEN)?close():open()});
-host.prepend(fab)}
-new MutationObserver(ensure).observe(document.body,{childList:true,subtree:true});
-document.addEventListener("pointerdown",function(e){if(!document.documentElement.classList.contains(OPEN))return;var c=col();if(c&&c.contains(e.target))return;if(fab&&fab.contains(e.target))return;close()},true);
+fab.addEventListener("click",function(){document.documentElement.classList.contains(OPEN)?close():open()});
+document.body.appendChild(fab);
+var edge=document.createElement("div");edge.className="mewclaw-rail-edge";document.body.appendChild(edge);
+var sx=0,sy=0,track="";
+document.addEventListener("touchstart",function(e){var t=e.touches[0];if(!t)return;
+if(document.documentElement.classList.contains(OPEN)){var c=col();if(c&&c.contains(e.target)){sx=t.clientX;sy=t.clientY;track="close"}}
+else if(edge===e.target||t.clientX<=16){sx=t.clientX;sy=t.clientY;track="open"}},true);
+document.addEventListener("touchmove",function(e){if(!track)return;var t=e.touches[0];if(!t)return;var dx=t.clientX-sx,dy=t.clientY-sy;
+if(track==="open"&&dx>56&&dx>Math.abs(dy)*1.5){track="";open()}
+else if(track==="close"&&dx<-56&&-dx>Math.abs(dy)*1.5){track="";close()}},true);
+["touchend","touchcancel"].forEach(function(t){document.addEventListener(t,function(){track=""},true)});
+document.addEventListener("pointerdown",function(e){if(!document.documentElement.classList.contains(OPEN))return;var c=col();if(c&&c.contains(e.target))return;if(fab.contains(e.target))return;close()},true);
 document.addEventListener("click",function(e){var t=toggleBtn();if(t&&(t===e.target||t.contains(e.target))&&t.getAttribute("aria-label")==="Collapse sidebar")setTimeout(function(){var c=col();if(c&&c.getBoundingClientRect().width<100)document.documentElement.classList.remove(OPEN)},350)},true);
-ensure();
 })()</script>`;
 const BOOT_STYLE = `html.mewclaw-boot-seen .mewclaw-boot{display:none}.mewclaw-boot{position:fixed;z-index:2147483647;inset:0;display:grid;place-items:center;pointer-events:none;background:#f5f5f7;color:#181717;animation:mewclaw-boot-away .32s cubic-bezier(.4,0,1,1) 1.05s forwards}.mewclaw-boot-inner{display:grid;justify-items:center;gap:24px;animation:mewclaw-boot-arrive .52s cubic-bezier(.22,1,.36,1) both}.mewclaw-boot-logo{width:88px;height:88px;border-radius:50%;filter:drop-shadow(0 12px 24px rgb(0 0 0/.12))}.mewclaw-boot-track{width:112px;height:3px;overflow:hidden;border-radius:999px;background:rgb(24 23 23/.12)}.mewclaw-boot-progress{display:block;width:42%;height:100%;border-radius:inherit;background:currentColor;animation:mewclaw-boot-progress .82s cubic-bezier(.2,.8,.2,1) .14s both}@keyframes mewclaw-boot-arrive{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}@keyframes mewclaw-boot-progress{from{transform:translateX(-110%)}to{transform:translateX(250%)}}@keyframes mewclaw-boot-away{to{opacity:0;visibility:hidden}}body[data-ds-dark-theme] .mewclaw-boot{background:#18181a;color:#fff}@media(prefers-color-scheme:dark){html:not([data-ds-theme=light]) .mewclaw-boot{background:#18181a;color:#fff}}@media(prefers-reduced-motion:reduce){.mewclaw-boot,.mewclaw-boot-inner,.mewclaw-boot-progress{animation:none}.mewclaw-boot{opacity:0;visibility:hidden}}`;
 const BOOT_MARKUP = `<div class="mewclaw-boot" aria-hidden="true"><div class="mewclaw-boot-inner"><img class="mewclaw-boot-logo" src="${FAVICON_PATH}" alt=""><span class="mewclaw-boot-track"><span class="mewclaw-boot-progress"></span></span></div></div>`;
@@ -63,7 +77,7 @@ export function apply(ctx: Context, options?: MewClawBrandOptions): void {
     .replace(/<title>[^<]*<\/title>/u, `<title>${PRODUCT_NAME}</title>`)
     .replace(/(<link\b[^>]*rel="icon"[^>]*href=")[^"]*(")/u, `$1${FAVICON_PATH}$2`)
     .replace(/(<link\b[^>]*rel="manifest"[^>]*href=")[^"]*(")/u, `$1${MANIFEST_PATH}$2`)
-    .replace("</head>", `${BOOT_HEAD_SCRIPT}<style data-mewclaw-brand>${BRAND_STYLE}${STROKE_ONLY_STYLE}${HERO_STYLE}${mobileStyle}${BOOT_STYLE}</style></head>`)
+    .replace("</head>", `${BOOT_HEAD_SCRIPT}<style data-mewclaw-brand>${BRAND_STYLE}${STROKE_ONLY_STYLE}${HERO_STYLE}${DEDUPE_STYLE}${mobileStyle}${BOOT_STYLE}</style></head>`)
     .replace(/<body([^>]*)>/u, `<body$1>${BOOT_MARKUP}`)
     .replace("</body>", `${options?.mobile === false ? "" : MOBILE_RAIL_SCRIPT}${BOOT_END_SCRIPT}</body>`)));
   ctx.effect(() => ctx.webServer.register({ kind: "exact", path: FAVICON_PATH, handler: (_req, res) => respond(res, "image/svg+xml; charset=utf-8", FAVICON_RESPONSE) }));
