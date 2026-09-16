@@ -24,9 +24,9 @@ D:\AI\dsh\MewClaw-desktop-candidate\release\MewClaw-1.0.0-win-x64
 
 | 产物 | 字节 | SHA-256 |
 | --- | ---: | --- |
-| `MewClaw-1.0.0-win-x64-Portable.exe` | 142873483 | `111a9b5486f9ee966be23ca86ffdbe45902c302461a4e1e7c99e4dc31eafdf18` |
-| `MewClaw-1.0.0-win-x64-Setup.exe` | 143117423 | `c409eb5b58909c9b630279b785481a343db2c0d3387fb25a87387cec3a4ff3fc` |
-| `MewClaw-1.0.0-win-x64.zip` | 187031889 | `82c9c7e66f4b69f5813c7fd7a3538af45ef525272a0244e5e7fe558558db3841` |
+| `MewClaw-1.0.0-win-x64-Portable.exe` | 142872719 | `2b9289a4329c6a92ab0f2b546f10d2a4cb5d5da217fda4746e17dae623576176` |
+| `MewClaw-1.0.0-win-x64-Setup.exe` | 143116657 | `398abac439cfa29d8eaa2af0d0a82b5b87e2a0bda5493a24c6166ba70dbeb5e5` |
+| `MewClaw-1.0.0-win-x64.zip` | 187034469 | `92f5cb9c7944d1bfed78b53fbd08a718185c29ad3a4a8b398348395555736bbf` |
 
 产物未签名。`win-unpacked` 与上述安装包位于同一 Release 目录，必须一起保留用于目录模式验收。
 
@@ -46,7 +46,7 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 当前结果：
 
 - 候选 DSH 依赖、冻结 `package-lock.json` 和 overrides 统一为 `0.1.5-rc.2`；官方 DSH 包未修改。
-- `verify-workspace`：22 个测试文件、68 个测试通过，输出 `WORKSPACE_OFFLINE_VERIFIED`。
+- `verify-workspace`：22 个测试文件、69 个测试通过，输出 `WORKSPACE_OFFLINE_VERIFIED`。
 - `verify-package`：`ASAR_ENTRYPOINTS_OK`、`OFFICIAL_RUNTIME_UNCHANGED 731`、`NATIVE_SPAWN_OK CLOUD_PROVIDER_IMPORT_OK`、4 个 Runtime smoke、`ZIP_PAYLOAD_MATCHES_VERIFIED_APP`、`MEWCLAW_PACKAGE_OK`。
 - Release UI 冒烟：`DIRECTORY_COMPOSER_EDITABLE`、`RENDERER_ERRORS 0`、`LOCATION_SWITCH_OK local-to-cloud`、`LOCATION_SWITCH_OK cloud-to-local`、`LOCAL_UI_OK advanced Release`。
 - 候选改名后曾发现 Windows workspace Junction 指向旧 r4 路径；已在最终目录重新运行 npm 安装重建 Junction，并重新通过上述门禁。
@@ -75,7 +75,7 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 
 ### 1. 本地模式模型选项——已完成（服务端 R33 + 桌面端 picker 均已接入）
 
-**状态更新（2026-09-15，接入完成）**：主线 `master@38795d2` 把 Edge `desktop-inference` 扩展为三形态选择器、`/auth/models` 附 `sharedModels` 目录（生产 `R33-desktop-inference-20260915` 已上线）。桌面端 picker 接入已完成：`apps/desktop/plugins/cloud/src/cloud-model.ts` 改为缓存整个 `/auth/models` 目录并展开三类条目——`cloud-default`（仅在默认 profile 存在时列出）、`account/<profileId>/<model>`（每个 keyConfigured profile 的全部 modelIds，显示名 `<displayName> · <model>`）、`shared/<provider>/<model>`（显示名用服务端 `name`）。`resolveEntry` 本地校验选择器（未知 → `MODEL_NOT_FOUND`，不发推理请求）；`stream` 把选择器原样透传为 `model` 字段，密钥仍全部在服务端。目录缓存 TTL 5s，`/auth/models` 非 GET 变更即失效。测试 11 例覆盖三形态展开、选择器透传、未知选择器拒绝、API Key 拒收。**修正（同日）**：`cloud-default` 占位条目曾无条件列在首位，无默认 profile 的账号会被默认选取命中报 `CLOUD_DEFAULT_MODEL_REQUIRED`——现改为仅在默认 profile 存在时列出；显式解析 `cloud-default` 仍返回明确错误。
+**状态更新（2026-09-15，接入完成）**：主线 `master@38795d2` 把 Edge `desktop-inference` 扩展为三形态选择器、`/auth/models` 附 `sharedModels` 目录（生产 `R33-desktop-inference-20260915` 已上线）。桌面端 picker 接入已完成并与云端 Worker 布局同构：`apps/desktop/plugins/cloud/src/cloud-model.ts` 初始注册 `mewclaw-cloud` 兼容桥（不列 picker 条目，仅保证旧的 `mewclaw-cloud/*` 已存选择可解析），拉取 `/auth/models` 后经 `AdapterRegistrationHandle.replace` 原子替换路由——`web-private`（"我的模型"，仅列默认 profile 的 `defaultModel`，与云端"只路由默认"语义一致）+ 按 `sharedModels[].provider` 动态注册的共享 provider（如 `deepseek-official`，列原始 model id + 服务端 `name`）；已被本机其他适配器占用的 provider id 跳过。本地 `(provider, model)` 选择器在 `stream` 时翻译为服务端选择器：`web-private/<defaultModel>` → `cloud-default`，共享 → `shared/<provider>/<model>`；`account/<pid>/<model>` 透传。未知选择器本地拒绝（`MODEL_NOT_FOUND`），不发推理请求；密钥仍全部在服务端。目录缓存 TTL 5s，`/auth/models` 非 GET 变更即失效。会话持久化的 provider/model 标识与云端模式一致，两种模式间切换不需要迁移已存选择。**修正（同日）**：`cloud-default` 占位条目曾无条件列在首位，无默认 profile 的账号会被默认选取命中报 `CLOUD_DEFAULT_MODEL_REQUIRED`——现改为仅在默认 profile 存在时列出；显式解析 `cloud-default`（旧会话残留选择）仍返回明确错误。测试 12 例覆盖三形态展开、动态 provider 路由、选择器透传、未知选择器拒绝、API Key 拒收。
 
 **仍确认的事实**（picker 数据源结构不变）：本地 picker 的选项来自本机 `session/modelCatalog` = 已注册 llm 适配器；`mewclaw-cloud` 桥接适配器负责把账号侧目录投影为本地模型条目。
 
@@ -91,7 +91,7 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 
 ## 推送状态与限制
 
-- 本轮改动基于 `origin/desktop@4719c46`，叠加远端 desktop-dev 合并（`de12683`）、无缝切换、同步边界修正、本地模式三形态模型 picker 接入、测试和文档更新。合并提交 `f48f39c`；edge typecheck 干净、151/151 edge 测试通过。
+- 本轮改动基于 `origin/desktop@4719c46`，叠加远端 desktop-dev 合并（`de12683`）、无缝切换、同步边界修正、本地模式 picker 云端同构布局接入、测试和文档更新。合并提交 `f48f39c`；edge typecheck 干净、151/151 edge 测试通过。
 - **品牌改名已进候选**：候选 `mewclaw-brand` workspace 的包名/插件名/客户端模块 id 已从 `dsh-lark-atw-brand` 改为 `dsh-lark-mewclaw-brand-desktop`（桌面变体语义，候选只保留这一个品牌 workspace）；`verify-package.mjs` 的 ASAR 断言路径同步更新。上述产物哈希即改名后的构建。
 - `desktop` 远端现为 `4719c46`，`desktop-dev` 推送后重新核验 `git ls-remote`（HTTPS 443 不通时经 mewclaw-vps SSH SOCKS 代理完成；注意 origin 的 fetch refspec 只覆盖 `desktop`，desktop-dev 需显式 `git fetch origin +refs/heads/desktop-dev:refs/remotes/origin/desktop-dev`）。
 - 后续若继续修改源码或交接文档，完成提交后重新执行：
@@ -101,6 +101,6 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
   git ls-remote origin refs/heads/desktop-dev refs/heads/desktop
   ```
 
-- Auth Edge 已部署（R33，生产 `chat.rwr.ink`）；桌面端真实模型请求与 picker 接入验收属于下一次候选构建范围。
+- Auth Edge 已部署（R33，生产 `chat.rwr.ink`）；上述产物哈希即为 picker 云端同构布局接入后的构建，真实账号的模型请求验收可直接用该包进行。
 
 

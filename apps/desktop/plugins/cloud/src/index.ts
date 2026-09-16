@@ -155,13 +155,20 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
       const adapter = new CloudAccountModel({ origin: cloudOrigin(config.cloudOrigin).origin,
         cookie: () => this.accountCookie, enabled: () => this.location.location === 'local' });
       this.cloudModel = adapter;
-      local.effect(() => local.llm.registerAdapter([CLOUD_MODEL_PROVIDER], adapter));
+      local.effect(() => {
+        const handle = local.llm.registerAdapter([CLOUD_MODEL_PROVIDER], adapter);
+        adapter.bindRoutes(handle, () => local.llm.listProviders().map(item => item.id));
+        return handle;
+      });
       let cloudSelection = this.location.location === 'local' ? local.agentDefaultModel.currentSelection() : undefined;
       let transition = Promise.resolve();
       const apply = async (next: 'cloud' | 'local') => {
         if (next === 'local') {
           if (!cloudSelection) cloudSelection = local.agentDefaultModel.currentSelection();
-          await local.agentDefaultModel.saveSelection({ provider: CLOUD_MODEL_PROVIDER, model: 'cloud-default' });
+          const catalog = await adapter.catalogSnapshot();
+          await local.agentDefaultModel.saveSelection(catalog
+            ? adapter.defaultSelection(catalog)
+            : { provider: CLOUD_MODEL_PROVIDER, model: 'cloud-default' });
         } else if (cloudSelection) {
           const restore = cloudSelection;
           cloudSelection = undefined;

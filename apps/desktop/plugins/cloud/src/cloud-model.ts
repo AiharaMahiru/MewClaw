@@ -1,11 +1,14 @@
 /** 本地会话的云端模型桥接；配置由云端账号决定，API Key 始终留在服务器。 */
 import { createProvider, type Model } from '@earendil-works/pi-ai';
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy';
-import { LlmAdapter, LlmError, type GenerateOptions, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm';
+import { LlmAdapter, LlmError, type GenerateOptions, type LlmProviderInfo, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm';
 import { PiAiAdapter, type PiAiAdapterOptions, type ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai';
+import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm';
 
 export const CLOUD_MODEL_PROVIDER = 'mewclaw-cloud';
-const MODEL = 'cloud-default';
+/** 与云端 Worker 相同的 provider id：会话选择（provider/model）在两种模式下完全一致。 */
+export const PRIVATE_MODEL_PROVIDER = 'web-private';
+const LEGACY_DEFAULT = 'cloud-default';
 const CONTEXT_WINDOW = 262144;
 const MAX_TOKENS = 32768;
 const CATALOG_TTL_MS = 5000;
@@ -14,6 +17,7 @@ const EMPTY_AUTH: PiAiAdapterOptions['auth'] = {
   credentials: { async read() { return undefined; }, async list() { return []; }, async modify(_id, fn) { return fn(undefined); }, async delete() {} },
   authContext: { async env() { return undefined; }, async fileExists() { return false; } },
 };
+const SHARED_PROVIDER_NAMES: Record<string, string> = { 'deepseek-official': 'DeepSeek', deepseek: 'DeepSeek', openai: 'OpenAI' };
 
 interface CloudModelProfile {
   id: string;
@@ -36,8 +40,9 @@ interface CloudModelCatalog {
   defaultProfileId: string | null;
 }
 
-/** `model` 字段是服务端路由选择器：cloud-default / account/<pid>[/<model>] / shared/<provider>/<model>。 */
+/** picker 展示的模型 id 与服务端路由选择器解耦：id 与云端同形，selector 发给 Edge。 */
 interface CatalogEntry {
+  id: string;
   selector: string;
   name: string;
   description: string;
@@ -53,6 +58,9 @@ export class CloudAccountModel extends LlmAdapter {
   private cached: CachedCatalog | undefined;
   private pending: Promise<CloudModelCatalog> | undefined;
   private pendingCookie: string | undefined;
+  private routes: string[] = [CLOUD_MODEL_PROVIDER];
+  private registration: AdapterRegistrationHandle | undefined;
+  private registeredProviders: (() => string[]) | undefined;
 
   constructor(private readonly options: {
     origin: string;
@@ -61,20 +69,92 @@ export class CloudAccountModel extends LlmAdapter {
     fetch?: typeof globalThis.fetch;
     catalogTtlMs?: number;
   }) { super(); }
-  override providerInfo() { return { id: CLOUD_MODEL_PROVIDER, name: '云端账号模型桥接' }; }
+
+  override providerInfo(provider: string): LlmProviderInfo {
+    if (provider === PRIVATE_MODEL_PROVIDER) return { id: provider, name: '我的模型' };
+    if (provider === CLOUD_MODEL_PROVIDER) return { id: provider, name: '云端账号模型桥接' };
+    return { id: provider, name: SHARED_PROVIDER_NAMES[provider] ?? provider };
+  }
+
+  /** 由 index.ts 接线：目录刷新后把注册路由原子替换为云端同构的 provider 集。 */
+  bindRoutes(registration: AdapterRegistrationHandle, registeredProviders: () => string[]): void {
+    this.registration = registration;
+    this.registeredProviders = registeredProviders;
+  }
+
   invalidateCatalog(): void { this.cached = undefined; }
-  override async listModels() {
-    if (!this.isEnabled()) return [];
-    try { return catalogEntries(await this.catalog()).map(entry => this.info(entry)); } catch { return []; }
+
+  /** 目标路由集：web-private + 目录里的共享 provider + mewclaw-cloud（仅解析兼容，不列条目）。 */
+  private desiredRoutes(catalog: CloudModelCatalog): string[] {
+    return [PRIVATE_MODEL_PROVIDER, ...new Set(catalog.sharedModels.map(item => item.provider)), CLOUD_MODEL_PROVIDER];
   }
-  override async resolveModel(_provider: string, model: string): Promise<LlmResolvedModelInfo> {
+
+  /** 目录到达后原子换路由；与本地既有 provider 冲突的 id 跳过（共享条目不挤占本机适配器）。 */
+  private syncRoutes(catalog: CloudModelCatalog): void {
+    if (!this.registration || !this.registeredProviders) return;
+    const held = new Set(this.routes);
+    const taken = new Set(this.registeredProviders().filter(id => !held.has(id)));
+    const next = this.desiredRoutes(catalog).filter(id => id === CLOUD_MODEL_PROVIDER || !taken.has(id));
+    if (next.length === this.routes.length && next.every((id, index) => id === this.routes[index])) return;
+    try { this.registration.replace(next); this.routes = next; } catch { /* 保留旧路由 */ }
+  }
+
+  override async listModels(provider: string) {
+    if (!this.isEnabled() || !this.routes.includes(provider)) return [];
+    // 初始只有 mewclaw-cloud 一路由：对它的 listModels 是目录拉取与路由扩展的引导点。
+    let catalog: CloudModelCatalog;
+    try { catalog = await this.catalog(); } catch { return []; }
+    if (provider === CLOUD_MODEL_PROVIDER) return [];
+    return provider === PRIVATE_MODEL_PROVIDER ? privateEntries(catalog) : sharedEntries(catalog, provider);
+  }
+
+  override async resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
     if (!this.isEnabled()) throw new LlmError('当前模式未启用云端账号模型桥接。', 'MODEL_NOT_FOUND');
-    return this.info(this.entry(await this.catalog(), model));
+    return this.info(provider, this.resolve(provider, model, await this.catalog()));
   }
-  private info(entry: CatalogEntry): LlmResolvedModelInfo {
+
+  /** 会话持久化的 (provider, model) → 服务端路由选择器；web-private 仅认默认 profile 的默认模型。 */
+  private resolve(provider: string, model: string, catalog: CloudModelCatalog): CatalogEntry {
+    if (provider === CLOUD_MODEL_PROVIDER) return this.legacy(catalog, model);
+    if (provider === PRIVATE_MODEL_PROVIDER) {
+      const profile = defaultProfile(catalog);
+      if (!profile) throw new LlmError('云端账号尚未配置默认模型或密钥。', 'CLOUD_DEFAULT_MODEL_REQUIRED');
+      if (model !== profile.defaultModel) throw new LlmError('云端模型选择无效', 'MODEL_NOT_FOUND');
+      return { id: model, selector: LEGACY_DEFAULT, name: model, description: `账号默认模型：${profile.displayName}` };
+    }
+    const shared = catalog.sharedModels.find(item => item.provider === provider && item.model === model);
+    if (shared) return { id: model, selector: `shared/${provider}/${model}`, name: shared.name, description: '部署共享模型' };
+    throw new LlmError('云端模型选择无效', 'MODEL_NOT_FOUND');
+  }
+
+  /** 旧版 mewclaw-cloud/* 持久化选择的兼容解析：选择器即模型 id。 */
+  private legacy(catalog: CloudModelCatalog, selector: string): CatalogEntry {
+    if (selector === LEGACY_DEFAULT) {
+      const profile = defaultProfile(catalog);
+      if (!profile) throw new LlmError('云端账号尚未配置默认模型或密钥。', 'CLOUD_DEFAULT_MODEL_REQUIRED');
+      return { id: selector, selector, name: profile.displayName, description: `云端默认模型：${profile.defaultModel}` };
+    }
+    const account = /^account\/([^/]+)(?:\/(.+))?$/.exec(selector);
+    if (account) {
+      const profile = catalog.profiles.find(item => item.id === account[1] && item.keyConfigured);
+      const model = account[2] ?? profile?.defaultModel;
+      if (profile && model !== undefined && profile.modelIds.includes(model)) {
+        return { id: selector, selector, name: `${profile.displayName} · ${model}`, description: '账号私有模型' };
+      }
+      throw new LlmError('云端模型选择无效', 'MODEL_NOT_FOUND');
+    }
+    const shared = /^shared\/([^/]+)\/(.+)$/.exec(selector);
+    if (shared) {
+      const entry = catalog.sharedModels.find(item => item.provider === shared[1] && item.model === shared[2]);
+      if (entry) return { id: selector, selector, name: entry.name, description: '部署共享模型' };
+    }
+    throw new LlmError('云端模型选择无效', 'MODEL_NOT_FOUND');
+  }
+
+  private info(provider: string, entry: CatalogEntry): LlmResolvedModelInfo {
     return {
-      provider: CLOUD_MODEL_PROVIDER,
-      id: entry.selector,
+      provider,
+      id: entry.id,
       name: entry.name,
       description: entry.description,
       inputModalities: ['text'],
@@ -82,6 +162,7 @@ export class CloudAccountModel extends LlmAdapter {
       defaultMaxTokens: MAX_TOKENS,
     };
   }
+
   override async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     if (!this.isEnabled()) {
       yield { type: 'finish', reason: { kind: 'error', failure: { code: 'CLOUD_MODEL_DISABLED', message: '当前模式未启用云端账号模型桥接。' } } };
@@ -92,13 +173,13 @@ export class CloudAccountModel extends LlmAdapter {
     if (!csrf || !/(?:^|;\s*)(?:__Host-dsh_session|dsh_session)=/.test(cookie)) {
       throw new LlmError('请先在云端登录账号后再使用本地会话模型。', 'CLOUD_LOGIN_REQUIRED');
     }
-    const entry = this.entry(await this.catalog(), options.model);
+    const entry = this.resolve(options.provider, options.model, await this.catalog());
     const profile = gatewayProfile(this.options.origin, { cookie, origin: this.options.origin, 'x-csrf-token': decodeURIComponent(csrf) }, entry);
     const adapter = new PiAiAdapter({ profiles: () => new Map([[CLOUD_MODEL_PROVIDER, profile]]),
       // 协议占位符不是凭证；服务器仅验证 Cookie/CSRF，不接受此 Bearer。
       resolveApiKey: async () => 'desktop-session', auth: EMPTY_AUTH });
     try {
-      for await (const chunk of adapter.stream(options)) {
+      for await (const chunk of adapter.stream({ ...options, provider: CLOUD_MODEL_PROVIDER, model: entry.selector })) {
         if (chunk.type === 'finish' && chunk.reason.kind === 'error') {
           yield { ...chunk, reason: { kind: 'error', failure: { code: 'CLOUD_INFERENCE_UNAVAILABLE', message: '云端模型推理不可用，请检查登录、默认模型及云端推理服务。' } } };
         } else yield chunk;
@@ -108,28 +189,18 @@ export class CloudAccountModel extends LlmAdapter {
 
   private isEnabled(): boolean { return this.options.enabled?.() ?? true; }
 
-  /** 把目录条目与选择器互查收敛到一处；未知选择器与无默认的 cloud-default 在此分流。 */
-  private entry(catalog: CloudModelCatalog, selector: string): CatalogEntry {
-    if (selector === MODEL) {
-      const profile = defaultProfile(catalog);
-      if (!profile) throw new LlmError('云端账号尚未配置默认模型或密钥。', 'CLOUD_DEFAULT_MODEL_REQUIRED');
-      return { selector, name: profile.displayName, description: `云端默认模型：${profile.defaultModel}` };
-    }
-    const account = /^account\/([^/]+)(?:\/(.+))?$/.exec(selector);
-    if (account) {
-      const profile = catalog.profiles.find(item => item.id === account[1] && item.keyConfigured);
-      const model = account[2] ?? profile?.defaultModel;
-      if (profile && model !== undefined && profile.modelIds.includes(model)) {
-        return { selector, name: `${profile.displayName} · ${model}`, description: '账号私有模型' };
-      }
-      throw new LlmError('云端模型选择无效', 'MODEL_NOT_FOUND');
-    }
-    const shared = /^shared\/([^/]+)\/(.+)$/.exec(selector);
-    if (shared) {
-      const entry = catalog.sharedModels.find(item => item.provider === shared[1] && item.model === shared[2]);
-      if (entry) return { selector, name: entry.name, description: '部署共享模型' };
-    }
-    throw new LlmError('云端模型选择无效', 'MODEL_NOT_FOUND');
+  /** 进入本地模式时的默认选择：默认私有模型 → 首个共享模型 → 旧 cloud-default（无可用项时保留错误面）。 */
+  defaultSelection(catalog: CloudModelCatalog): { provider: string; model: string } {
+    const profile = defaultProfile(catalog);
+    if (profile) return { provider: PRIVATE_MODEL_PROVIDER, model: profile.defaultModel };
+    const shared = catalog.sharedModels[0];
+    if (shared) return { provider: shared.provider, model: shared.model };
+    return { provider: CLOUD_MODEL_PROVIDER, model: LEGACY_DEFAULT };
+  }
+
+  /** 目录失败时返回 undefined，调用方自行决定默认选择回退。 */
+  async catalogSnapshot(): Promise<CloudModelCatalog | undefined> {
+    try { return await this.catalog(); } catch { return undefined; }
   }
 
   private async catalog(): Promise<CloudModelCatalog> {
@@ -164,27 +235,27 @@ export class CloudAccountModel extends LlmAdapter {
     let catalog: CloudModelCatalog;
     try { catalog = parseCatalog(await response.json()); } catch { throw new LlmError('云端模型配置响应无效。', 'CLOUD_MODEL_UNAVAILABLE'); }
     this.cached = { cookie, expiresAt: Date.now() + (this.options.catalogTtlMs ?? CATALOG_TTL_MS), catalog };
+    this.syncRoutes(catalog);
     return catalog;
   }
 }
 
-/** picker 条目：账号默认（无默认 profile 时不列，避免被默认选取命中）+ 每个私有 profile 的每个 modelId + 部署共享目录。 */
-function catalogEntries(catalog: CloudModelCatalog): CatalogEntry[] {
+/** web-private 只列默认 profile 的默认模型：云端私有路由只解析默认项，多列会造成静默替换。 */
+function privateEntries(catalog: CloudModelCatalog): LlmResolvedModelInfo[] {
   const profile = defaultProfile(catalog);
-  const entries: CatalogEntry[] = [];
-  if (profile) {
-    entries.push({ selector: MODEL, name: profile.displayName, description: `云端默认模型：${profile.defaultModel}` });
-  }
-  for (const item of catalog.profiles) {
-    if (!item.keyConfigured) continue;
-    for (const model of item.modelIds) {
-      entries.push({ selector: `account/${item.id}/${model}`, name: `${item.displayName} · ${model}`, description: '账号私有模型' });
-    }
-  }
-  for (const item of catalog.sharedModels) {
-    entries.push({ selector: `shared/${item.provider}/${item.model}`, name: item.name, description: '部署共享模型' });
-  }
-  return entries;
+  if (!profile) return [];
+  return [{
+    provider: PRIVATE_MODEL_PROVIDER, id: profile.defaultModel, name: profile.defaultModel,
+    description: `账号默认模型：${profile.displayName}`, inputModalities: ['text'],
+    context: { contextWindow: CONTEXT_WINDOW }, defaultMaxTokens: MAX_TOKENS,
+  }];
+}
+
+function sharedEntries(catalog: CloudModelCatalog, provider: string): LlmResolvedModelInfo[] {
+  return catalog.sharedModels.filter(item => item.provider === provider).map(item => ({
+    provider, id: item.model, name: item.name, description: '部署共享模型',
+    inputModalities: ['text'], context: { contextWindow: CONTEXT_WINDOW }, defaultMaxTokens: MAX_TOKENS,
+  }));
 }
 
 function defaultProfile(catalog: CloudModelCatalog): CloudModelProfile | undefined {
