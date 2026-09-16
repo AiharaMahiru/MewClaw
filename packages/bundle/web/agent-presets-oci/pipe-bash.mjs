@@ -8,6 +8,8 @@
 import { randomUUID } from 'node:crypto'
 import { StringDecoder } from 'node:string_decoder'
 
+import { registerModelTool } from '../tool-schema.mjs'
+
 export const name = 'oci-pipe-bash'
 export const inject = ['subprocess', 'tools']
 
@@ -213,11 +215,18 @@ export function apply(ctx, config = {}) {
     liveSessions.clear()
   })
 
-  ctx.tools.register({
+  // 裸注册必须经 registerModelTool：parameters 是 object 根 JSON Schema
+  // 而非 defineTool 字段表，schema 不合法在装载期抛错而非请求时 400。
+  registerModelTool(ctx, {
     name: 'bash',
     description,
     parameters: {
-      command: { type: 'string', required: true, description: 'The bash command to run.' },
+      type: 'object',
+      properties: {
+        command: { type: 'string', description: 'The bash command to run.' },
+      },
+      required: ['command'],
+      additionalProperties: false,
     },
     output: {
       schema: { type: 'string' },

@@ -20,9 +20,16 @@
   disabled: true
 
 # name 是匹配条件，不能用于替换原行；独立插入路由适配器。
+# retryPolicy 在官方默认集合上补 STREAM_CLOSED：上游 relay 偶发不发
+# [DONE] 直接断流（TRANSPORT 之外的独立 code），不配它整轮即败；
+# llm-retry 已在 dsh-base 挂载，会在步骤边界持久化重试。
 - insert:
     - id: lark-deepseek-routing
       name: 'dsh-lark-deepseek-routing'
+      config:
+        retryPolicy:
+          mode: normal
+          retryableCodes: [EMPTY_RESPONSE, RATE_LIMIT, SERVER, TIMEOUT, TRANSPORT, STREAM_CLOSED]
 
 # web 缝指向 Firecrawl（search + fetch 双注册；dsh-base 缺省只挂 DeepSeek 搜索）。
 - id: web

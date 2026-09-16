@@ -95,6 +95,8 @@ describe("dsh-lark-mewclaw-brand", () => {
     expect(html).toContain("mewclaw-rail-fab");
     expect(html).toContain('aria-label","Menu"');
     expect(html).toContain('[class*="_titleRow"]{padding-left:48px!important}');
+    // 展开按列宽判定（rail <100px 时点官方开关扩为完整抽屉），不依赖 aria 文案
+    expect(html).toContain("getBoundingClientRect().width<100");
     expect(html).toContain("touch-action:pan-y");
     expect(html).toContain("pointerdown");
     expect(html).toContain("touchstart");

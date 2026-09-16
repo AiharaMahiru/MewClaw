@@ -55,6 +55,36 @@ describe("网络安全审计契约", () => {
     const auditor = createPromptAuditor({ generate: async () => { throw new Error("secret provider error"); } }, { timeoutMs: 100, maxConcurrent: 1 });
     expect(await auditor.audit("test")).toBe("unavailable");
   });
+
+  it("瞬态失败重试一次后可放行", async () => {
+    const generate = vi.fn()
+      .mockRejectedValueOnce(new Error("prompt audit: finish error SERVER"))
+      .mockResolvedValueOnce('{"decision":"allow"}');
+    const auditor = createPromptAuditor({ generate }, { timeoutMs: 100, maxConcurrent: 1 });
+    expect(await auditor.audit("test")).toBe("allow");
+    expect(generate).toHaveBeenCalledTimes(2);
+  });
+
+  it("确定性 finish code 不重试", async () => {
+    const generate = vi.fn(async () => { throw new Error("prompt audit: finish error AUTH"); });
+    const auditor = createPromptAuditor({ generate }, { timeoutMs: 100, maxConcurrent: 1 });
+    expect(await auditor.audit("test")).toBe("unavailable");
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("超时不重试：第一次已烧完预算", async () => {
+    const generate = vi.fn((_input: { signal: AbortSignal }) => new Promise<string>(() => {}));
+    const auditor = createPromptAuditor({ generate }, { timeoutMs: 10, maxConcurrent: 1 });
+    expect(await auditor.audit("test")).toBe("unavailable");
+    expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it("连续瞬态失败只重试一次，仍失败关闭", async () => {
+    const generate = vi.fn(async () => { throw new Error("prompt audit: finish error SERVER"); });
+    const auditor = createPromptAuditor({ generate }, { timeoutMs: 100, maxConcurrent: 1 });
+    expect(await auditor.audit("test")).toBe("unavailable");
+    expect(generate).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("发送载荷提取", () => {

@@ -14,6 +14,10 @@ llm-deepseek:
   modelAliases:
     deepseek-v4.1-flash: deepseek/deepseek-v4.1-flash
   disabledModels: []
+  # 官方默认可重试集合不含 STREAM_CLOSED（上游断流不发 [DONE]），生产补上。
+  retryPolicy:
+    mode: normal
+    retryableCodes: [EMPTY_RESPONSE, RATE_LIMIT, SERVER, TIMEOUT, TRANSPORT, STREAM_CLOSED]
 
 llm-pi-ai:
   providers:
@@ -42,3 +46,8 @@ llm-pi-ai:
             high: high
             max: max
       apiKeyEnv: OPENAI_API_KEY
+      # cpa relay 同样偶发断流；pi-ai 的 retryPolicy 按 provider profile 配置。
+      retryPolicy:
+        mode: normal
+        retryableCodes: [EMPTY_RESPONSE, RATE_LIMIT, SERVER, TIMEOUT, TRANSPORT, STREAM_CLOSED]
+
