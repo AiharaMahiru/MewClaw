@@ -10,7 +10,9 @@ const forbidden = [
   [/\b(?:host|window)\.fetch\s*=/u, "禁止替换浏览器全局 fetch"],
   [/Object\.defineProperty\(window,\s*["']open["']/u, "禁止替换 window.open"],
   [/\bwindow\.open\s*=/u, "禁止替换 window.open"],
-  [/\bprocess\.env\.[A-Za-z0-9_]+\s*(?:\?\?=|=(?!=))/u, "插件不得改写 process.env"],
+  // 第三元为该规则的按文件豁免。apps/desktop/launcher.mjs 是 Electron 宿主入口（非 Cordis 插件）：
+  // 在 import 社区桌面包 main 之前必须就地写 DSH_HOME/MEWCLAW_DESKTOP_*，in-process 场景无 spawn env 可用。
+  [/\bprocess\.env\.[A-Za-z0-9_]+\s*(?:\?\?=|=(?!=))/u, "插件不得改写 process.env", new Set(["apps/desktop/launcher.mjs"])],
 ];
 const failures = [];
 
@@ -20,7 +22,8 @@ for (const base of ["apps", "packages"]) {
     if (relativePath.includes("/node_modules/") || relativePath.includes(".test.")) continue;
     if (!extensions.has(extname(path))) continue;
     const source = await readFile(path, "utf8");
-    for (const [pattern, message] of forbidden) {
+    for (const [pattern, message, exempt] of forbidden) {
+      if (exempt?.has(relativePath)) continue;
       if (pattern.test(source)) failures.push(`${relativePath}: ${message}`);
     }
   }
