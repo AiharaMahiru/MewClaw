@@ -310,6 +310,9 @@ function gatewayProfile(origin: string, headers: Record<string, string>, entry: 
     : Object.fromEntries(entry.reasoning.efforts.map(e => [e.id, e.id]));
   const model: Model<'openai-completions'> = { id: entry.selector, name: entry.name, api: 'openai-completions', provider: CLOUD_MODEL_PROVIDER,
     baseUrl: baseURL, reasoning: entry.reasoning !== undefined, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: CONTEXT_WINDOW, maxTokens: MAX_TOKENS,
+    // Edge 按 REQUEST_FIELDS 白名单逐字段校验：pi-ai 对未知 provider 探测 supportsStore=true 会
+    // 多发 `store:false`，被 400 INVALID_INFERENCE_REQUEST 拒掉——显式关掉。
+    compat: { supportsStore: false },
     ...thinkingLevelMap === undefined ? {} : { thinkingLevelMap } };
   return { provider: CLOUD_MODEL_PROVIDER, displayName: entry.name, api: 'openai-completions', baseURL, headers,
     streamIdleTimeoutMs: 300000, maxRequestImageBytes: 20 * 1024 * 1024, requestImagePixelBudget: 4194304, requestImageMaxBytes: 1048576,

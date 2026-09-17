@@ -255,6 +255,9 @@ it('选中强度经 reasoning_effort 到达 Edge；off 档也能上线', async (
   await collect(adapter.stream({ ...base, reasoningEffort: ReasoningEffortId('low') }));
   await collect(adapter.stream({ ...base, reasoningEffort: ReasoningEffortId('off') }));
   expect(bodies.map(body => JSON.parse(body).reasoning_effort)).toEqual(['low', 'off']);
+  // Edge parseDesktopInference 逐字段白名单校验，多一个字段即 INVALID_INFERENCE_REQUEST。
+  const REQUEST_FIELDS = new Set(['model', 'messages', 'tools', 'tool_choice', 'stream', 'stream_options', 'max_tokens', 'max_completion_tokens', 'temperature', 'top_p', 'frequency_penalty', 'presence_penalty', 'stop', 'parallel_tool_calls', 'reasoning_effort']);
+  for (const body of bodies) for (const key of Object.keys(JSON.parse(body))) expect(REQUEST_FIELDS.has(key), `unexpected field ${key}`).toBe(true);
 });
 
 it('同步云端模型配置和密钥状态，但拒绝接收原始 API key', async () => {
