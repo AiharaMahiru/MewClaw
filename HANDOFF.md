@@ -2,7 +2,7 @@
 
 更新时间：2026-09-17
 工作分支：`desktop-dev`
-本地同步基线：已合入 `origin/desktop@a36a7e0`（累计含 R32 计费纪元、R33 桌面推理三形态选择器与共享模型目录、R34-R37 品牌改名、R48 ws-crashguard、R49 bash schema、R52 OCI 出站网络 + 侧栏 10GB、R53 ui-sidebar-files 去重、R54 侧栏媒体流式转发、R55 移动端顶栏对齐、工具 schema 门禁与 STREAM_CLOSED/审计瞬态重试硬化）。途中远端 desktop-dev 已先行合入 `91bd7e6`（`de12683`），本分支在其上再合 desktop（`f48f39c`、`3b527c7`、`868fffa`、本轮 `a36a7e0`、`7e98458`）。最新合并 `b7f289d` 并入 `origin/desktop@7e98458`（`dd9a170` 移动端右坞毛玻璃 + `7e98458` master 合入），干净无冲突、仅触 `packages/lark/mewclaw-brand` 移动端文件，按既定边界不移植桌面变体；已推送并核验远端 `desktop-dev=b7f289d`。注意：主线 `06dc1af` 首次挂接 `upstream/dsh-desktop` 于 `a1ddcda8`（比本分支 pin `5510cb1203` 老），合并时保持本分支较新 pin 不回退。按交接约定 `packages/auth/edge` 下 `desktop-inference.ts`/`desktop-inference.test.ts`/`auth-routes.ts`/`server.ts`/`config.ts` 冲突全部取主线版本——本轮为思考强度元数据新增了 `DesktopSharedModel` 接口字段（见下），属本分支对 edge 的**新增**改动而非冲突取线。候选 `mewclaw-brand` workspace 是桌面变体的**展开副本**（剥离移动代码、无 `mobile` 选项）：上游改动中仅全视口生效的 `DEDUPE_STYLE`（隐藏会话头部 "Open right sidebar"）已手工移植；`@media(max-width:768px)` 与 rail 脚本类改动按设计不进入桌面。
+本地同步基线：已合入 `origin/desktop@a36a7e0`（累计含 R32 计费纪元、R33 桌面推理三形态选择器与共享模型目录、R34-R37 品牌改名、R48 ws-crashguard、R49 bash schema、R52 OCI 出站网络 + 侧栏 10GB、R53 ui-sidebar-files 去重、R54 侧栏媒体流式转发、R55 移动端顶栏对齐、工具 schema 门禁与 STREAM_CLOSED/审计瞬态重试硬化）。途中远端 desktop-dev 已先行合入 `91bd7e6`（`de12683`），本分支在其上再合 desktop（`f48f39c`、`3b527c7`、`868fffa`、本轮 `a36a7e0`、`7e98458`）。最新合并 `b7f289d` 并入 `origin/desktop@7e98458`（`dd9a170` 移动端右坞毛玻璃 + `7e98458` master 合入），干净无冲突、仅触 `packages/lark/mewclaw-brand` 移动端文件，按既定边界不移植桌面变体；已推送并核验远端 `desktop-dev=b7f289d`。随后 VPS 侧再合 `origin/desktop@b5995ca`（`10114eb`，带入 R57 OCI 容器名冲突修复）+ 边界门禁宿主豁免（`7c8dc2c`），并以此发布生产 `R58-desktop-dev-reasoning-20260917`（见 §4）。注意：主线 `06dc1af` 首次挂接 `upstream/dsh-desktop` 于 `a1ddcda8`（比本分支 pin `5510cb1203` 老），合并时保持本分支较新 pin 不回退。按交接约定 `packages/auth/edge` 下 `desktop-inference.ts`/`desktop-inference.test.ts`/`auth-routes.ts`/`server.ts`/`config.ts` 冲突全部取主线版本——本轮为思考强度元数据新增了 `DesktopSharedModel` 接口字段（见下），属本分支对 edge 的**新增**改动而非冲突取线。候选 `mewclaw-brand` workspace 是桌面变体的**展开副本**（剥离移动代码、无 `mobile` 选项）：上游改动中仅全视口生效的 `DEDUPE_STYLE`（隐藏会话头部 "Open right sidebar"）已手工移植；`@media(max-width:768px)` 与 rail 脚本类改动按设计不进入桌面。
 
 ## 当前唯一交付目录
 
@@ -102,13 +102,15 @@ node D:\AI\dsh\MewClaw-desktop\apps\desktop\local-ui-smoke.mjs D:\AI\dsh\MewClaw
 
 合并带入的 `packages/lark/model-seat` 在根 `pnpm typecheck`（`tsconfig.test.json`）下失败。核实后的归因：`subagentAddress` 存在于 `dsh-api-session-controller`（客户端）的 `ISessions`，但 `dsh-session`（服务端）把 `Context.sessions` 声明为 `SessionStore`——根全量编译时服务端声明胜出，`client.ts:42` 报缺成员；`client.test.ts` 的 `El`/`SeatReactApi` 桩与 React 18 严格类型不兼容。该包自身 tsconfig 单独编译通过。修复方向（主线做）：model-seat 侧把 `ctx.sessions` 按客户端契约收窄，或根 typecheck 排除该包测试——不属桌面端改动范围。
 
-### 4. 生产部署 desktop-dev（进行中，SSH 受限）
+### 4. 生产部署 desktop-dev（已完成 → R58）
 
-**目标**：`desktop-dev@b7f289d` 发布为 `R57-desktop-dev-reasoning-20260917`，使 `/auth/models` 下发 `reasoningEfforts`/`defaultReasoningEffort`（picker 强度项出现的前提），并把 liquid-glass `backdrop-filter` 修复带进云端 bundle。
+**目标**：`desktop-dev` 发布上线，使 `/auth/models` 下发 `reasoningEfforts`/`defaultReasoningEffort`（picker 强度项出现的前提），并把 liquid-glass `backdrop-filter` 修复带进云端 bundle。
 
-**已备妥**：`/opt/dsh/source` 检出 `origin/desktop-dev` → `node scripts/package-linux-release.mjs --release-id R57-... --output-dir /opt/dsh/incoming`（packager 自建 stage + `pnpm install --frozen-lockfile` + `pnpm build` + `build:admin-web` + `validate-linux-release`）→ 解 tar 至 `/opt/dsh/releases/R57-...`（tar 为相对路径条目，无顶层目录，不要 `--strip-components`）→ 断言 `.dsh-release-manifest.json` 与 `apps/auth/dist/shared-model-runtime.js` 含 `reasoningEfforts` → `ln -sfn` + `mv -T` 原子翻 `/opt/dsh/current` → 重启 `dsh-auth dsh-worker dsh-gateway dsh-admin dsh-preview dsh-browser`。部署脚本已备于本机 `C:\Users\ATWER\AppData\Local\Temp\deploy-r57.sh`。`upstream/dsh-desktop` pin 不进发布面（`BUILD_STAGE_DIRS` 不含 `upstream/`），submodule 失败不阻塞。
+**已部署（2026-09-17 晚，VPS 侧执行）**：先合 `origin/desktop@b5995ca`（带入 R57 OCI 容器名冲突修复，避免裸发回退；合并 `10114eb` 干净无冲突，`upstream/dsh-desktop` pin 保持 `5510cb1` 未回退）→ 修 `verify-plugin-boundaries.mjs`（桌面宿主入口 `apps/desktop/launcher.mjs` 非 Cordis 插件，按规则逐文件豁免其 `process.env` 引导写入，`7c8dc2c`）→ 打包 `R58-desktop-dev-reasoning-20260917`（gitCommit `7c8dc2c`、node 24.19.0、pnpm 10.30.3、SHA-256 `794321aeb73d51fa5fd2d62e59986651da3c8c88ab4f021f8e488145d1670a29`）→ `/opt/dsh/releases/R58-...` → `/opt/dsh/current` 原子翻转 → 6 服务重启全 active。**注意版本号**：R57 已被主线 `R57-oci-name-conflict-20260917` 占用，故本发布用 R58。
 
-**阻塞**：VPS SSH 端口 TCP 可达但 `kex_exchange_identification` 持续 reset——本机高频 SSH 轮询疑似触发对端限速/fail2ban；已停全部重连循环，待窗口恢复后先跑只读 preflight 再执行脚本。期间 `chat.rwr.ink` 服务正常（R56 在线）。
+**打包器调用约定（VPS 实测）**：`PATH=/opt/dsh/runtime/node/bin:$PATH /opt/dsh/runtime/node/bin/node --import tsx/esm scripts/package-linux-release.mjs --release-id <id> --output-dir /opt/dsh/incoming`。两个坑：① 版本门禁要求 node 严格等于 lock 的 24.19.0——PATH 上的 `/www/server/nodejs/v24.11.1` 会被拒，必须用 `/opt/dsh/runtime/node`；② `infra/linux/src/*.ts` 内部用 `./x.js` specifier，Node 类型剥离不做 `.js`→`.ts` 映射，必须 `--import tsx/esm`（tsx 是 workspace devDep，非新依赖）。
+
+**生产验证**：站点 200；`/auth/models` 未认证 401、认证后 9 个共享模型全部带 `reasoningEfforts`（deepseek-official 系 default=high；openai 系无 default——off 档按既定规则不下发默认值时不展示）；`packages/sandbox/oci/lib` 产物含 `isNameConflict` 回收重试 + `containers.delete` 失败逐出；`podman ps -a` 零残留；测试令牌已吊销。
 
 ## 推送状态与限制
 
