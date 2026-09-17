@@ -133,6 +133,10 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
       return { container, containerCwd };
     })();
     this.containers.set(cwd, binding);
+    // provision 失败（如残留冲突重试仍败）不得毒化缓存：逐出后下个 spawn 重试。
+    void binding.catch(() => {
+      if (this.containers.get(cwd) === binding) this.containers.delete(cwd);
+    });
     return binding;
   }
 

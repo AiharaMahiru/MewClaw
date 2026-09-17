@@ -123,6 +123,16 @@ export class OciContainerRuntime {
   }
 
   /**
+   * podman 命名冲突判定（error.stderr / message）。孤儿容器来源：worker
+   * 重启后 provisioned 集合丢失，而 `sleep infinity` 容器仍在跑（--rm 只在
+   * 停止时生效）；同名沙箱同工作区同配置，回收重建语义等价。
+   */
+  private static isNameConflict(error: unknown): boolean {
+    const e = error as { message?: string; stderr?: string | Buffer } | undefined;
+    return /already in use/i.test(`${e?.message ?? ""} ${e?.stderr ?? ""}`);
+  }
+
+  /**
    * provision：校验工作区在工作区根内（realpath 双重校验防符号链接逃逸），
    * 派生容器名，起一个后台睡眠容器（exec 目标），返回含 cleanup 的句柄。
    */
@@ -149,7 +159,14 @@ export class OciContainerRuntime {
       config.image,
       "-c", "sleep infinity",
     ];
-    await this.exec(args);
+    try {
+      await this.exec(args);
+    } catch (error) {
+      if (!OciContainerRuntime.isNameConflict(error)) throw error;
+      this.options.logger.warn(`sandbox-oci: 容器名冲突（${name}），回收孤儿容器后重试一次`);
+      await this.cleanup(name);
+      await this.exec(args);
+    }
     this.provisioned.add(name);
     return {
       name,
