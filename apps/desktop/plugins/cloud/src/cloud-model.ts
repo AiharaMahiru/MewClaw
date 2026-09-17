@@ -320,7 +320,8 @@ function gatewayProfile(origin: string, headers: Record<string, string>, entry: 
   } as ResolvedPiAiProviderProfile;
 }
 
-function hasSession(cookie: string): boolean {
+/** 快照 cookie 是否构成一次可用的云端会话（桥接目录与推理都以它为门槛）。 */
+export function hasSession(cookie: string): boolean {
   return /(?:^|;\s*)(?:__Host-dsh_session|dsh_session)=[^;]+/.test(cookie)
     && /(?:^|;\s*)dsh_csrf=[^;]+/.test(cookie);
 }

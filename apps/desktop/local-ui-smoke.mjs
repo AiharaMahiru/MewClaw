@@ -1,6 +1,7 @@
 /** 无账号、无模型请求的 Electron 本地会话界面冒烟。 */
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
+import { createServer as createHttpServer } from 'node:http';
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -17,6 +18,27 @@ const home = await mkdtemp(join(tmpdir(), 'mewclaw-local-ui-'));
 await mkdir(join(home, 'userdata'));
 await writeFile(join(home, 'mewclaw-location.json'), JSON.stringify({ location: 'local' }));
 await writeFile(join(home, 'settings.yaml'), `dsh-desktop:\n  mode: ${mode}\n  port: 0\n  openBrowser: false\n`);
+// 目录用例需要本地会话带可解析模型：桥接目录来自云端账号，冒烟以 loopback mock 顶替
+// /auth/models 并注入会话 cookie。MEWCLAW_CLOUD_MODEL_ORIGIN 只改模型桥接，页面 /auth
+// 代理仍走真实云端（不影响 --switch 的云端访问）。
+let mockCatalogHits = 0;
+let mockServer;
+let mockOrigin;
+if (directoryTest) {
+  mockServer = createHttpServer((req, res) => {
+    if ((req.url ?? '').startsWith('/auth/models')) {
+      mockCatalogHits++;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ profiles: [], defaultProfileId: null,
+        sharedModels: [{ provider: 'deepseek-official', model: 'deepseek-smoke-v1', name: 'DeepSeek Smoke V1' }] }));
+      return;
+    }
+    res.writeHead(404, { 'content-type': 'application/json' });
+    res.end('{"error":"NOT_FOUND"}');
+  });
+  await new Promise(resolve => mockServer.listen(0, '127.0.0.1', resolve));
+  mockOrigin = `http://127.0.0.1:${mockServer.address().port}`;
+}
 const listener = createServer();
 await new Promise(resolve => listener.listen(0, '127.0.0.1', resolve));
 const port = listener.address().port;
@@ -27,7 +49,7 @@ await new Promise(resolve => listener.close(resolve));
 const candidateVersion = JSON.parse(await readFile(join(candidate, 'package.json'), 'utf8')).version;
 const executable = dev ? join(candidate, 'node_modules/electron/dist/electron.exe')
   : join(candidate, 'release', releaseDirectoryName(candidateVersion), 'win-unpacked', 'MewClaw.exe');
-const environment = { ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1' };
+const environment = { ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1', ...(mockOrigin ? { MEWCLAW_CLOUD_MODEL_ORIGIN: mockOrigin } : {}) };
 delete environment.ELECTRON_RUN_AS_NODE;
 const child = spawn(executable, [...(directoryTest ? [`--inspect=${inspectorPort}`] : []), ...(dev ? [join(candidate, 'launcher.mjs')] : []), `--user-data-dir=${join(home, 'userdata')}`, `--remote-debugging-port=${port}`], {
   cwd: candidate, windowsHide: true, env: environment, stdio: ['ignore', 'pipe', 'pipe'],
@@ -44,8 +66,14 @@ async function connect(url, pageUrl = '') {
   const pending = new Map();
   socket.addEventListener('message', event => {
     const value = JSON.parse(event.data);
-    if (value.method === 'Runtime.exceptionThrown' || (value.method === 'Log.entryAdded' && value.params?.entry?.level === 'error')
-      || (value.method === 'Runtime.consoleAPICalled' && value.params?.type === 'error')) rendererErrors.push({ page: pageUrl.split('?')[0], ...value });
+    const entry = value.params?.entry;
+    // 冒烟注入的是假会话，页面 /auth/* 仍代理真实云端：上游抖动产生的资源错误与本用例无关；
+    // file:// 原生向导页 meta CSP 提示是 Chromium 既有噪声。其余错误一律计入。
+    const ignorable = value.method === 'Log.entryAdded' && entry
+      && ((entry.source === 'network' && /^https?:\/\/[^/]+\/auth\//.test(entry.url ?? ''))
+        || (entry.source === 'security' && /frame-ancestors/.test(entry.text ?? '')));
+    if (!ignorable && (value.method === 'Runtime.exceptionThrown' || (value.method === 'Log.entryAdded' && entry?.level === 'error')
+      || (value.method === 'Runtime.consoleAPICalled' && value.params?.type === 'error'))) rendererErrors.push({ page: pageUrl.split('?')[0], ...value });
     if (pending.has(value.id)) { pending.get(value.id)(value); pending.delete(value.id); }
   });
   return { socket, send(method, params = {}) {
@@ -94,8 +122,9 @@ try {
       }
       const result = await client.send('Runtime.evaluate', { expression: 'document.body.innerText', returnByValue: true });
       text = result.result?.result?.value ?? '';
+      // 2.0.10 的跳过确认弹层与向导页都含"跳过设置"按钮：优先点 dialog 内的，命中不到再回退最后一个同名按钮。
       if (text.includes('确认跳过')) await client.send('Runtime.evaluate', { expression: "Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='确认跳过')?.click()" });
-      else if (text.includes('跳过设置')) await client.send('Runtime.evaluate', { expression: "Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='跳过设置')?.click()" });
+      else if (text.includes('跳过设置')) await client.send('Runtime.evaluate', { expression: "(()=>{const bs=[...document.querySelectorAll('button')].filter(b=>b.textContent.trim()==='跳过设置');(bs.find(b=>b.closest('[role=\"dialog\"],dialog,[data-state=\"open\"]'))??bs.at(-1))?.click()})()" });
       if (text.includes('内测声明')) await client.send('Runtime.evaluate', { expression: "Array.from(document.querySelectorAll('button')).find(button=>button.textContent.trim()==='继续')?.click()" });
       const hasNewSessionLabel = text.includes('新建会话') || text.includes('新会话');
       if (text.includes('打开本地目录') && hasNewSessionLabel && text.includes('选择工作区') && !text.includes('内测声明') && !text.includes('Failed to load plugins')) readyChecks++;
@@ -122,13 +151,31 @@ try {
     const patched = await inspector.send('Runtime.evaluate', { expression: `(()=>{const {dialog}=process.getBuiltinModule('module').createRequire(process.cwd()+'/package.json')('electron');dialog.showOpenDialog=async()=>({canceled:false,filePaths:[${JSON.stringify(folder)}]});return true})()`, awaitPromise: true, returnByValue: true });
     inspector.socket.close();
     if (patched.result?.result?.value !== true) throw new Error(`TEST_PICKER_NOT_INSTALLED ${JSON.stringify(patched)}`);
+    // 桥接目录需要会话 cookie：注入后一次已认证的同站 GET '/' 触发快照与本地默认模型重排
+    //（'/api/mewclaw-desktop/*' 与 '/_dsh/*' 在快照前分流，'/auth/*' 依赖真实上游，都不能用）。
+    // 页面可能仍在过渡，注入在轮询里幂等重放直到目录被拉取。
+    const syncDeadline = Date.now() + 25000;
+    let syncedText = '';
+    while (Date.now() < syncDeadline) {
+      const probe = await client.send('Runtime.evaluate', { expression: 'document.body.innerText', returnByValue: true });
+      syncedText = probe.result?.result?.value ?? '';
+      if (mockCatalogHits > 0 && syncedText.includes('DeepSeek Smoke V1')) break;
+      await client.send('Runtime.evaluate', { expression: "document.cookie='dsh_session=smoke-local;path=/';document.cookie='dsh_csrf=smoke-local;path=/';fetch('/').then(r=>r.status).catch(()=>0)", awaitPromise: true });
+      await delay(500);
+    }
+    if (mockCatalogHits === 0) throw new Error(`LOCAL_MODEL_CATALOG_NOT_FETCHED cookie=${syncedText.length}`);
     await client.send('Runtime.evaluate', { expression: `document.querySelector('button[title="打开本地目录"]').click()` });
-    await delay(5000);
+    const editDeadline = Date.now() + 15000;
+    let editable = false;
+    while (Date.now() < editDeadline) {
+      const probe = await client.send('Runtime.evaluate', { expression: `!!document.querySelector('[contenteditable="true"],textarea:not([disabled])')`, returnByValue: true });
+      if (probe.result?.result?.value) { editable = true; break; }
+      await delay(500);
+    }
     const body = await client.send('Runtime.evaluate', { expression: 'document.body.innerText', returnByValue: true });
     await writeFile(join(home, 'directory-body.txt'), body.result?.result?.value ?? '');
     await writeFile(join(home, 'renderer-errors.json'), JSON.stringify(rendererErrors, null, 2));
-    const editable = await client.send('Runtime.evaluate', { expression: `!!document.querySelector('[contenteditable="true"],textarea:not([disabled])')`, returnByValue: true });
-    if (!editable.result?.result?.value) throw new Error('DIRECTORY_COMPOSER_DISABLED');
+    if (!editable) throw new Error('DIRECTORY_COMPOSER_DISABLED');
     console.log('DIRECTORY_COMPOSER_EDITABLE');
   }
   await delay(3000);
@@ -153,4 +200,5 @@ try {
 } finally {
   if (client) { await client.send('Browser.close').catch(() => {}); client.socket.close(); }
   if (child.exitCode === null) child.kill();
+  mockServer?.close();
 }

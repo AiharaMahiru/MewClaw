@@ -20,10 +20,10 @@ import { installLocalGlass } from './local-glass.js';
 import { sessionLocationHtml } from './session-boot.js';
 import { LocalHarnessWorkspaces } from './local-workspaces.js';
 import type {} from '@deepseek-ai/dsh-agent-default-model';
-import { CloudAccountModel, CLOUD_MODEL_PROVIDER } from './cloud-model.js';
+import { CloudAccountModel, CLOUD_MODEL_PROVIDER, hasSession } from './cloud-model.js';
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths';
 
-export interface Config extends WebConfig, Omit<ControllerOptions, 'fs' | 'pick' | 'shell' | 'confirm' | 'maxBytes' | 'maxEntries'> { cloudOrigin: string; cloudTimeoutMs: number; cloudSessionRetentionSeconds?: number; workspaceMaxBytes?: number; workspaceMaxEntries?: number; cloudMaxIndexBytes?: number }
+export interface Config extends WebConfig, Omit<ControllerOptions, 'fs' | 'pick' | 'shell' | 'confirm' | 'maxBytes' | 'maxEntries'> { cloudOrigin: string; cloudModelOrigin?: string; cloudTimeoutMs: number; cloudSessionRetentionSeconds?: number; workspaceMaxBytes?: number; workspaceMaxEntries?: number; cloudMaxIndexBytes?: number }
 
 /** 桌面私有控制面始终留在本机，不发送到云端。 */
 export function isLocalDesktopPath(raw: string): boolean {
@@ -57,6 +57,8 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     syncMaxEntries: z.number().step(1).min(1).max(10000).default(2000),
     syncMaxTotalBytes: z.number().step(1).min(1024).max(268435456).default(33554432),
     cloudOrigin: z.string().default('https://chat.rwr.ink'),
+    /** 模型桥接（目录 + 推理）独立 origin；空串随 cloudOrigin。仅本机 loopback 可用 http。 */
+    cloudModelOrigin: z.string().default(''),
     cloudTimeoutMs: z.number().step(1).min(1000).max(600000).default(120000),
     cloudSessionRetentionSeconds: z.number().step(1).min(0).max(2592000).default(2592000),
     cloudMaxIndexBytes: z.number().step(1).min(65536).max(8388608).default(2097152),
@@ -66,6 +68,8 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
   private workspace?: WorkspaceController;
   private localWorkspaces?: LocalHarnessWorkspaces;
   private cloudModel?: CloudAccountModel;
+  /** 本地模式下观察到会话 cookie 建立时重排本地默认模型（未登录进入 local 时选择是占位值）。 */
+  private localModelResync: (() => void) | undefined;
   private accountCookie = '';
   private readonly location = new LocationPreference(resolveDshHome());
   private localBrandRevision = '';
@@ -73,6 +77,7 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
 
   constructor(ctx: Context, config: Config) {
     cloudOrigin(config.cloudOrigin);
+    if (config.cloudModelOrigin) cloudOrigin(config.cloudModelOrigin);
     super(ctx, config);
     const require = createRequire(import.meta.url);
     const script = readFileSync(require.resolve('dsh-plugin-desktop/client'));
@@ -155,7 +160,8 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
       return this.location.location === 'local' ? 'LOCAL_TOOL_NOT_AUTHORIZED' : undefined;
     })));
     ctx.inject(['llm', 'agentDefaultModel'], async local => {
-      const adapter = new CloudAccountModel({ origin: cloudOrigin(config.cloudOrigin).origin,
+      // env 是测试逃生口（冒烟用 loopback mock 顶替目录）；部署走 cloudModelOrigin/cloudOrigin 配置。
+      const adapter = new CloudAccountModel({ origin: cloudOrigin(process.env.MEWCLAW_CLOUD_MODEL_ORIGIN || config.cloudModelOrigin || config.cloudOrigin).origin,
         cookie: () => this.accountCookie, enabled: () => this.location.location === 'local' });
       this.cloudModel = adapter;
       local.effect(() => {
@@ -186,6 +192,8 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
       };
       const unsubscribe = this.location.subscribe(next => { schedule(next); });
       local.effect(() => unsubscribe);
+      this.localModelResync = () => schedule('local');
+      local.effect(() => () => { this.localModelResync = undefined; });
       schedule(this.location.location);
     });
     ctx.inject(['tools', 'fs', 'sessions', 'workspaceRegistry'], local => {
@@ -233,8 +241,10 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
       if (path === '/' && !connection.authorizeIndex(req, res)) return;
       const rejection = connection.requestRejection(req);
       if (rejection !== undefined) { res.writeHead(rejection); res.end('DESKTOP_UNAUTHORIZED'); return; }
+      const hadSession = hasSession(this.accountCookie);
       this.accountCookie = (req.headers.cookie ?? '').split(';').map(value => value.trim())
         .filter(value => /^(?:__Host-dsh_session|dsh_session|dsh_csrf)=/.test(value)).join('; ');
+      if (!hadSession && hasSession(this.accountCookie) && this.location.location === 'local') this.localModelResync?.();
       if (path.startsWith('/auth/models') && req.method !== 'GET') this.cloudModel?.invalidateCatalog();
       if (path === '/auth/logout') { this.workspace?.revokeAll(); this.localWorkspaces?.dispose(); this.accountCookie = ''; }
       if (this.location.location === 'local' && !path.startsWith('/auth/') && !isCloudSynchronizedPath(path)) return handler(req, res);
