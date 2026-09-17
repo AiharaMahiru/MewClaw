@@ -142,6 +142,42 @@ describe("OciContainerRuntime", () => {
       .toEqual(["exec", "--workdir=/workspace", "c1", "rg", "needle"]);
   });
 
+  it("provision：命名冲突回收孤儿容器后重试一次（warn 留审计）", async () => {
+    const cfg = await tempConfig();
+    const warn = vi.fn();
+    let conflictsLeft = 1;
+    const runFile = vi.fn(async (_file: unknown, args: unknown) => {
+      if ((args as string[])[0] === "run" && conflictsLeft-- > 0) {
+        const error = new Error("Command failed") as Error & { stderr: string };
+        error.stderr = `Error: the container name "dsh-lark-x" is already in use by "abc123"`;
+        throw error;
+      }
+      return undefined;
+    });
+    const runtime = new OciContainerRuntime({ config: cfg, runFile, logger: { warn } });
+    const handle = await runtime.provision("scope-1", "quota-1", cfg.workspaceRoot);
+    const rmCalls = runFile.mock.calls.filter((call) => (call[1] as string[])[0] === "rm");
+    expect(rmCalls).toHaveLength(1);
+    expect(rmCalls[0]![1][3]).toBe(handle.name);
+    expect(runFile.mock.calls.filter((call) => (call[1] as string[])[0] === "run")).toHaveLength(2);
+    expect(warn).toHaveBeenCalledWith(expect.stringMatching(/冲突/));
+  });
+
+  it("provision：重试仍冲突 → 抛出（有界重试，不吞非冲突错误）", async () => {
+    const cfg = await tempConfig();
+    const runFile = vi.fn(async (_file: unknown, args: unknown) => {
+      if ((args as string[])[0] === "run") {
+        const error = new Error("Command failed") as Error & { stderr: string };
+        error.stderr = "container name already in use";
+        throw error;
+      }
+      return undefined;
+    });
+    const runtime = new OciContainerRuntime({ config: cfg, runFile });
+    await expect(runtime.provision("scope-1", "quota-1", cfg.workspaceRoot)).rejects.toThrow();
+    expect(runFile.mock.calls.filter((call) => (call[1] as string[])[0] === "run")).toHaveLength(2);
+  });
+
   it("dispose：清理全部已 provision 容器（吞错不吞审计）", async () => {
     const cfg = await tempConfig();
     const runFile = mockRun();

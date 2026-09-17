@@ -172,6 +172,28 @@ describe("OciSubprocessRuntime.spawn", () => {
     }
   });
 
+  it("provision 失败逐出缓存：下一次 spawn 重新 provision（不毒化工作区）", async () => {
+    const runFile = vi.fn(async () => undefined);
+    const core = new OciContainerRuntime({ config, runFile });
+    const spy = vi.spyOn(core, "provision")
+      .mockRejectedValueOnce(new Error('the container name "x" is already in use'));
+    const child = makeChild();
+    spawnMock.mockReturnValue(child);
+    const runtime = new OciSubprocessRuntime(fakeCtx(), core, config);
+    const spec = {
+      argv: ["bash", "-c", "echo hi"],
+      cwd: workspaceRoot,
+      stdio: { stdin: "ignore" as const, stdout: "pipe" as const, stderr: "pipe" as const },
+      graceMs: 5000,
+    };
+    const failed = runtime.spawn(spec);
+    await expect(failed.done).rejects.toThrow(/already in use/);
+    // 缓存逐出后第二个 spawn 重新 provision（spy 第二次走真实实现 + mock runFile）。
+    runtime.spawn(spec);
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
   it("spawnTerminal 拒绝（容器不支持终端原语）", async () => {
     const core = new OciContainerRuntime({ config, runFile: vi.fn(async () => undefined) });
     const runtime = new OciSubprocessRuntime(fakeCtx(), core, config);
