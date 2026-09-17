@@ -8,6 +8,7 @@ function fixture(chunks: StreamChunk[], providers = [{ id: "openai", name: "Open
   const runtime = createSharedModelRuntimeClient(
     providers,
     async (provider) => catalog[provider] ?? [],
+    async () => ({ reasoning: { efforts: [{ id: "off" as never, name: "Off" }, { id: "high" as never, name: "High" }], defaultEffort: "high" as never } }),
     async function* (request) { requests.push(request); yield* chunks; },
     close,
   );
@@ -33,12 +34,24 @@ describe("共享模型运行时", () => {
       openai: [{ id: "gpt-5.6-luna", name: "GPT-5.6 Luna" }],
       "deepseek-official": [{ id: "deepseek-v4.1-flash", name: "DeepSeek V4.1 Flash" }],
     });
+    const efforts = [{ id: "off", name: "Off" }, { id: "high", name: "High" }];
     expect(await runtime.listModels()).toEqual([
-      { provider: "openai", model: "gpt-5.6-luna", name: "GPT-5.6 Luna" },
-      { provider: "deepseek-official", model: "deepseek-v4.1-flash", name: "DeepSeek V4.1 Flash" },
+      { provider: "openai", model: "gpt-5.6-luna", name: "GPT-5.6 Luna", reasoningEfforts: efforts, defaultReasoningEffort: "high" },
+      { provider: "deepseek-official", model: "deepseek-v4.1-flash", name: "DeepSeek V4.1 Flash", reasoningEfforts: efforts, defaultReasoningEffort: "high" },
     ]);
     await runtime.close();
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("resolved 失败保留目录条目但不携带强度元数据", async () => {
+    const runtime = createSharedModelRuntimeClient(
+      [{ id: "openai", name: "OpenAI" }],
+      async () => [{ id: "gpt-5.6-luna", name: "GPT-5.6 Luna" }],
+      async () => { throw new Error("resolve failed"); },
+      async function* () {},
+      async () => {},
+    );
+    expect(await runtime.listModels()).toEqual([{ provider: "openai", model: "gpt-5.6-luna", name: "GPT-5.6 Luna" }]);
   });
 
   it("text/reasoning/tool_calls/usage/finish 翻译为 OpenAI SSE", async () => {

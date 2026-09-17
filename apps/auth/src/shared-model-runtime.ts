@@ -17,13 +17,14 @@ import LlmRuntime, {
   ToolCallId,
   type ContentBlock,
   type GenerateOptions,
+  type LlmResolvedModelInfo,
   type Message,
   type StreamChunk,
   type ToolSchema,
 } from "@deepseek-ai/dsh-llm";
 import * as piAi from "@deepseek-ai/dsh-llm-pi-ai";
 import FileSettingsProvider from "@deepseek-ai/dsh-settings-file";
-import type { DesktopSharedRuntime } from "dsh-lark-auth-edge";
+import type { DesktopSharedModel, DesktopSharedRuntime } from "dsh-lark-auth-edge";
 import { InvalidSharedRequestError } from "dsh-lark-auth-edge";
 import * as deepseekRouting from "dsh-lark-deepseek-routing";
 
@@ -53,6 +54,7 @@ export async function createSharedModelRuntime(options: SharedModelRuntimeOption
     return createSharedModelRuntimeClient(
       ctx.llm.listProviders(),
       (provider) => ctx.llm.listModels(provider),
+      (provider, model) => ctx.llm.resolveModelInfo(provider, model),
       (request) => ctx.llm.stream(request),
       async () => { await ctx.fiber.dispose(); },
     );
@@ -62,20 +64,29 @@ export async function createSharedModelRuntime(options: SharedModelRuntimeOption
   }
 }
 
-/** 与 ctx 解耦的实现核心：注入目录枚举与流入口，便于无密钥重放的单测。 */
+/** 与 ctx 解耦的实现核心：注入目录枚举、resolved 元数据查询与流入口，便于无密钥重放的单测。 */
 export function createSharedModelRuntimeClient(
   providers: readonly { id: string; name: string }[],
   listModels: (provider: string) => Promise<readonly { id: string; name: string }[]>,
+  resolveModelInfo: (provider: string, model: string) => Promise<Pick<LlmResolvedModelInfo, "reasoning">>,
   stream: (request: GenerateOptions) => AsyncIterable<StreamChunk>,
   close: () => Promise<void>,
 ): SharedModelRuntime {
   return {
     close,
     async listModels() {
-      const entries: { provider: string; model: string; name: string }[] = [];
+      const entries: DesktopSharedModel[] = [];
       for (const provider of providers) {
         for (const model of await listModels(provider.id).catch(() => [])) {
-          entries.push({ provider: provider.id, model: model.id, name: model.name || model.id });
+          // resolved 失败（模型暂不可解析）只丢强度元数据，不丢目录条目本身。
+          const reasoning = await resolveModelInfo(provider.id, model.id).then(r => r.reasoning).catch(() => undefined);
+          entries.push({
+            provider: provider.id, model: model.id, name: model.name || model.id,
+            ...reasoning === undefined ? {} : {
+              reasoningEfforts: reasoning.efforts.map(e => ({ id: e.id, name: e.name, ...e.description === undefined ? {} : { description: e.description } })),
+              ...reasoning.defaultEffort === undefined ? {} : { defaultReasoningEffort: reasoning.defaultEffort },
+            },
+          });
         }
       }
       return entries;

@@ -73,7 +73,7 @@ export class InvalidSharedRequestError extends Error {
  * `stream` 产出完整的 OpenAI SSE `data:` 行（含结尾 [DONE]）。
  */
 export interface DesktopSharedRuntime {
-  listModels(): Promise<readonly { provider: string; model: string; name: string }[]>;
+  listModels(): Promise<readonly DesktopSharedModel[]>;
   stream(input: {
     provider: string;
     model: string;
@@ -87,6 +87,15 @@ export interface DesktopSharedRuntime {
     includeUsage?: boolean | undefined;
     signal: AbortSignal;
   }): AsyncIterable<string>;
+}
+
+/** 目录条目：reasoningEfforts/defaultReasoningEffort 由实现侧 resolved 元数据透传，缺省表示该模型不暴露强度选择。 */
+export interface DesktopSharedModel {
+  provider: string;
+  model: string;
+  name: string;
+  reasoningEfforts?: { id: string; name: string; description?: string }[] | undefined;
+  defaultReasoningEffort?: string | undefined;
 }
 
 export async function desktopInference(req: IncomingMessage, res: ServerResponse, options: {

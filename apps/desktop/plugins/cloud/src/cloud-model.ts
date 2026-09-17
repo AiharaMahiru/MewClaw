@@ -1,7 +1,7 @@
 /** 本地会话的云端模型桥接；配置由云端账号决定，API Key 始终留在服务器。 */
 import { createProvider, type Model } from '@earendil-works/pi-ai';
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy';
-import { LlmAdapter, LlmError, type GenerateOptions, type LlmProviderInfo, type LlmResolvedModelInfo, type StreamChunk } from '@deepseek-ai/dsh-llm';
+import { LlmAdapter, LlmError, ReasoningEffortId, type GenerateOptions, type LlmProviderInfo, type LlmResolvedModelInfo, type ResolvedRetryPolicy, type StreamChunk } from '@deepseek-ai/dsh-llm';
 import { PiAiAdapter, type PiAiAdapterOptions, type ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai';
 import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm';
 
@@ -13,6 +13,8 @@ const CONTEXT_WINDOW = 262144;
 const MAX_TOKENS = 32768;
 const CATALOG_TTL_MS = 5000;
 const NO_RETRY = { mode: 'normal' as const, maxRetries: 0, retryableCodes: [], initialDelayMs: 500, maxDelayMs: 10000, jitterRatio: 0.1 };
+/** 官方默认集合补 STREAM_CLOSED（上游断流不发 [DONE]）与 CLOUD_INFERENCE_FAILED（Edge 5xx）——部署重启窗口的瞬态失败在步骤边界自动重试，语义错误仍即时上浮。 */
+const CLOUD_RETRY_POLICY: ResolvedRetryPolicy = { mode: 'normal', maxRetries: 5, retryableCodes: ['EMPTY_RESPONSE', 'RATE_LIMIT', 'SERVER', 'TIMEOUT', 'TRANSPORT', 'STREAM_CLOSED', 'CLOUD_INFERENCE_FAILED'], initialDelayMs: 500, maxDelayMs: 10000, jitterRatio: 0.1 };
 const EMPTY_AUTH: PiAiAdapterOptions['auth'] = {
   credentials: { async read() { return undefined; }, async list() { return []; }, async modify(_id, fn) { return fn(undefined); }, async delete() {} },
   authContext: { async env() { return undefined; }, async fileExists() { return false; } },
@@ -33,6 +35,9 @@ interface CloudSharedModel {
   provider: string;
   model: string;
   name: string;
+  /** Edge 透传的服务端 resolved reasoning 元数据；缺省表示该模型不暴露强度选择。 */
+  reasoningEfforts?: { id: string; name: string; description?: string }[];
+  defaultReasoningEffort?: string;
 }
 
 interface CloudModelCatalog {
@@ -47,6 +52,7 @@ interface CatalogEntry {
   selector: string;
   name: string;
   description: string;
+  reasoning?: LlmResolvedModelInfo['reasoning'];
 }
 
 interface CachedCatalog {
@@ -124,7 +130,7 @@ export class CloudAccountModel extends LlmAdapter {
       return { id: model, selector: LEGACY_DEFAULT, name: model, description: `账号默认模型：${profile.displayName}` };
     }
     const shared = catalog.sharedModels.find(item => item.provider === provider && item.model === model);
-    if (shared) return { id: model, selector: `shared/${provider}/${model}`, name: shared.name, description: '部署共享模型' };
+    if (shared) return { id: model, selector: `shared/${provider}/${model}`, name: shared.name, description: '部署共享模型', reasoning: sharedReasoning(shared) };
     throw new LlmError('云端模型选择无效', 'MODEL_NOT_FOUND');
   }
 
@@ -161,7 +167,13 @@ export class CloudAccountModel extends LlmAdapter {
       inputModalities: ['text'],
       context: { contextWindow: CONTEXT_WINDOW },
       defaultMaxTokens: MAX_TOKENS,
+      ...entry.reasoning === undefined ? {} : { reasoning: entry.reasoning },
     };
+  }
+
+  /** 桥接路由注册时捕获的重试策略：对齐生产 Worker 的瞬态集合（含 STREAM_CLOSED/CLOUD_INFERENCE_FAILED）。 */
+  override providerRetryPolicy(_provider: string): ResolvedRetryPolicy {
+    return CLOUD_RETRY_POLICY;
   }
 
   override async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
@@ -258,10 +270,31 @@ function privateEntries(catalog: CloudModelCatalog): LlmResolvedModelInfo[] {
 }
 
 function sharedEntries(catalog: CloudModelCatalog, provider: string): LlmResolvedModelInfo[] {
-  return catalog.sharedModels.filter(item => item.provider === provider).map(item => ({
-    provider, id: item.model, name: item.name, description: '部署共享模型',
-    inputModalities: ['text'], context: { contextWindow: CONTEXT_WINDOW }, defaultMaxTokens: MAX_TOKENS,
-  }));
+  return catalog.sharedModels.filter(item => item.provider === provider).map(item => {
+    const reasoning = sharedReasoning(item);
+    return {
+      provider, id: item.model, name: item.name, description: '部署共享模型',
+      inputModalities: ['text'], context: { contextWindow: CONTEXT_WINDOW }, defaultMaxTokens: MAX_TOKENS,
+      ...reasoning === undefined ? {} : { reasoning },
+    };
+  });
+}
+
+/**
+ * 服务端下发的强度表 → Harness reasoning 元数据。`off` 经 pi-ai 只能在请求里表达为
+ * `reasoning_effort:"off"`（见 thinkingLevelMap），而它只在会话已固化默认值后可达：
+ * 无默认值的模型若仍展示 off，未选强度的请求会被静默改写成"关闭思考"——此时摘掉 off 档。
+ */
+function sharedReasoning(item: CloudSharedModel): CatalogEntry['reasoning'] {
+  const efforts = item.reasoningEfforts;
+  if (!efforts || efforts.length === 0) return undefined;
+  const hasDefault = item.defaultReasoningEffort !== undefined && efforts.some(e => e.id === item.defaultReasoningEffort);
+  const visible = hasDefault ? efforts : efforts.filter(e => e.id !== 'off');
+  if (visible.length === 0) return undefined;
+  return {
+    efforts: visible.map(e => ({ id: ReasoningEffortId(e.id), name: e.name, ...e.description === undefined ? {} : { description: e.description } })),
+    ...hasDefault ? { defaultEffort: ReasoningEffortId(item.defaultReasoningEffort!) } : {},
+  };
 }
 
 function defaultProfile(catalog: CloudModelCatalog): CloudModelProfile | undefined {
@@ -271,8 +304,13 @@ function defaultProfile(catalog: CloudModelCatalog): CloudModelProfile | undefin
 
 function gatewayProfile(origin: string, headers: Record<string, string>, entry: CatalogEntry): ResolvedPiAiProviderProfile {
   const baseURL = `${origin}/auth/desktop-inference`;
+  // Edge 白名单直接吃强度词（off/minimal/low/medium/high/xhigh/max），map 恒等即够；
+  // 'off' 必须有映射：pi-ai 把选中 off 剥成"不带强度"，回落分支再按 map.off 发出。
+  const thinkingLevelMap = entry.reasoning === undefined ? undefined
+    : Object.fromEntries(entry.reasoning.efforts.map(e => [e.id, e.id]));
   const model: Model<'openai-completions'> = { id: entry.selector, name: entry.name, api: 'openai-completions', provider: CLOUD_MODEL_PROVIDER,
-    baseUrl: baseURL, reasoning: false, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: CONTEXT_WINDOW, maxTokens: MAX_TOKENS };
+    baseUrl: baseURL, reasoning: entry.reasoning !== undefined, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: CONTEXT_WINDOW, maxTokens: MAX_TOKENS,
+    ...thinkingLevelMap === undefined ? {} : { thinkingLevelMap } };
   return { provider: CLOUD_MODEL_PROVIDER, displayName: entry.name, api: 'openai-completions', baseURL, headers,
     streamIdleTimeoutMs: 300000, maxRequestImageBytes: 20 * 1024 * 1024, requestImagePixelBudget: 4194304, requestImageMaxBytes: 1048576,
     retryPolicy: NO_RETRY, configuredMaxTokens: new Map(), modelErrors: new Map(),
@@ -345,9 +383,26 @@ function parseProfile(value: unknown): CloudModelProfile {
 /** provider 段不得含 `/`（否则选择器无法被服务端解析回原始条目）。 */
 function parseSharedModel(value: unknown): CloudSharedModel {
   if (!isRecord(value) || Object.hasOwn(value, 'apiKey')) throw new Error('INVALID_CLOUD_MODEL_PROFILE');
-  const entry = { provider: readString(value.provider), model: readString(value.model), name: readString(value.name) };
+  const entry: CloudSharedModel = { provider: readString(value.provider), model: readString(value.model), name: readString(value.name) };
   if (!entry.provider || entry.provider.includes('/') || !entry.model || !entry.name) throw new Error('INVALID_CLOUD_MODEL_PROFILE');
+  if (Array.isArray(value.reasoningEfforts)) {
+    const efforts = value.reasoningEfforts.map(parseEffort).filter((e): e is NonNullable<typeof e> => e !== undefined);
+    if (efforts.length > 0) {
+      entry.reasoningEfforts = efforts;
+      const defaultEffort = readString(value.defaultReasoningEffort);
+      if (defaultEffort) entry.defaultReasoningEffort = defaultEffort;
+    }
+  }
   return entry;
+}
+
+function parseEffort(value: unknown): { id: string; name: string; description?: string } | undefined {
+  if (!isRecord(value)) return undefined;
+  const id = readString(value.id);
+  const name = readString(value.name);
+  if (!id || !name) return undefined;
+  const description = readString(value.description);
+  return description === '' ? { id, name } : { id, name, description };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import type { GenerateOptions } from '@deepseek-ai/dsh-llm';
+import { ReasoningEffortId, type GenerateOptions } from '@deepseek-ai/dsh-llm';
 import { CloudAccountModel, CLOUD_MODEL_PROVIDER, PRIVATE_MODEL_PROVIDER } from './cloud-model.js';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -201,6 +201,60 @@ it('推理端点传输层抛错保留 TRANSPORT 码并给出连接指引', async
     .catch((error: unknown) => ({ code: (error as { code?: string }).code, message: (error as Error).message }));
   expect(result?.code).toBe('TRANSPORT');
   expect(result?.message).toContain('网络');
+});
+
+it('桥接重试策略覆盖瞬态失败码（含 STREAM_CLOSED/断流与 Edge 5xx），语义错误不重试', () => {
+  const { adapter } = boundAdapter();
+  for (const provider of ['deepseek-official', PRIVATE_MODEL_PROVIDER, CLOUD_MODEL_PROVIDER]) {
+    const policy = adapter.providerRetryPolicy(provider);
+    expect(policy?.mode).toBe('normal');
+    if (policy?.mode !== 'normal') continue;
+    for (const code of ['TRANSPORT', 'TIMEOUT', 'STREAM_CLOSED', 'RATE_LIMIT', 'CLOUD_INFERENCE_FAILED']) expect(policy.retryableCodes).toContain(code);
+    for (const code of ['CLOUD_LOGIN_REQUIRED', 'MODEL_UNAVAILABLE', 'PROMPT_AUDIT_REJECTED', 'CLOUD_DEFAULT_MODEL_REQUIRED']) expect(policy.retryableCodes).not.toContain(code);
+  }
+});
+
+const effortCatalog = {
+  ...catalog,
+  sharedModels: [{ provider: 'deepseek-official', model: 'deepseek-chat', name: 'DeepSeek V4',
+    reasoningEfforts: [{ id: 'off', name: 'Off' }, { id: 'low', name: 'Low' }, { id: 'high', name: 'High' }, { id: 'max', name: 'Max' }],
+    defaultReasoningEffort: 'high' }],
+};
+
+it('共享目录携带强度元数据时透出 reasoning，picker 与云端同构', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => catalogResponse(effortCatalog)));
+  const { adapter } = boundAdapter();
+  await adapter.catalogSnapshot();
+  const reasoning = { efforts: [{ id: 'off', name: 'Off' }, { id: 'low', name: 'Low' }, { id: 'high', name: 'High' }, { id: 'max', name: 'Max' }], defaultEffort: 'high' };
+  expect(await adapter.listModels('deepseek-official')).toMatchObject([{ id: 'deepseek-chat', reasoning }]);
+  await expect(adapter.resolveModel('deepseek-official', 'deepseek-chat')).resolves.toMatchObject({ reasoning });
+});
+
+it('服务端未下发默认值时不展示 off 档（未选强度的请求不得被改写为关闭思考）', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => catalogResponse({
+    ...catalog,
+    sharedModels: [{ provider: 'deepseek-official', model: 'deepseek-chat', name: 'DeepSeek V4',
+      reasoningEfforts: [{ id: 'off', name: 'Off' }, { id: 'high', name: 'High' }] }],
+  })));
+  const { adapter } = boundAdapter();
+  await adapter.catalogSnapshot();
+  const resolved = await adapter.resolveModel('deepseek-official', 'deepseek-chat');
+  expect(resolved.reasoning?.efforts.map(e => e.id)).toEqual(['high']);
+  expect(resolved.reasoning?.defaultEffort).toBeUndefined();
+});
+
+it('选中强度经 reasoning_effort 到达 Edge；off 档也能上线', async () => {
+  const bodies: string[] = [];
+  vi.stubGlobal('fetch', async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (String(url).endsWith('/auth/models')) return catalogResponse(effortCatalog);
+    bodies.push(String(init?.body));
+    return sseResponse();
+  });
+  const { adapter } = boundAdapter();
+  const base = { provider: 'deepseek-official', model: 'deepseek-chat', messages: [] };
+  await collect(adapter.stream({ ...base, reasoningEffort: ReasoningEffortId('low') }));
+  await collect(adapter.stream({ ...base, reasoningEffort: ReasoningEffortId('off') }));
+  expect(bodies.map(body => JSON.parse(body).reasoning_effort)).toEqual(['low', 'off']);
 });
 
 it('同步云端模型配置和密钥状态，但拒绝接收原始 API key', async () => {
