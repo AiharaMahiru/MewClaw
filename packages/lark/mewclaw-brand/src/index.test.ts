@@ -77,7 +77,9 @@ describe("dsh-lark-mewclaw-brand", () => {
     expect(html).toContain('sessionStorage.setItem("mewclaw.boot.v1","1")');
     expect(html).toContain("setTimeout(remove,1600)");
     expect(html).toContain("pointer-events:none");
-    // 移动适配覆盖层样式（§6 移动适配）
+    // 移动适配覆盖层样式（§6 移动适配）：抽屉断点对齐上游 narrow <1024，
+    // 顶栏收纳保留 ≤768 小屏阈值
+    expect(html).toContain("@media(max-width:1023px)");
     expect(html).toContain("@media(max-width:768px)");
     expect(html).toContain('[class*="_sidebarCol"]{position:fixed');
     expect(html).toContain('[class*="_centerCol"]{grid-column:1/-1}');

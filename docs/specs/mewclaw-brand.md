@@ -64,11 +64,12 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
 - 启动屏：`prefers-reduced-motion` 下不播放；~1.05s 后淡出并自删，失败兜底
   1600ms `setTimeout` 移除；
 - 移动适配：官方前端无移动断点，`≤768px` 视口下左侧栏列仍占 grid 轨侧推
-  挤压主列。注入样式把 `[class*="_sidebarCol"]` 改为 `fixed` 覆盖层
+  挤压主列（0.1.6 起 `<1024px` 即 narrow，仅给折叠态 56px rail）。移动适配
+  断点与上游 narrow 对齐为 `≤1023px`。注入样式把 `[class*="_sidebarCol"]` 改为 `fixed` 覆盖层
   （`top/bottom/left:0`，`z-index:120`，`height:100dvh`）；侧栏脱离 grid 布局后
   `centerCol` 会落进 56px 的首轨，须以 `grid-column:1/-1` 跨满全行；选择器用
   CSS Module 稳定后缀（`<hash>_<name>`，重建仅哈希变化），不改官方包；
-- 移动端侧栏折叠：`≤768px` 时整条 `sidebarCol`（含 55px 图标栏）默认
+- 移动端侧栏折叠：`≤1023px` 时整条 `sidebarCol`（含 56px 图标栏）默认
   `translateX(-110%)+visibility:hidden` 收起，`centerCol` 占满视口。注入的
   `data-mewclaw-rail` 脚本提供两种开合方式：左上角固定菜单键
   `mewclaw-rail-fab`（fixed top-left，`z-index` 低于抽屉/遮罩，抽屉展开时被
@@ -86,7 +87,7 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   touchmove 不受影响。脚本只做 DOM 开合，不读凭证、不发请求，
   `matchMedia` 在桌面视口短路；
 - 移动端抽屉不透明：官方侧栏背景为半透明 `rgba(28 28 35 / .5)`，桌面内联
-  无碍但作为覆盖层会透出下层内容；`≤768px` 下 `sidebarCol` 背景改不透明
+  无碍但作为覆盖层会透出下层内容；`≤1023px` 下 `sidebarCol` 背景改不透明
   （官方样式表同级规则在其后，须 `!important`）；
 - 右坞开关去重（全视口）：官方右坞把唯一展开入口注入会话头部角落
   （`data-sidebar-right-expand`），与第三方坞簇开关职责重复；隐藏前者，
