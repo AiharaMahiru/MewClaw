@@ -194,7 +194,7 @@ describe("Linux production overlays", () => {
     });
     expect(rowConfig(items, "sandbox-oci")).toMatchObject({
       image: { __jsExpr: "process.env.DSH_SANDBOX_IMAGE" },
-      network: "none",
+      network: "bridge",
       workspaceRoot: "/var/lib/dsh/workspaces",
     });
   });

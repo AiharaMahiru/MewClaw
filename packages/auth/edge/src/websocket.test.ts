@@ -104,7 +104,7 @@ describe("AuthEdgeServer WebSocket isolation", () => {
 
     const frames = await readFrames(edgeAddress.port, userResult!.token, origin, "/api/remote.mux", [
       maskedTextFrame(JSON.stringify({ type: "open", streamId: "events", endpoint: "$events", payload: { args: {} } })),
-      maskedTextFrame(JSON.stringify({ type: "open", streamId: "rpc", endpoint: "session/follow", payload: { args: {} } })),
+      maskedTextFrame(JSON.stringify({ type: "open", streamId: "rpc", endpoint: "session/follow", payload: { args: { request: { address: { kind: "session", sessionId: "own-session" } } } } })),
     ]);
     expect(frames).toHaveLength(7);
     expect(JSON.parse(frames[0]!).value.type).toBe("ready");
@@ -385,10 +385,12 @@ function textFrame(value: string): Buffer {
 }
 function maskedTextFrame(value: string): Buffer {
   const payload = Buffer.from(value, "utf8");
-  if (payload.length >= 126) throw new Error("test frame is unexpectedly large");
   const mask = Buffer.from([1, 2, 3, 4]);
   const encoded = Buffer.from(payload);
   for (let index = 0; index < encoded.length; index += 1) encoded[index] = encoded[index]! ^ mask[index % 4]!;
-  return Buffer.concat([Buffer.from([0x81, 0x80 | payload.length]), mask, encoded]);
+  if (payload.length < 126) return Buffer.concat([Buffer.from([0x81, 0x80 | payload.length]), mask, encoded]);
+  const header = Buffer.alloc(4);
+  header[0] = 0x81; header[1] = 0x80 | 126; header.writeUInt16BE(payload.length, 2);
+  return Buffer.concat([header, mask, encoded]);
 }
 function envelope(sessionId: string): string { return JSON.stringify({ type: "server-request", rpcId: "test", method: "events.mux", payload: { type: "session/event", sessionId, event: { type: "user/message" } } }); }

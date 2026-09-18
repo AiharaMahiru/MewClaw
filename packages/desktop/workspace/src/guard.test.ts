@@ -1,5 +1,6 @@
 import { Context } from '@deepseek-ai/cordis';
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session';
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection';
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
 import Tools, { defineTool } from '@deepseek-ai/dsh-tools';
 import { expect, it } from 'vitest';
@@ -9,6 +10,7 @@ import { workspaceJournal } from './journal.js';
 it('默认关闭桥接时允许普通归档父链，但归档本机父链仍拒绝', async () => {
   const ctx = new Context();
   await ctx.plugin(SessionStore); await ctx.plugin(SystemPrompt); await ctx.plugin(Tools, { mode: 'native' });
+  new SessionProjectionRegistry(ctx);
   let desktop = false, closed = 0, executions = 0;
   ctx.reflect.provide('credentials', { resolve: async () => undefined });
   ctx.reflect.provide('webServer', { register: () => () => {}, tapIndex: () => () => {} });
@@ -35,6 +37,7 @@ it('默认关闭桥接时允许普通归档父链，但归档本机父链仍拒�
 it('真实Tools运行时阻止父子会话的云端工具，后续allow策略不能重新放行', async () => {
   const ctx = new Context();
   await ctx.plugin(SessionStore); await ctx.plugin(SystemPrompt); await ctx.plugin(Tools, { mode: 'native' });
+  new SessionProjectionRegistry(ctx);
   const scope = { tenantId: 'dsh-web', botId: 'dsh-web', deploymentId: 'auth-edge', userId: 'a', conversationId: 'parent' };
   ctx.reflect.provide('credentials', { resolve: async () => ({ value: 'fixture-token' }) });
   ctx.reflect.provide('webServer', { register: () => () => {}, tapIndex: () => () => {} });

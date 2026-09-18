@@ -4,7 +4,7 @@
  * （SPEC docs/specs/model-seat.md）。不修改官方包、不建第二份状态。
  */
 import type { Context as ClientContext } from "@deepseek-ai/cordis";
-import type {} from "@deepseek-ai/dsh-api-session-controller/client";
+import type { ISessions } from "@deepseek-ai/dsh-api-session-controller/client";
 import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type {} from "@deepseek-ai/dsh-client-ui-model-selection/client";
 import type {} from "@deepseek-ai/dsh-client-ui-renderer/client";
@@ -39,7 +39,7 @@ export function applyModelSeat(ctx: ClientContext, React: SeatReactApi, dom: Sea
         priority: -1,
         inject: (sessionId) => {
           const directory = ctx.modelDirectories.directoryFor(sessionId);
-          const available = ctx.sessions.subagentAddress(sessionId) === undefined;
+          const available = (ctx.sessions as unknown as ISessions).subagentAddress(sessionId) === undefined;
           return {
             available,
             directory: directory.store,

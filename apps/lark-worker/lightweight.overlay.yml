@@ -72,3 +72,19 @@
   disabled: true
 - id: web-ui-pet
   disabled: true
+
+# 0.1.6 上游新增默认行的处置（与 full/oci 一致）：Web 终端宿主 PTY 与
+# 插件管理供应链写面全部显式关闭。
+- id: terminal-controller
+  disabled: true
+- id: ui-sidebar-terminal
+  disabled: true
+- id: plugin-manager
+  disabled: true
+- id: ui-plugin-manager
+  disabled: true
+
+# OTLP 会话遥测默认向 harness-telemetry.deepseeksvc.com 外发反馈事件；
+# 自建生产不向第三方端点外发会话数据，显式关闭。
+- id: session-telemetry-otel
+  disabled: true

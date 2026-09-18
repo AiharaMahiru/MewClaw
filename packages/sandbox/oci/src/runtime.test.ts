@@ -202,7 +202,7 @@ describe("OciSubprocessRuntime.spawn", () => {
 });
 
 describe("OciSandbox.confine", () => {
-  it("未就绪（podman 探活失败）→ SandboxUnavailableError", () => {
+  it("未就绪（podman 探活失败）→ SandboxUnavailableError", async () => {
     const core = new OciContainerRuntime({
       config,
       runFile: vi.fn(async () => {
@@ -210,26 +210,24 @@ describe("OciSandbox.confine", () => {
       }),
     });
     const sandbox = new OciSandbox(fakeCtx(), core);
-    expect(() => sandbox.confine(["bash"], { mode: "workspace-write", workspaceRoot: "." }))
-      .toThrowError(/podman 不可用/);
+    await expect(sandbox.confine(["bash"], { mode: "workspace-write", workspaceRoot: "." }))
+      .rejects.toThrowError(/podman 不可用/);
   });
 
   it("就绪后透传 argv 并声明 full enforcement", async () => {
     const core = new OciContainerRuntime({ config, runFile: vi.fn(async () => undefined) });
     const sandbox = new OciSandbox(fakeCtx(), core);
-    await vi.waitFor(() => {
-      const result = (() => {
-        try {
-          return sandbox.confine(["bash", "-c", "x"], { mode: "workspace-write", workspaceRoot: "." });
-        } catch {
-          return undefined;
-        }
-      })();
-      expect(result).toBeDefined();
-    });
-    const result = sandbox.confine(["bash", "-c", "x"], { mode: "workspace-write", workspaceRoot: "." });
+    // 0.1.6 起 confine 等待探测落定：无需先轮询就绪
+    const result = await sandbox.confine(["bash", "-c", "x"], { mode: "workspace-write", workspaceRoot: "." });
     expect(result.argv).toEqual(["bash", "-c", "x"]);
     expect(result.enforcement).toBe("full");
     expect(result.denialSignatures.length).toBeGreaterThan(0);
+  });
+
+  it("已取消信号立即拒绝（不等探测落定）", async () => {
+    const core = new OciContainerRuntime({ config, runFile: vi.fn(async () => undefined) });
+    const sandbox = new OciSandbox(fakeCtx(), core);
+    await expect(sandbox.confine(["x"], { mode: "workspace-write", workspaceRoot: "." }, AbortSignal.abort()))
+      .rejects.toThrow();
   });
 });

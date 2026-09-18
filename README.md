@@ -12,13 +12,13 @@
 
 - 已验证：独立桌面底座构建、Linux Electron 启动、云端登录，以及同账号桌面/Web 两轮真实续聊同步。
 - 已实现并验证：原生目录授权、文件工具、独立 Shell 授权/撤销、长命令心跳、二进制文件双向同步、冲突保留与可恢复删除；Auth Edge 到本机的离线 HTTP 全链路已通过。
-- 云端共享包与 Web 使用 DSH `0.1.5-rc.2`；独立桌面底座保持 `0.1.2-rc.1`。官方包不修改，桌面客户端和云端的共享 Consumer 分别验证兼容性。
+- 云端共享包与 Web 使用 DSH `0.1.6-alpha.2`；独立桌面底座保持 `0.1.2-rc.1`。官方包不修改，桌面客户端和云端的共享 Consumer 分别验证兼容性。
 - 云端通过 [可选 overlay](config/desktop-workspace.patch.yml) 启用桌面桥接，默认保持关闭。Git 合并和推送不会自动切换生产。
 - 本机 Shell 以当前系统用户权限执行，cwd 不是沙箱；Shell 和同步分别原生确认。同步不复制空目录和权限位，不自动解决冲突，不重放离线写入，不自动接管其他设备。
 
-DSH 核心及官方插件锁定 `0.1.5-rc.2`（2026-09 自 rc.1 升级，见 [升级说明](docs/dsh-0.1.5-upgrade.md)）。lightweight 不再裁剪执行能力，保留模式 ID 并复用官方 standard；Scope、目录授权、审批及 OCI 边界不变。
+DSH 核心及官方插件锁定 `0.1.6-alpha.2`（2026-09 自 `0.1.5-rc.2` 升级，评估与实施记录见 [0.1.6 升级文档](docs/dsh-0.1.6-upgrade.md)）。lightweight 不再裁剪执行能力，保留模式 ID 并复用官方 standard；Scope、目录授权、审批及 OCI 边界不变。
 
-截至 **2026-09-14，生产基线为 `R25-model-seat-scroll-20260914`**（含模型选择器 effort 滑条遮蔽、Auth Edge 会话持久化与代理体上限、文档/尺寸门禁收口）。本机生产入口 `/opt/dsh/current` 指向 `releases/R25-model-seat-scroll-20260914`；Git 分支后续提交不等于生产已发布。
+截至 **2026-09-17，生产基线为 `R58-desktop-dev-reasoning-20260917`**（构建自 `desktop-dev@7c8dc2c`，含 `/auth/models` 推理强度元数据、liquid-glass backdrop-filter 修复及 R52–R57 全部主线修复）。本机生产入口 `/opt/dsh/current` 指向 `releases/R58-desktop-dev-reasoning-20260917`；Git 分支后续提交不等于生产已发布。
 
 ## 分支协作
 

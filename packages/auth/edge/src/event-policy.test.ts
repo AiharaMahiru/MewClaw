@@ -68,8 +68,8 @@ describe("user WebSocket event policy", () => {
     await service.saveResource({ resourceType: "session", resourceId: "own-session", userId: user.id, resourcePath: `D:/workspaces/users/${user.id}`, createdAt: "2026-08-19T00:00:00.000Z" });
     const policy = await createUserRemoteMuxPolicy(service, user, { user: "D:/workspaces/users", admin: "D:/workspaces/admin" });
     policy.observeClientFrames(remoteOpen("events-stream", "$events"));
-    policy.observeClientFrames(remoteOpen("business-stream", "session/follow"));
-    policy.observeClientFrames(remoteOpen("error-stream", "session/follow"));
+    policy.observeClientFrames(remoteOpen("business-stream", "acme/custom-stream"));
+    policy.observeClientFrames(remoteOpen("error-stream", "acme/custom-stream"));
     const filter = policy.filterServerFrames;
 
     const ready = remoteFrame({ type: "ready", clientId: "client-1", host: { home: "/var/lib/dsh" } });
@@ -131,13 +131,88 @@ describe("user WebSocket event policy", () => {
     await service.register("fake-ready@example.com", "correct horse battery staple", "Fake Ready", { requestId: "test" });
     const user = (await service.verifyEmailCode("fake-ready@example.com", mail.verification[1]!, { requestId: "test" }))!.user;
     const policy = await createUserRemoteMuxPolicy(service, user, { user: "D:/workspaces/users", admin: "D:/workspaces/admin" });
-    policy.observeClientFrames(remoteOpen("business-stream", "session/follow"));
+    policy.observeClientFrames(remoteOpen("business-stream", "acme/custom-stream"));
     const fakeReady = remoteFrame({ type: "ready", clientId: "client-1", host: { home: "/var/lib/dsh" } }, "business-stream");
     const foreignEmit = remoteFrame({ type: "emit", event: "api-session/status", args: ["foreign-session", true] }, "business-stream");
     expect(await policy.filterServerFrames(fakeReady)).toBe(fakeReady);
     expect(await policy.filterServerFrames(foreignEmit)).toBe(foreignEmit);
     const end = remoteTerminal("end", "business-stream");
     expect(await policy.filterServerFrames(end)).toBe(end);
+  });
+
+  it("session/follow 与 workspaceFiles/changes 按 open 声明的会话归属放行或拒绝", async () => {
+    const mail = new FakeMail();
+    const service = new AuthService({ store: new MemoryAuthStore(), mail });
+    await service.register("admin@example.com", "correct horse battery staple", "Admin", { requestId: "test" });
+    await service.verifyEmailCode("admin@example.com", mail.verification[0]!, { requestId: "test" });
+    await service.register("scoped@example.com", "correct horse battery staple", "Scoped", { requestId: "test" });
+    const user = (await service.verifyEmailCode("scoped@example.com", mail.verification[1]!, { requestId: "test" }))!.user;
+    await service.saveResource({ resourceType: "session", resourceId: "own-session", userId: user.id, resourcePath: `D:/workspaces/users/${user.id}`, createdAt: "2026-08-19T00:00:00.000Z" });
+    const policy = await createUserRemoteMuxPolicy(service, user, { user: "D:/workspaces/users", admin: "D:/workspaces/admin" });
+
+    const open = (streamId: string, endpoint: string, args: Record<string, unknown>) =>
+      policy.observeClientFrames(JSON.stringify({ type: "open", streamId, endpoint, payload: { args } }));
+
+    // 自有会话的 follow 全量透传（含 subagent 地址按父会话归属）。
+    open("follow-own", "session/follow", { request: { address: { kind: "session", sessionId: "own-session" } } });
+    const ownItem = remoteFrame({ type: "snapshot", seq: 1 }, "follow-own");
+    expect(await policy.filterServerFrames(ownItem)).toBe(ownItem);
+    open("follow-sub", "session/follow", { request: { address: { kind: "subagent", parentSessionId: "own-session", childSessionId: "child-1", mode: "continuable" } } });
+    const subItem = remoteFrame({ type: "events", events: [] }, "follow-sub");
+    expect(await policy.filterServerFrames(subItem)).toBe(subItem);
+
+    // 他人会话：首个 item 回 forbidden error 帧显式终止，后续帧丢弃。
+    open("follow-foreign", "session/follow", { request: { address: { kind: "session", sessionId: "foreign-session" } } });
+    const denied = JSON.parse((await policy.filterServerFrames(remoteFrame({ type: "snapshot", seq: 1 }, "follow-foreign")))!);
+    expect(denied).toMatchObject({ type: "error", streamId: "follow-foreign", error: { code: "forbidden" } });
+    expect(await policy.filterServerFrames(remoteFrame({ type: "snapshot", seq: 2 }, "follow-foreign"))).toBeNull();
+
+    // 缺 address 的畸形 open 同样 fail closed。
+    open("follow-bad", "session/follow", {});
+    const badDenied = JSON.parse((await policy.filterServerFrames(remoteFrame({ type: "x" }, "follow-bad")))!);
+    expect(badDenied.error.code).toBe("forbidden");
+
+    // workspaceFiles/changes 以 workspaceFileScopeId 判定归属。
+    open("changes-own", "workspaceFiles/changes", { workspaceFileScopeId: "own-session" });
+    const changeItem = remoteFrame({ type: "changed", path: "a.ts" }, "changes-own");
+    expect(await policy.filterServerFrames(changeItem)).toBe(changeItem);
+    open("changes-foreign", "workspaceFiles/changes", { workspaceFileScopeId: "foreign-session" });
+    const changeDenied = JSON.parse((await policy.filterServerFrames(remoteFrame({ type: "changed", path: "b.ts" }, "changes-foreign")))!);
+    expect(changeDenied.error.code).toBe("forbidden");
+
+    // 终端流端点生产禁用：无论参数一律拒绝。
+    open("term", "terminal/follow", { id: "t1" });
+    const termDenied = JSON.parse((await policy.filterServerFrames(remoteFrame({ type: "snapshot", screen: "sh" }, "term")))!);
+    expect(termDenied.error.code).toBe("forbidden");
+  });
+
+  it("session/control 全局流按会话归属裁剪 baseline 与增量帧", async () => {
+    const mail = new FakeMail();
+    const service = new AuthService({ store: new MemoryAuthStore(), mail });
+    await service.register("admin@example.com", "correct horse battery staple", "Admin", { requestId: "test" });
+    await service.verifyEmailCode("admin@example.com", mail.verification[0]!, { requestId: "test" });
+    await service.register("control@example.com", "correct horse battery staple", "Control", { requestId: "test" });
+    const user = (await service.verifyEmailCode("control@example.com", mail.verification[1]!, { requestId: "test" }))!.user;
+    await service.saveResource({ resourceType: "session", resourceId: "own-session", userId: user.id, resourcePath: `D:/workspaces/users/${user.id}`, createdAt: "2026-08-19T00:00:00.000Z" });
+    const policy = await createUserRemoteMuxPolicy(service, user, { user: "D:/workspaces/users", admin: "D:/workspaces/admin" });
+    policy.observeClientFrames(remoteOpen("control", "session/control"));
+
+    const baseline = remoteFrame({ type: "baseline", value: {
+      jobs: { "own-session": [{ id: "j1" }], "foreign-session": [{ id: "j2" }] },
+      projections: { "own-session": { agentPreset: "standard" }, "foreign-session": { agentPreset: "x" } },
+    } }, "control");
+    const filtered = JSON.parse((await policy.filterServerFrames(baseline))!);
+    expect(Object.keys(filtered.value.value.jobs)).toEqual(["own-session"]);
+    expect(Object.keys(filtered.value.value.projections)).toEqual(["own-session"]);
+
+    const ownJobs = remoteFrame({ type: "jobs", sessionId: "own-session", jobs: [] }, "control");
+    expect(await policy.filterServerFrames(ownJobs)).toBe(ownJobs);
+    expect(await policy.filterServerFrames(remoteFrame({ type: "jobs", sessionId: "foreign-session", jobs: [] }, "control"))).toBeNull();
+    expect(await policy.filterServerFrames(remoteFrame({ type: "projection", sessionId: "foreign-session", key: "k", value: 1, seq: 3 }, "control"))).toBeNull();
+    const ownProjection = remoteFrame({ type: "projection", sessionId: "own-session", key: "agentPreset", value: "standard", seq: 4 }, "control");
+    expect(await policy.filterServerFrames(ownProjection)).toBe(ownProjection);
+    // 未知控制帧 fail closed。
+    expect(await policy.filterServerFrames(remoteFrame({ type: "surprise", sessionId: "own-session" }, "control"))).toBeNull();
   });
 
   it("限制活动 Remote 流状态并在终态与 cancel 时释放", async () => {

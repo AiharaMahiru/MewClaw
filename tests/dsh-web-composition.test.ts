@@ -188,7 +188,7 @@ describe("官方 dsh Web 组合", () => {
     expect(manifest.dependencies).toMatchObject({
       "dsh-context": "0.48.0",
       "@linxin666/dsh-web-all": "0.3.19",
-      "dsh-better-sidebar": "0.18.1",
+      "dsh-better-sidebar": "0.19.1",
     });
     expect(manifest.dsh?.profile?.bundles).not.toContain("dsh-better-sidebar");
 

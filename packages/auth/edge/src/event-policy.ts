@@ -33,6 +33,7 @@ const REMOTE_SCOPED_EMIT_EVENTS = new Set([
   "api-session/status",
   "cordis/inspect-query",
   "cordis/request-run",
+  "goal/activation-changed",
 ]);
 const REMOTE_SCOPED_WATERFALL_EVENTS = new Set(["approval/request", "user-questions/request"]);
 
@@ -49,7 +50,14 @@ export interface UserRemoteMuxPolicy {
 
 type RemoteMuxStreamState =
   | { kind: "business" }
+  // denied：归属校验失败或端点被禁；首个 item 回合成 error 帧显式终止，
+  // 之后全部丢弃，避免客户端悬挂。
+  | { kind: "denied"; reported?: boolean }
   | { kind: "workspace" }
+  | { kind: "session-control" }
+  // session/follow 与 workspaceFiles/changes 按 open 帧声明的会话归属在首个
+  // item 处惰性判定；拒绝后按 denied 处理。
+  | { kind: "session-scoped"; sessionId: string; allowed?: boolean; reported?: boolean }
   | { kind: "event"; phase: "opening" | "ready" | "rejected" };
 
 export async function createUserEventFilter(service: AuthService, user: AuthUser, roots: { user: string; admin: string }): Promise<WebSocketServerFrameFilter> {
@@ -158,7 +166,20 @@ async function filterRemoteMuxFrame(
   }
 
   const value = parseRecord(frame.value);
+  if (state.kind === "denied") {
+    if (state.reported) return null;
+    state.reported = true;
+    return deniedStreamFrame(streamId);
+  }
   if (state.kind === "business") return text;
+  if (state.kind === "session-scoped") {
+    state.allowed ??= await resources.owns("session", state.sessionId);
+    if (state.allowed) return text;
+    if (state.reported) return null;
+    state.reported = true;
+    return deniedStreamFrame(streamId);
+  }
+  if (state.kind === "session-control") return value ? await filterSessionControlFrame(text, value, resources) : null;
   if (state.kind === "workspace") return value ? await filterWorkspaceFollowFrame(text, value, resources) : null;
   if (state.phase === "rejected") return null;
   if (state.phase === "opening") {
@@ -191,12 +212,76 @@ function observeRemoteMuxClientFrame(text: string, streamStates: Map<string, Rem
   if (!endpoint) return;
   if (streamStates.has(streamId) || closedStreamIds.has(streamId)) throw new Error("duplicate Remote mux stream id");
   if (streamStates.size >= MAX_REMOTE_MUX_STREAMS) throw new Error("Remote mux stream limit exceeded");
+  // Web 终端流端点在组合层已禁用；即使组合被改动这里仍 fail closed。
+  if (endpoint.startsWith("terminal/")) {
+    streamStates.set(streamId, { kind: "denied" });
+    return;
+  }
+  if (endpoint === "session/control") {
+    streamStates.set(streamId, { kind: "session-control" });
+    return;
+  }
+  if (endpoint === "session/follow" || endpoint === "workspaceFiles/changes") {
+    const sessionId = scopedStreamSessionId(endpoint, frame);
+    streamStates.set(streamId, sessionId ? { kind: "session-scoped", sessionId } : { kind: "denied" });
+    return;
+  }
   streamStates.set(streamId,
     endpoint === REMOTE_EVENT_STREAM_ENDPOINT
       ? { kind: "event", phase: "opening" }
       : endpoint === "workspace/follow"
         ? { kind: "workspace" }
         : { kind: "business" });
+}
+
+/** 从 open 帧 payload.args 提取会话归属：session/follow 在 request.address，changes 在 workspaceFileScopeId。 */
+function scopedStreamSessionId(endpoint: string, frame: Record<string, unknown>): string | undefined {
+  const payload = parseRecord(frame.payload);
+  const args = parseRecord(payload?.args);
+  if (endpoint === "workspaceFiles/changes") return stringValue(args?.workspaceFileScopeId);
+  const request = parseRecord(args?.request);
+  const address = parseRecord(request?.address);
+  if (!address) return undefined;
+  // subagent 地址用父会话归属判定：子会话是父会话资源树的成员。
+  return stringValue(address.sessionId) ?? stringValue(address.parentSessionId);
+}
+
+/** session/control 是 Host 全局流：baseline 与增量帧都按会话归属裁剪。 */
+async function filterSessionControlFrame(text: string, value: Record<string, unknown>, resources: UserResourceAccessors): Promise<string | null> {
+  const type = stringValue(value.type);
+  if (type === "baseline") {
+    const baseline = parseRecord(value.value);
+    if (!baseline) return null;
+    const jobs = parseRecord(baseline.jobs);
+    const projections = parseRecord(baseline.projections);
+    return JSON.stringify({ ...parseRecordJson(text), value: {
+      ...value,
+      value: {
+        ...baseline,
+        jobs: await filterOwnedRecord(jobs, resources),
+        projections: await filterOwnedRecord(projections, resources),
+      },
+    } });
+  }
+  if (type === "jobs" || type === "projection") {
+    const sessionId = stringValue(value.sessionId);
+    return sessionId && await resources.owns("session", sessionId) ? text : null;
+  }
+  // 未知控制帧不猜语义，fail closed。
+  return null;
+}
+
+async function filterOwnedRecord(value: Record<string, unknown> | undefined, resources: UserResourceAccessors): Promise<Record<string, unknown>> {
+  if (!value) return {};
+  const output: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value)) {
+    if (await resources.owns("session", key)) output[key] = entry;
+  }
+  return output;
+}
+
+function deniedStreamFrame(streamId: string): string {
+  return JSON.stringify({ type: "error", streamId, error: { code: "forbidden", message: "stream not allowed", details: {} } });
 }
 
 async function filterWorkspaceFollowFrame(text: string, value: Record<string, unknown>, resources: UserResourceAccessors): Promise<string | null> {
@@ -323,6 +408,7 @@ async function filterRemoteEventValue(value: Record<string, unknown>, resources:
 
 function remoteEmitSessionId(event: string, args: unknown[]): string | undefined {
   if (event === "cordis/inspect-query" || event === "cordis/request-run") return stringValue(parseRecord(args[0])?.agentId);
+  if (event === "goal/activation-changed") return stringValue(parseRecord(args[0])?.sessionId);
   return stringValue(args[0]);
 }
 
