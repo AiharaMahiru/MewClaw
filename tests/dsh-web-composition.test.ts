@@ -474,6 +474,7 @@ describe("官方 dsh Web 组合", () => {
     expect(roster?.config).toEqual({
       default: "lark-lightweight",
       roots: (overlayRows("apps/lark-worker/full.overlay.yml").find((row) => row.id === "agent-presets")?.config as { roots: unknown }).roots,
+      includeShippedRoot: false,
       includeUserRoot: false,
     });
 
@@ -497,11 +498,11 @@ describe("官方 dsh Web 组合", () => {
 
     const webRows = overlayRows("packages/bundle/web/cordis.patch.yml");
     expect(webRows.find((row) => row.id === "agent-presets")?.config)
-      .toEqual(expect.objectContaining({ default: "standard", includeUserRoot: false }));
+      .toEqual(expect.objectContaining({ default: "standard", includeShippedRoot: false, includeUserRoot: false }));
     expect(overlayRows("apps/lark-worker/oci.overlay.yml"))
       .toContainEqual(expect.objectContaining({
         id: "agent-presets",
-        config: expect.objectContaining({ default: "standard", includeUserRoot: false }),
+        config: expect.objectContaining({ default: "standard", includeShippedRoot: false, includeUserRoot: false }),
       }));
   });
 
@@ -531,6 +532,7 @@ describe("官方 dsh Web 组合", () => {
           trust: "system",
         },
       ],
+      includeShippedRoot: false,
       includeUserRoot: false,
     });
     expect(rows.find((row) => row.id === "lark-run")?.config).toEqual(expect.objectContaining({
@@ -560,7 +562,7 @@ describe("官方 dsh Web 组合", () => {
   });
 
   it("full 与 OCI 的 system roots 实际组成恰好七项 preset", () => {
-    const expected = ["cordis", "lark-lightweight", "lark-standard", "liangshen", "minimal", "ptc", "standard"];
+    const expected = ["cordis", "cordis", "lark-lightweight", "lark-standard", "liangshen", "minimal", "ptc", "standard"];
     const ids = [
       ...readdirSync(repositoryPath("packages/bundle/web/agent-presets-lightweight")),
       ...readdirSync(repositoryPath("packages/bundle/web/agent-presets")),
