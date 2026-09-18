@@ -10,7 +10,7 @@ MewClaw 是基于 **DeepSeek Harness（DSH）与 Cordis** 的智能体平台，�
 
 桌面工作区云端配套已加入源码：自有插件支持本机文件工具、独立授权的 Shell 和目录双向同步。普通 Web 保持云端默认行为，桌面连接需显式启用 [部署 overlay](config/desktop-workspace.patch.yml)，不随 Git 更新自动上线。架构、安全边界和测试入口见 [工作区 SPEC](docs/specs/desktop-workspace.md) 与 [插件说明](packages/desktop/workspace/README.md)；桌面发行和原生授权界面由 `desktop` 分支维护。
 
-DSH 核心及官方插件锁定 `0.1.5-rc.2`（2026-09 自 rc.1 升级，见 [升级说明](docs/dsh-0.1.5-upgrade.md)）。上游 `0.1.6` 处于 alpha 阶段（评估与修复计划见 [0.1.6 升级评估](docs/dsh-0.1.6-upgrade.md)，等 `0.1.6-rc.x` 再执行适配）。lightweight 不再裁剪执行能力，保留模式 ID 并复用官方 standard；Scope、目录授权、审批及 OCI 边界不变。
+DSH 核心及官方插件锁定 `0.1.6-alpha.2`（2026-09 自 `0.1.5-rc.2` 升级，评估与实施记录见 [0.1.6 升级文档](docs/dsh-0.1.6-upgrade.md)）。lightweight 不再裁剪执行能力，保留模式 ID 并复用官方 standard；Scope、目录授权、审批及 OCI 边界不变。
 
 截至 **2026-09-18，生产基线为 `R59-dsh-0.1.6-alpha2-20260918`**（构建自 `desktop-dev@b6629c7`，DSH 内核 `0.1.5-rc.2 → 0.1.6-alpha.2`：sandbox 可取消异步接口、会话投影 API、Messages 协议固化、cordis preset 遮蔽与 Web 终端/遥测/插件页生产禁用；详见 [0.1.6 升级文档](docs/dsh-0.1.6-upgrade.md) §五）。本机生产入口 `/opt/dsh/current` 指向 `releases/R59-dsh-0.1.6-alpha2-20260918`；Git 分支后续提交不等于生产已发布。
 
@@ -34,7 +34,7 @@ docs/       # 架构、SPEC、发布说明与验收证据
 
 ## 开发与验证
 
-需要 Node.js 24+、pnpm 10.30.3；生产构建使用部署指定的固定 Node 版本。DSH 核心依赖当前锁定为 `0.1.5-rc.2`，以锁文件为准。
+需要 Node.js 24+、pnpm 10.30.3；生产构建使用部署指定的固定 Node 版本。DSH 核心依赖当前锁定为 `0.1.6-alpha.2`，以锁文件为准。
 
 ```sh
 pnpm install --frozen-lockfile
