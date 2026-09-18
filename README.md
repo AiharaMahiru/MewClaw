@@ -12,7 +12,7 @@ MewClaw 是基于 **DeepSeek Harness（DSH）与 Cordis** 的智能体平台，�
 
 DSH 核心及官方插件锁定 `0.1.5-rc.2`（2026-09 自 rc.1 升级，见 [升级说明](docs/dsh-0.1.5-upgrade.md)）。上游 `0.1.6` 处于 alpha 阶段（评估与修复计划见 [0.1.6 升级评估](docs/dsh-0.1.6-upgrade.md)，等 `0.1.6-rc.x` 再执行适配）。lightweight 不再裁剪执行能力，保留模式 ID 并复用官方 standard；Scope、目录授权、审批及 OCI 边界不变。
 
-截至 **2026-09-17，生产基线为 `R58-desktop-dev-reasoning-20260917`**（构建自 `desktop-dev@7c8dc2c`，含 `/auth/models` 推理强度元数据、liquid-glass backdrop-filter 修复及 R52–R57 全部主线修复）。本机生产入口 `/opt/dsh/current` 指向 `releases/R58-desktop-dev-reasoning-20260917`；Git 分支后续提交不等于生产已发布。
+截至 **2026-09-18，生产基线为 `R59-dsh-0.1.6-alpha2-20260918`**（构建自 `desktop-dev@b6629c7`，DSH 内核 `0.1.5-rc.2 → 0.1.6-alpha.2`：sandbox 可取消异步接口、会话投影 API、Messages 协议固化、cordis preset 遮蔽与 Web 终端/遥测/插件页生产禁用；详见 [0.1.6 升级文档](docs/dsh-0.1.6-upgrade.md) §五）。本机生产入口 `/opt/dsh/current` 指向 `releases/R59-dsh-0.1.6-alpha2-20260918`；Git 分支后续提交不等于生产已发布。
 
 - R3 已发布远程设置修复和四模式整合，见 [R3 设计说明](docs/specs/web-remote-settings-r3.md) 与 [生产验收记录](docs/evidence/r3-production-20260910.md)。
 - 早期 M0–M5 飞书迁移验收见 [历史证据](docs/evidence/m5-feishu-acceptance.md)，不代表后续新增功能已通过端到端验收。
