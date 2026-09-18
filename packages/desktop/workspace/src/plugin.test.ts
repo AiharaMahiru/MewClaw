@@ -1,5 +1,6 @@
 import { Context } from '@deepseek-ai/cordis';
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session';
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection';
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt';
 import Tools from '@deepseek-ai/dsh-tools';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -13,6 +14,7 @@ it('真实插件装配校验凭证与会话云端根，sync不能指定任意服
   const root = await mkdtemp(join(tmpdir(), 'mewclaw-plugin-'));
   const ctx = new Context();
   await ctx.plugin(SessionStore); await ctx.plugin(SystemPrompt); await ctx.plugin(Tools, { mode: 'native' });
+  new SessionProjectionRegistry(ctx);
   const scope = { tenantId: 'dsh-web', botId: 'dsh-web', deploymentId: 'auth-edge', userId: 'alice', conversationId: 'sync-session' };
   const routes: Array<{ handler(req: IncomingMessage, res: ServerResponse): void | Promise<void> }> = [];
   ctx.reflect.provide('credentials', { resolve: async () => ({ value: 'fixture-token' }) });

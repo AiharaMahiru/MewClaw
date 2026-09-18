@@ -15,7 +15,7 @@ import { ownerKey } from './wire.js';
 import { prepareLineage, childToolDenial } from './lineage.js';
 
 export const name = 'desktop-workspace';
-export const inject = ['webServer', 'credentials', 'sessions', 'sessionPersistence', 'tools', 'larkScopeIndex'];
+export const inject = ['webServer', 'credentials', 'sessions', 'sessionPersistence', 'sessionProjections', 'tools', 'larkScopeIndex'];
 export const Config = z.object({
   enabled: z.boolean().default(false),
   tokenRef: z.string().required(),

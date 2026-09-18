@@ -158,7 +158,7 @@ describe("OciContainerRuntime", () => {
     const handle = await runtime.provision("scope-1", "quota-1", cfg.workspaceRoot);
     const rmCalls = runFile.mock.calls.filter((call) => (call[1] as string[])[0] === "rm");
     expect(rmCalls).toHaveLength(1);
-    expect(rmCalls[0]![1][3]).toBe(handle.name);
+    expect((rmCalls[0]![1] as string[])[3]).toBe(handle.name);
     expect(runFile.mock.calls.filter((call) => (call[1] as string[])[0] === "run")).toHaveLength(2);
     expect(warn).toHaveBeenCalledWith(expect.stringMatching(/冲突/));
   });

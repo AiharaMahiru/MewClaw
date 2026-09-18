@@ -23,6 +23,7 @@ import {
   type SubprocessOutcome,
   type SubprocessOutputReader,
   type SubprocessSpawnSpec,
+  type SubprocessTerminalEnvironment,
 } from "@deepseek-ai/dsh-subprocess";
 
 import type { ResolvedSandboxConfig } from "./config.js";
@@ -140,6 +141,11 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
     return binding;
   }
 
+  /** 容器执行世界是 Linux/bash——与镜像固定工具链一致。 */
+  async terminalEnvironment(): Promise<SubprocessTerminalEnvironment> {
+    return { platform: "posix", defaultShell: "/bin/bash" };
+  }
+
   async resolveExecutable(command: string): Promise<string> {
     if (PACKAGED_RIPGREP.test(command)) return CONTAINER_RIPGREP;
     // 裸名交给容器内 PATH（镜像工具链负责）；相对含分隔符路径拒绝。
@@ -237,6 +243,8 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
       stdin: spec.stdio.stdin === "pipe" ? (stdinStream as Writable) : undefined,
       stdout: spec.stdio.stdout === "pipe" ? (stdoutStream as Readable) : undefined,
       stderr: spec.stdio.stderr === "pipe" ? (stderrStream as Readable) : undefined,
+      // fd7 控制管道是本地宿主原语，OCI 边界不暴露该通道。
+      control: undefined,
       collected,
       done: outcome,
       terminate,
@@ -262,22 +270,18 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
 
 /** SandboxProvider：容器即边界，confine 透传；podman 未就绪 fail closed。 */
 export class OciSandbox extends SandboxProvider {
-  private ready = false;
+  private readonly ready: Promise<boolean>;
 
   constructor(ctx: Context, core: OciContainerRuntime) {
     super(ctx);
-    void (async () => {
-      try {
-        await core.probe();
-        this.ready = true;
-      } catch {
-        this.ready = false;
-      }
-    })();
+    this.ready = core.probe().then(() => true, () => false);
   }
 
-  confine(argv: readonly string[], policy: SandboxPolicy): ConfinedArgv {
-    if (!this.ready) {
+  // 0.1.6 起 confine 为可取消异步：先等 podman 探测落定再判定，
+  // 消除探测在途时调用的假阴性拒绝；signal 命中即按取消契约抛出。
+  async confine(argv: readonly string[], policy: SandboxPolicy, signal?: AbortSignal): Promise<ConfinedArgv> {
+    signal?.throwIfAborted();
+    if (!(await this.ready)) {
       throw new SandboxUnavailableError(policy.mode, "podman 不可用（OCI 沙箱未就绪）");
     }
     return {

@@ -40,7 +40,7 @@ interface RoutingSnapshot {
 export class RoutedDeepSeekAdapter extends LlmAdapter {
   constructor(private readonly delegate: DeepSeekAdapter, private readonly snapshot: () => RoutingSnapshot) { super(); }
   override providerInfo(provider: string): LlmProviderInfo { return this.delegate.providerInfo(provider); }
-  override providerRetryPolicy(provider: string): ResolvedRetryPolicy { return this.delegate.providerRetryPolicy(provider); }
+  override providerRetryPolicy(provider: string): ResolvedRetryPolicy | undefined { return this.delegate.providerRetryPolicy(provider); }
   override imageRequestPricing(provider: string, model: string): ReturnType<LlmAdapter["imageRequestPricing"]> {
     this.assertEnabled(model, this.snapshot());
     return this.delegate.imageRequestPricing(provider, model);

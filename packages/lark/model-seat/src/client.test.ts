@@ -12,13 +12,14 @@ import {
   initialView,
   triggerEffortLabel,
   triggerModelLabel,
+  type SeatDomApi,
   type SeatGroup,
   type SeatModel,
   type SeatProps,
   type SeatSnapshot,
 } from "./seat.js";
 
-type El = { type: unknown; props: Record<string, unknown> | null; children: unknown[] };
+type El = { type: unknown; props: Record<string, unknown>; children: unknown[] };
 
 /** 可控假 React：useState 依序取 states 种子，setter 记录调用。 */
 function makeReact(states: unknown[] = []) {
@@ -28,7 +29,7 @@ function makeReact(states: unknown[] = []) {
     sets,
     react: {
       createElement(type: unknown, props: Record<string, unknown> | null, ...children: unknown[]): El {
-        return { type, props, children };
+        return { type, props: props ?? {}, children };
       },
       useSyncExternalStore<T>(_sub: (fn: () => void) => () => void, get: () => T): T {
         return get();
@@ -55,7 +56,7 @@ function makeReact(states: unknown[] = []) {
   };
 }
 
-const dom = { createPortal: (node: unknown, host: unknown) => ({ portal: node, host }) };
+const dom = { createPortal: (node: unknown, host: unknown) => ({ portal: node, host }) } as unknown as SeatDomApi;
 
 /** 滑条测试用的最小 React：useRef 固定返回 100px 宽的轨道。 */
 function makeSliderReact() {
@@ -63,7 +64,7 @@ function makeSliderReact() {
   return {
     sets,
     react: {
-      createElement: (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]): El => ({ type, props, children }),
+      createElement: (type: unknown, props: Record<string, unknown> | null, ...children: unknown[]): El => ({ type, props: props ?? {}, children }),
       useState: <T,>(initial: T) => {
         const calls: T[] = [];
         sets.push(calls);
@@ -163,7 +164,7 @@ describe("composer 模型位 shadow 注册", () => {
       sessions: { subagentAddress: vi.fn(() => undefined) },
     } as never;
 
-    applyModelSeat(fakeContext, makeReact().react, dom);
+    applyModelSeat(fakeContext, makeReact().react as never, dom);
     expect(injected.map(({ name }) => name)).toEqual(["conversation.input.model"]);
 
     injected[0]!.callback();
@@ -191,14 +192,14 @@ describe("composer 模型位 shadow 注册", () => {
     const core = new SlotCore();
     core.register(
       { name: "root", children: { "conversation.input.model": { kind: "single", scope: "session" } } },
-      () => "shell",
+      (_props: { renderSlot: unknown; SessionProvider: unknown }) => "shell",
     );
     // 与官方注册等价的占据（无 priority → 0）。
     core.register({ name: "conversation.input.model", inject: () => ({}) }, () => "official");
     core.register({ name: "conversation.input.model", priority: -1, inject: () => ({}) }, () => "ours");
     const winners = core.entriesOfSlot("conversation.input.model");
     expect(winners).toHaveLength(1);
-    expect(winners[0]!.component({} as never)).toBe("ours");
+    expect((winners[0] as { component: (props: unknown) => unknown }).component({})).toBe("ours");
     expect(core.entries("conversation.input.model")).toHaveLength(2);
   });
 
@@ -223,7 +224,7 @@ describe("composer 模型位 shadow 注册", () => {
       modelDirectories: { directoryFor: () => directory },
       sessions: { subagentAddress: () => ({ agent: "sub" }) },
     } as never;
-    applyModelSeat(fakeContext, makeReact().react, dom);
+    applyModelSeat(fakeContext, makeReact().react as never, dom);
     const face = (registrations[0]!.options.inject as (id: string) => {
       available: boolean;
       load(): void;
@@ -241,7 +242,7 @@ describe("模型位渲染与选择", () => {
   const Seat = createSeatComponent(makeReact().react as never, dom);
 
   it("关闭态渲染触发器：模型名 + 生效强度", () => {
-    const tree = Seat(seatProps(snapshot())) as El;
+    const tree = Seat(seatProps(snapshot())) as unknown as El;
     const trigger = findAll(tree, byClass("mwseat-trigger"))[0]!;
     expect(trigger.props["aria-expanded"]).toBe(false);
     expect(findAll(trigger, byClass("mwseat-label"))[0]!.children).toContain("Muse Spark 1.3");
@@ -254,7 +255,7 @@ describe("模型位渲染与选择", () => {
   it("打开后首先呈现思考强度滑条，而非模型清单", () => {
     const react = makeReact([true, "effort", { left: 0, top: 0 }]);
     const SeatOpen = createSeatComponent(react.react as never, dom);
-    const tree = SeatOpen(seatProps(snapshot())) as El;
+    const tree = SeatOpen(seatProps(snapshot())) as unknown as El;
     const menu = findAll(tree, byClass("mwseat-menu"))[0]!;
     const slider = findAll(menu, isSliderEl)[0]!;
     const rows = slider.props.rows as { label: string; active: boolean }[];
@@ -268,7 +269,7 @@ describe("模型位渲染与选择", () => {
     const select = vi.fn(async () => true);
     const react = makeReact([true, "effort", { left: 0, top: 0 }]);
     const SeatOpen = createSeatComponent(react.react as never, dom);
-    const tree = SeatOpen(seatProps(snapshot(), { select })) as El;
+    const tree = SeatOpen(seatProps(snapshot(), { select })) as unknown as El;
     const slider = findAll(tree, isSliderEl)[0]!;
     (slider.props.onPick as (effort: string | undefined) => void)("low");
     expect(select).toHaveBeenCalledWith({ provider: "deepseek-official", model: "muse-spark-1.3", reasoningEffort: "low" });
@@ -277,7 +278,7 @@ describe("模型位渲染与选择", () => {
   it("滑条：role=slider 语义、刻度与档位标签", () => {
     const slider = createEffortSlider(makeSliderReact().react as never);
     const rows = effortRows(MUSE, { provider: "deepseek-official", model: "muse-spark-1.3" });
-    const tree = slider({ rows, busy: false, onPick: () => {} }) as El;
+    const tree = slider({ rows, busy: false, onPick: () => {} }) as unknown as El;
     const rail = findAll(tree, byClass("mwseat-sliderRail"))[0]!;
     expect(rail.props.role).toBe("slider");
     expect(rail.props["aria-valuemax"]).toBe(1);
@@ -305,7 +306,7 @@ describe("模型位渲染与选择", () => {
       const fake = makeSliderReact();
       const slider = createEffortSlider(fake.react as never);
       const rows = effortRows(MUSE, { provider: "deepseek-official", model: "muse-spark-1.3" });
-      const tree = slider({ rows, busy: false, onPick }) as El;
+      const tree = slider({ rows, busy: false, onPick }) as unknown as El;
       const rail = findAll(tree, byClass("mwseat-sliderRail"))[0]!;
       (rail.props.onPointerDown as (ev: unknown) => void)({ clientX: 0, button: 0, preventDefault: () => {} });
       expect(listeners.has("pointermove")).toBe(true);
@@ -322,7 +323,7 @@ describe("模型位渲染与选择", () => {
     const fake = makeSliderReact();
     const slider = createEffortSlider(fake.react as never);
     const rows = effortRows(MUSE, { provider: "deepseek-official", model: "muse-spark-1.3" });
-    const tree = slider({ rows, busy: false, onPick }) as El;
+    const tree = slider({ rows, busy: false, onPick }) as unknown as El;
     const rail = findAll(tree, byClass("mwseat-sliderRail"))[0]!;
     (rail.props.onKeyDown as (ev: unknown) => void)({ key: "Home", preventDefault: () => {} });
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -335,7 +336,7 @@ describe("模型位渲染与选择", () => {
     const onPick = vi.fn();
     const slider = createEffortSlider(makeSliderReact().react as never);
     const rows = effortRows(MUSE, { provider: "deepseek-official", model: "muse-spark-1.3" });
-    const tree = slider({ rows, busy: false, onPick }) as El;
+    const tree = slider({ rows, busy: false, onPick }) as unknown as El;
     const rail = findAll(tree, byClass("mwseat-sliderRail"))[0]!;
     const key = (k: string) => (rail.props.onKeyDown as (ev: unknown) => void)({ key: k, preventDefault: () => {} });
     key("ArrowLeft");
@@ -351,7 +352,7 @@ describe("模型位渲染与选择", () => {
   it("「更多」切换到模型清单视图", () => {
     const react = makeReact([true, "effort", { left: 0, top: 0 }]);
     const SeatOpen = createSeatComponent(react.react as never, dom);
-    const tree = SeatOpen(seatProps(snapshot())) as El;
+    const tree = SeatOpen(seatProps(snapshot())) as unknown as El;
     const more = findAll(tree, byClass("mwseat-more"))[0]!;
     (more.props.onClick as () => void)();
     expect(react.sets.find((s) => s.index === 1)!.calls).toEqual(["list"]);
@@ -360,7 +361,7 @@ describe("模型位渲染与选择", () => {
   it("清单视图按 provider 分组渲染，标题无黑底类样式", () => {
     const react = makeReact([true, "list", { left: 0, top: 0 }]);
     const SeatList = createSeatComponent(react.react as never, dom);
-    const tree = SeatList(seatProps(snapshot())) as El;
+    const tree = SeatList(seatProps(snapshot())) as unknown as El;
     const titles = findAll(tree, byClass("mwseat-groupTitle"));
     expect(titles.map((t) => t.children[0])).toEqual(["DeepSeek", "OpenAI"]);
     const groupRule = SEAT_CSS.match(/\.mwseat-groupTitle\{[^}]*\}/u)![0];
@@ -379,7 +380,7 @@ describe("模型位渲染与选择", () => {
     const select = vi.fn(async () => true);
     const react = makeReact([true, "list", { left: 0, top: 0 }]);
     const SeatList = createSeatComponent(react.react as never, dom);
-    const tree = SeatList(seatProps(snapshot(), { select })) as El;
+    const tree = SeatList(seatProps(snapshot(), { select })) as unknown as El;
     const rows = findAll(tree, byClass("mwseat-row"));
     (rows[2]!.props.onClick as () => void)();
     expect(select).toHaveBeenCalledWith({ provider: "openai", model: "gpt-5.6-luna" });
@@ -397,13 +398,13 @@ describe("模型位渲染与选择", () => {
   it("unavailable 会话不渲染，locked 时触发器禁用", () => {
     const SeatClosed = createSeatComponent(makeReact().react as never, dom);
     expect(SeatClosed(seatProps(snapshot(), { available: false }))).toBeNull();
-    const locked = SeatClosed(seatProps(snapshot(), { locked: true })) as El;
+    const locked = SeatClosed(seatProps(snapshot(), { locked: true })) as unknown as El;
     expect(findAll(locked, byClass("mwseat-trigger"))[0]!.props.disabled).toBe(true);
   });
 
   it("空目录与错误态在清单内提示而非破坏 composer", () => {
     const renderOpen = (state: SeatSnapshot) =>
-      createSeatComponent(makeReact([true, "list", { left: 0, top: 0 }]).react as never, dom)(seatProps(state)) as El;
+      createSeatComponent(makeReact([true, "list", { left: 0, top: 0 }]).react as never, dom)(seatProps(state)) as unknown as El;
     expect(JSON.stringify(renderOpen(snapshot({ current: null, groups: [], status: "loading" })))).toContain("正在加载模型目录");
     expect(JSON.stringify(renderOpen(snapshot({ groups: [], error: "catalog down" })))).toContain("catalog down");
     expect(JSON.stringify(renderOpen(snapshot({

@@ -1,11 +1,13 @@
 import { Context } from '@deepseek-ai/cordis';
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session';
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection';
 import { expect, it } from 'vitest';
 import { workspaceJournal } from './journal.js';
 import { childToolDenial, sessionAncestry } from './lineage.js';
 
 it('没有继承绑定事件的独立子会话也不能绕过父会话本机限制', async () => {
   const ctx = new Context(); await ctx.plugin(SessionStore);
+  new SessionProjectionRegistry(ctx);
   const parent = ctx.sessions.create(SessionId('parent'));
   const child = ctx.sessions.create(SessionId('child'), { meta: { cwd: process.cwd(), parentSession: parent.id } });
   const journal = workspaceJournal(ctx);

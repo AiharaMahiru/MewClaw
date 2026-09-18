@@ -151,7 +151,7 @@ describe("worker 组合（技能与 overlay）", () => {
       "subprocess", "bash-sandbox", "pwsh-sandbox", "tool-bash", "tool-pwsh",
       "jobs", "tool-jobs", "tool-fs-search", "permission", "subagent-spawn-in-process",
       "subagent-fork-in-process", "tool-subagent-control", "tool-subagent-list-agents",
-      "tool-subagent", "tool-subagent-fork", "tool-subagent-report", "workflow-worker-thread",
+      "tool-subagent", "tool-subagent-fork", "tool-subagent-report", "workflow-ptc",
       "tool-workflow", "tool-ralph",
     ];
     for (const id of execution) expect(disabled).not.toContain(id);

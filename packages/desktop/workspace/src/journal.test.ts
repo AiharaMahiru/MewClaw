@@ -1,10 +1,12 @@
 import { Context } from '@deepseek-ai/cordis';
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session';
+import { SessionProjectionRegistry } from '@deepseek-ai/dsh-session-projection';
 import { expect, it } from 'vitest';
 import { workspaceJournal } from './journal.js';
 
 it('切回云端落盘失败后拒绝读取新状态，不能回退到服务器执行', async () => {
   const ctx = new Context(); await ctx.plugin(SessionStore);
+  new SessionProjectionRegistry(ctx);
   const session = ctx.sessions.create(SessionId('workspace-journal-failure'));
   const journal = workspaceJournal(ctx);
   try {
@@ -18,6 +20,7 @@ it('切回云端落盘失败后拒绝读取新状态，不能回退到服务器�
 it('绑定事实进入真实Session日志并等待官方flush完成', async () => {
   const ctx = new Context();
   await ctx.plugin(SessionStore);
+  new SessionProjectionRegistry(ctx);
   const session = ctx.sessions.create(SessionId('workspace-journal-test'));
   const journal = workspaceJournal(ctx);
   const flushed: unknown[] = [];
