@@ -92,8 +92,9 @@
 
 **侧边栏大扩展**（Office 预览/URL 浏览器/Subagent 会话/提交计划/终端/布局持久化）+ 官方 `ui-sidebar-*` 包在 0.1.6 全在。
 
-- 实证：我们 R53 禁了 `ui-sidebar-files`（官方 Files 与 better-sidebar 重复），品牌插件锚 `data-dsh-panel-host`/`_panel`/`toggleCluster`/`_titleRow`/`_handle`/`data-dsh-sidebar-collapsed`。
-- 修复方向：重新评估 better-sidebar `0.19.1` 与官方新侧栏的功能差（官方已有终端/浏览器页签，差距在缩小）；布局持久化后 DOM 结构变，品牌锚点需在新 UI 上全量重验（移动端 media 规则同）；`ui-sidebar-files` 去重决策按新功能面重审。
+- 实证：我们 R53 禁了 `ui-sidebar-files`（官方 Files 与 better-sidebar 重复），品牌插件锚 `data-dsh-panel-host`/`_panel`/`toggleCluster`/`_titleRow`/`_handle`/`data-sidebar-collapsed`（0.1.6 起由 AppFrame 发布在布局 frame 上，替代 0.1.5 的 `body[data-dsh-sidebar-collapsed]`）。
+- 已修复（R59 后回归修复）：旧 `body[data-dsh-sidebar-collapsed]` 选择器恒不匹配导致移动菜单键永久隐藏——改锚 `data-sidebar-collapsed` 并以 `MutationObserver` 兜底全部收起路径；右坞去重、顶栏收纳等 aria-label 锚点同步改为 locale 无关选择器（详见后文实施记录）。
+- 修复方向：重新评估 better-sidebar `0.19.1` 与官方新侧栏的功能差（官方已有终端/浏览器页签，差距在缩小）；`ui-sidebar-files` 去重决策按新功能面重审。
 
 ### 2.6 其余已核实
 

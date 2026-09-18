@@ -19,23 +19,26 @@ const MANIFEST = JSON.stringify({ id: "/", name: PRODUCT_NAME, short_name: "MewC
 const BRAND_STYLE = `.mewclaw-sidebar-name{font-family:"Maple Mono NF CN",monospace;font-weight:600}.mewclaw-brand-mark{--mewclaw-mark-bg:#fff;--mewclaw-mark-ink:#181717}.mewclaw-mark-bg{fill:var(--mewclaw-mark-bg)}.mewclaw-mark-ink{fill:var(--mewclaw-mark-ink);stroke:var(--mewclaw-mark-ink)}.mewclaw-mark-cutout{fill:var(--mewclaw-mark-bg);stroke:var(--mewclaw-mark-bg)}body[data-ds-dark-theme] .mewclaw-brand-mark{--mewclaw-mark-bg:#181717;--mewclaw-mark-ink:#fff}`;
 const STROKE_ONLY_STYLE = `.mewclaw-mark-ink[fill="none"],.mewclaw-mark-cutout[fill="none"],g.mewclaw-mark-ink,g.mewclaw-mark-cutout{fill:none}`;
 const HERO_STYLE = `.mewclaw-hero-brand{display:inline-flex;align-items:center;gap:12px;white-space:nowrap}.mewclaw-hero-copy{display:inline-block;font-size:22px;font-weight:600;line-height:32px;letter-spacing:-.02em}span:has(.mewclaw-hero-brand)+span{display:none}.mewclaw-sidebar-mark{width:24px;height:24px}`;
-// 官方前端无移动断点：侧栏列在手机上是侧推挤压而非覆盖。利用 CSS Module 稳定后缀
+// 官方前端无移动断点：侧栏列在手机上是侧推挤压而非覆盖（0.1.6 起 <1024px
+// 仅有折叠态 56px rail，仍占网格轨道）。利用 CSS Module 稳定后缀
 // （<hash>_<name>，重建仅哈希变化）把侧栏改为 fixed 覆盖；侧栏脱离 grid 后
-// centerCol 会掉进 56px 的第一轨，需 grid-column:1/-1 跨全行。移动端默认收起
-// 整条侧栏列（含 55px 图标栏），由左缘滑动手势开合，展开时带暗色遮罩。
+// centerCol 会掉进第一轨，需 grid-column:1/-1 跨全行。移动端由左上角菜单键 +
+// 左缘滑动手势开合完整会话抽屉，展开时带暗色遮罩、菜单键随之隐藏。
 // 桌面端侧栏背景是半透明（覆盖式抽屉会透出下层会话头部），移动端改为不透明——
 // 等优先级规则后被官方样式表覆盖，需 !important。
-// 右坞开关去重（全视口）：会话头部自带 "Open right sidebar" 与坞簇
-// "Expand sidebar" 是同一坞的两个入口——隐藏前者，坞簇开关作为默认右侧栏按钮。
-const DEDUPE_STYLE = `[aria-label="Open right sidebar"]{display:none!important}`;
-// 会话头部顶栏在手机上溢出：隐藏桌面专属控件——外部编辑器入口、底部坞开关
-// （移动端无内容）、标题行内的模式徽标+云端位置选择器（"Standard mode ☁️云端"——
-// 移动 Web 只有云端）。顶栏仅剩面包屑、More actions 与坞簇 Expand sidebar。
+// 右坞开关去重（全视口）：官方右坞把唯一的展开入口注入会话头部角落
+// （data-sidebar-right-expand），与第三方坞簇开关职责重复——隐藏前者，坞簇
+// 开关作为默认右侧栏按钮。锚定 data 属性而非 aria-label，避免文案随语言失效。
+const DEDUPE_STYLE = `[data-sidebar-right-expand]{display:none!important}`;
+// 会话头部顶栏在手机上溢出：隐藏桌面专属控件容器——_headerActions（模式徽标、
+// 云端位置选择器、jobs/schedule/终端等槽位集合）与 _headerUtilities（外部编辑器
+// 入口）。按容器隐藏与语言无关；顶栏仅剩面包屑与 More actions。
+// 坞簇内底部面板开关已由 better-sidebar 按窄屏自行省略（!narrow 渲染），无需再隐。
 // 右坞窄屏已有自家浮层（data-dsh-panel-host fixed 铺满 + translate 滑入），但面板
 // 底色是 68% 透明毛玻璃（--dsw-alias-bg-layer-1 带 alpha）、无 backdrop 模糊——
 // 窄屏下底层聊天文字直接透上来。补 backdrop-filter 保住毛玻璃观感且可读；
 // 分栏拖拽柄在触屏无意义，同隐。
-const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)!important}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}[data-dsh-panel-host] [class*="_panel"]{-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}body:not([data-dsh-sidebar-collapsed]) .mewclaw-rail-fab{display:none}[class*="_handle"]{display:none}[class*="_centerCol"]{grid-column:1/-1}[class*="_titleRow"]{padding-left:48px!important}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}[aria-label="Open workspace in Cursor"],[aria-label="Choose an app to open in"],[aria-label="Expand bottom panel"],[class*="_titleRow"] [class*="_headerActions"]{display:none!important}}
+const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)!important}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}html.mewclaw-rail-open .mewclaw-rail-fab{display:none}[data-dsh-panel-host] [class*="_panel"]{-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}[class*="_handle"]{display:none}[class*="_centerCol"]{grid-column:1/-1}[class*="_titleRow"]{padding-left:48px!important}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}[class*="_titleRow"] [class*="_headerActions"],[class*="_titleRow"] [class*="_headerUtilities"]{display:none!important}}
 .mewclaw-rail-edge,.mewclaw-rail-fab{display:none}
 @media(max-width:768px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}.mewclaw-rail-fab{display:inline-flex;position:fixed;top:7px;left:9px;z-index:108;width:36px;height:36px;align-items:center;justify-content:center;border:0;border-radius:10px;background:transparent;color:inherit;cursor:pointer;padding:0}[class*="_toggleCluster"]{top:calc(11px + env(safe-area-inset-top))!important}}`;
 // 移动端侧栏开合控制：左上角固定菜单键 + 左缘 16px 起笔右滑展开完整会话抽屉，
@@ -43,14 +46,19 @@ const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fi
 // 左缘右滑会被浏览器声明为系统手势导致 pointermove 断流，touchmove 不受影响；
 // 起笔判定按触点坐标（热区元素可能被下层输入控件遮挡）。脚本仅 DOM 开合，
 // 不读凭证、不发请求；桌面视口 matchMedia 短路。
+// 折叠态判定锚定 AppFrame 发布的 data-sidebar-collapsed 属性（0.1.6 起挂在
+// 布局 frame 上），不读 aria-label——其文案随界面语言变化。MutationObserver
+// 兜底所有收起路径（抽屉内官方开关、右坞开启联动、视口跨界）复位 OPEN。
 const MOBILE_RAIL_SCRIPT = `<script data-mewclaw-rail>(function(){
 if(!matchMedia("(max-width:768px)").matches)return;
 var OPEN="mewclaw-rail-open";
 function col(){return document.querySelector('[class*="_sidebarCol"]')}
 function toggleBtn(){var c=col();return c&&c.querySelector('[class*="_toggle"]')}
-function expand(){var c=col(),t=toggleBtn();if(c&&t&&c.getBoundingClientRect().width<100&&t.getAttribute("aria-label")!=="Collapse sidebar")t.click()}
+function collapsed(){return !!document.querySelector("[data-sidebar-collapsed]")}
+function expand(){var t=toggleBtn();if(t&&collapsed())t.click()}
 function open(){document.documentElement.classList.add(OPEN);expand();setTimeout(expand,320)}
-function close(){var c=col();if(c&&c.getBoundingClientRect().width>100){var t=toggleBtn();if(t)t.click()}document.documentElement.classList.remove(OPEN)}
+function close(){var t=toggleBtn();if(t&&!collapsed())t.click();document.documentElement.classList.remove(OPEN)}
+new MutationObserver(function(){if(collapsed())document.documentElement.classList.remove(OPEN)}).observe(document.body,{attributes:true,attributeFilter:["data-sidebar-collapsed"],subtree:true});
 var fab=document.createElement("button");fab.type="button";fab.setAttribute("aria-label","Menu");
 fab.className="mewclaw-rail-fab";
 fab.innerHTML='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
@@ -66,7 +74,6 @@ if(track==="open"&&dx>56&&dx>Math.abs(dy)*1.5){track="";open()}
 else if(track==="close"&&dx<-56&&-dx>Math.abs(dy)*1.5){track="";close()}},true);
 ["touchend","touchcancel"].forEach(function(t){document.addEventListener(t,function(){track=""},true)});
 document.addEventListener("pointerdown",function(e){if(!document.documentElement.classList.contains(OPEN))return;var c=col();if(c&&c.contains(e.target))return;if(fab.contains(e.target))return;close()},true);
-document.addEventListener("click",function(e){var t=toggleBtn();if(t&&(t===e.target||t.contains(e.target))&&t.getAttribute("aria-label")==="Collapse sidebar")setTimeout(function(){var c=col();if(c&&c.getBoundingClientRect().width<100)document.documentElement.classList.remove(OPEN)},350)},true);
 })()</script>`;
 const BOOT_STYLE = `html.mewclaw-boot-seen .mewclaw-boot{display:none}.mewclaw-boot{position:fixed;z-index:2147483647;inset:0;display:grid;place-items:center;pointer-events:none;background:#f5f5f7;color:#181717;animation:mewclaw-boot-away .32s cubic-bezier(.4,0,1,1) 1.05s forwards}.mewclaw-boot-inner{display:grid;justify-items:center;gap:24px;animation:mewclaw-boot-arrive .52s cubic-bezier(.22,1,.36,1) both}.mewclaw-boot-logo{width:88px;height:88px;border-radius:50%;filter:drop-shadow(0 12px 24px rgb(0 0 0/.12))}.mewclaw-boot-track{width:112px;height:3px;overflow:hidden;border-radius:999px;background:rgb(24 23 23/.12)}.mewclaw-boot-progress{display:block;width:42%;height:100%;border-radius:inherit;background:currentColor;animation:mewclaw-boot-progress .82s cubic-bezier(.2,.8,.2,1) .14s both}@keyframes mewclaw-boot-arrive{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}@keyframes mewclaw-boot-progress{from{transform:translateX(-110%)}to{transform:translateX(250%)}}@keyframes mewclaw-boot-away{to{opacity:0;visibility:hidden}}body[data-ds-dark-theme] .mewclaw-boot{background:#18181a;color:#fff}@media(prefers-color-scheme:dark){html:not([data-ds-theme=light]) .mewclaw-boot{background:#18181a;color:#fff}}@media(prefers-reduced-motion:reduce){.mewclaw-boot,.mewclaw-boot-inner,.mewclaw-boot-progress{animation:none}.mewclaw-boot{opacity:0;visibility:hidden}}`;
 const BOOT_MARKUP = `<div class="mewclaw-boot" aria-hidden="true"><div class="mewclaw-boot-inner"><img class="mewclaw-boot-logo" src="${FAVICON_PATH}" alt=""><span class="mewclaw-boot-track"><span class="mewclaw-boot-progress"></span></span></div></div>`;

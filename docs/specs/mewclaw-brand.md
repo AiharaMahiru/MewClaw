@@ -75,25 +75,29 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   覆盖；`_titleRow` 左 padding 让位）与左缘滑动手势——触笔起笔于左缘 16px 内
   （`clientX<=16`，热区 `mewclaw-rail-edge` 可能被下层控件遮挡，按坐标判定）
   右滑 >56px 且明显横向即置 `html.mewclaw-rail-open` 并点开完整会话抽屉——
-  展开按列宽判定：列宽 <100px（rail 收起态）时点官方开关扩为完整抽屉，
-  立即 + 320ms 各检查一次，不依赖 aria 文案；
-  抽屉上左滑、`pointerdown`
-  落在列外（遮罩）或抽屉内折叠键即收起。手势监听用 TouchEvent 而非
+  展开按 AppFrame 发布的 `data-sidebar-collapsed` 属性判定（0.1.6 起挂在
+  布局 frame 上，窄屏折叠态为真）：属性存在时点官方开关扩为完整抽屉，
+  立即 + 320ms 各检查一次，不依赖 aria 文案（其随界面语言变化）；
+  抽屉上左滑、`pointerdown` 落在列外（遮罩）、抽屉内折叠键、右坞开启
+  联动收起或视口跨界即收起——`MutationObserver` 监听
+  `data-sidebar-collapsed` 出现即复位 `mewclaw-rail-open`，覆盖全部收起
+  路径。手势监听用 TouchEvent 而非
   PointerEvent——左缘右滑会被浏览器声明为系统手势令 pointermove 断流，
   touchmove 不受影响。脚本只做 DOM 开合，不读凭证、不发请求，
   `matchMedia` 在桌面视口短路；
 - 移动端抽屉不透明：官方侧栏背景为半透明 `rgba(28 28 35 / .5)`，桌面内联
   无碍但作为覆盖层会透出下层内容；`≤768px` 下 `sidebarCol` 背景改不透明
   （官方样式表同级规则在其后，须 `!important`）；
-- 右坞开关去重（全视口）：会话头部 "Open right sidebar" 与坞簇
-  "Expand sidebar" 是同一坞的两个入口；隐藏前者，坞簇开关为默认右侧栏
-  按钮；
+- 右坞开关去重（全视口）：官方右坞把唯一展开入口注入会话头部角落
+  （`data-sidebar-right-expand`），与第三方坞簇开关职责重复；隐藏前者，
+  坞簇开关为默认右侧栏按钮。锚定 data 属性而非 `aria-label`——后者文案
+  随界面语言变化（zh 下为 "打开右侧边栏"，英文选择器恒不匹配）；
 - 移动端顶栏收纳：会话头部顶栏控件按桌面密度排列，390px 下溢出重叠。
-  `≤768px` 隐藏桌面专属/重复控件（按官方 `aria-label` 或稳定类后缀选择）：
-  "Open workspace in Cursor"、"Choose an app to open in"（外部编辑器入口）、
-  "Expand bottom panel"（底部坞移动端无内容）、`_titleRow` 内 `_headerActions`
-  （模式徽标 + "☁云端" 位置选择器——移动 Web 只有云端）。保留面包屑、
-  More actions 与坞簇 Expand sidebar；
+  `≤768px` 按容器隐藏桌面专属控件槽位（与语言无关）：`_titleRow` 内
+  `_headerActions`（模式徽标 + "☁云端" 位置选择器、jobs/schedule/终端等，
+  移动 Web 只有云端）与 `_headerUtilities`（外部编辑器入口）。
+  坞簇内底部面板开关由 better-sidebar 按窄屏自行省略。保留面包屑、
+  More actions 与坞簇开关；
 - 所有注册经 `ctx.effect()`/`ctx.slots.inject`，卸载即回收。
 
 ## 7 安全与信任

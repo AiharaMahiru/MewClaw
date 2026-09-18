@@ -83,20 +83,25 @@ describe("dsh-lark-mewclaw-brand", () => {
     expect(html).toContain('[class*="_centerCol"]{grid-column:1/-1}');
     expect(html).toContain("translateX(-110%)");
     expect(html).toContain("html.mewclaw-rail-open");
-    // 移动端抽屉不透明 + 顶栏收纳（隐藏桌面专属控件）
+    // 移动端抽屉不透明 + 顶栏收纳（按容器隐藏桌面专属控件，与语言无关）
     expect(html).toContain("background-color:rgb(28 28 35)!important");
-    expect(html).toContain('[aria-label="Open workspace in Cursor"]');
-    expect(html).toContain('[aria-label="Open right sidebar"]');
-    expect(html).toContain('[aria-label="Expand bottom panel"]');
     expect(html).toContain('[class*="_titleRow"] [class*="_headerActions"]');
+    expect(html).toContain('[class*="_titleRow"] [class*="_headerUtilities"]');
+    // 右坞去重锚定官方展开按钮的 data 属性（aria-label 文案随语言失效）
+    expect(html).toContain("[data-sidebar-right-expand]{display:none!important}");
+    expect(html).not.toContain('[aria-label="Open right sidebar"]');
     // 侧栏开合控制器（§6 移动适配）：左上角菜单键 + 左缘热区滑动 + 外点关闭
     expect(html).toContain("data-mewclaw-rail");
     expect(html).toContain("mewclaw-rail-edge");
     expect(html).toContain("mewclaw-rail-fab");
     expect(html).toContain('aria-label","Menu"');
     expect(html).toContain('[class*="_titleRow"]{padding-left:48px!important}');
-    // 展开按列宽判定（rail <100px 时点官方开关扩为完整抽屉），不依赖 aria 文案
-    expect(html).toContain("getBoundingClientRect().width<100");
+    // 菜单键仅在抽屉关闭时可见——不再依赖已移除的 body 折叠属性
+    expect(html).toContain("html.mewclaw-rail-open .mewclaw-rail-fab{display:none}");
+    expect(html).not.toContain("data-dsh-sidebar-collapsed");
+    // 折叠判定锚定 AppFrame 的 data-sidebar-collapsed， MutationObserver 兜底复位
+    expect(html).toContain('document.querySelector("[data-sidebar-collapsed]")');
+    expect(html).toContain('attributeFilter:["data-sidebar-collapsed"]');
     expect(html).toContain("touch-action:pan-y");
     expect(html).toContain("pointerdown");
     expect(html).toContain("touchstart");
