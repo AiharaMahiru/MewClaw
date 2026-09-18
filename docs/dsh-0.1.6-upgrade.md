@@ -92,8 +92,9 @@
 
 **侧边栏大扩展**（Office 预览/URL 浏览器/Subagent 会话/提交计划/终端/布局持久化）+ 官方 `ui-sidebar-*` 包在 0.1.6 全在。
 
-- 实证：我们 R53 禁了 `ui-sidebar-files`（官方 Files 与 better-sidebar 重复），品牌插件锚 `data-dsh-panel-host`/`_panel`/`toggleCluster`/`_titleRow`/`_handle`/`data-dsh-sidebar-collapsed`。
-- 修复方向：重新评估 better-sidebar `0.19.1` 与官方新侧栏的功能差（官方已有终端/浏览器页签，差距在缩小）；布局持久化后 DOM 结构变，品牌锚点需在新 UI 上全量重验（移动端 media 规则同）；`ui-sidebar-files` 去重决策按新功能面重审。
+- 实证：我们 R53 禁了 `ui-sidebar-files`（官方 Files 与 better-sidebar 重复），品牌插件锚 `data-dsh-panel-host`/`_panel`/`toggleCluster`/`_titleRow`/`_handle`/`data-sidebar-collapsed`（0.1.6 起由 AppFrame 发布在布局 frame 上，替代 0.1.5 的 `body[data-dsh-sidebar-collapsed]`）。
+- 已修复（R59 后回归修复）：旧 `body[data-dsh-sidebar-collapsed]` 选择器恒不匹配导致移动菜单键永久隐藏——改锚 `data-sidebar-collapsed` 并以 `MutationObserver` 兜底全部收起路径；右坞去重、顶栏收纳等 aria-label 锚点同步改为 locale 无关选择器（详见后文实施记录）。
+- 修复方向：重新评估 better-sidebar `0.19.1` 与官方新侧栏的功能差（官方已有终端/浏览器页签，差距在缩小）；`ui-sidebar-files` 去重决策按新功能面重审。
 
 ### 2.6 其余已核实
 
@@ -174,10 +175,13 @@
 
 ### 组合与安全（§2.5）
 
-- 生产 overlay 显式禁用：`terminal-controller`（Web 终端=宿主 PTY 绕 OCI）、`ui-sidebar-terminal`、`ui-plugin-manager`、`plugin-manager`（供应链面）、`session-telemetry-otel`。
+- 生产 overlay 显式禁用：`terminal-controller`（Web 终端=宿主 PTY 绕 OCI）、`ui-sidebar-terminal`、`ui-plugin-manager`、`session-telemetry-otel`。
+- **`plugin-manager` 宿主服务保留**（打包校验实证）：dsh-base 以 `profileContext` 条件激活该服务，自建 worker 无 profile-backed host 故永不激活；但官方 `cordis` preset 的 `tool-plugin-manager` 行非禁用、硬依赖它，禁服务会让整个 cordis preset 挂载失败（boot-check 实测 `agent-preset/invalid`）。浏览器写面由 `ui-plugin-manager` 禁用 + edge RPC 白名单不含 pluginManager 方法（fail-closed）双层收口。
+- **cordis preset 本地遮蔽**：`agent-presets/cordis/` 复制官方 preset 仅 `tool-plugin-manager` 行置 `disabled: true`（与官方 standard/ptc 同处置）。同步发现 `includeShippedRoot` 默认 `true` 使内置根恒优先、配置根同名遮蔽失效——lightweight/full/web patch 按 oci 先例补 `includeShippedRoot: false`（官方根显式列最后兜底，roster 不变仅改同名优先级）。
 - `worker.production.yml` `sandbox-oci network: bridge` 断言修正（`network: none` 断言是测试过期，bridge 是刻意决策：容器出网装依赖、入站仍闭）。
 
 ### 核验证据
 
 - `pnpm verify` 全绿：258 测试文件 / 1626 用例通过、typecheck 0 错、lint、官方完整性（迁移期补丁豁免 0 项）、插件边界、工具 schema、capability matrix、`git diff --check`。
+- boot-check 实证：lightweight/full 两 profile 下 lark-lightweight/lark-standard/cordis/liangshen/standard/ptc/minimal 七 preset 全部挂载。
 - 会话格式：`SESSION_FORMAT_VERSION = 3` 两代相同，无迁移；冻结副本核验——8 个生产 v3 会话（zstd）在 0.1.6 持久化层只读恢复 421 事件全解码、sha256 前后一致零写入；迁移套件 23/23 绿。

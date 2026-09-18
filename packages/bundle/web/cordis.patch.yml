@@ -21,6 +21,9 @@
         trust: system
       - path: !!js process.cwd() + '/node_modules/@deepseek-ai/dsh-agent-presets/presets'
         trust: system
+    # 内置根恒优先于配置根，会使同名遮蔽失效；关闭后官方根由上方显式条目兜底，
+    # 同名 preset（如 cordis 的 plugin-manager 遮蔽行）按 roots 顺序生效。
+    includeShippedRoot: false
     includeUserRoot: false
 
 - id: system-prompt

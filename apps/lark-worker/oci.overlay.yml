@@ -55,10 +55,9 @@
 - id: ui-sidebar-terminal
   disabled: true
 
-# 插件管理面（安装/启停/移除运行时 bundle）是未审计的供应链写通道；
-# 生产组合由 cordis.yml 声明，禁止运行时改写。
-- id: plugin-manager
-  disabled: true
+# 插件管理面：宿主 pluginManager 服务保留（cordis preset 的
+# tool-plugin-manager 行依赖它）；浏览器写面经管理页行禁用 +
+# edge RPC 白名单 fail-closed 双层收口，客户端不可达。
 - id: ui-plugin-manager
   disabled: true
 

@@ -35,6 +35,9 @@
         trust: system
     # 只认仓库 system preset（含全能优化模式）及官方 preset；
     # 用户目录中的历史/实验 preset 不得污染 full/OCI roster 或阻断新会话创建。
+    # 内置根恒优先于配置根，会使同名遮蔽失效；关闭后官方根由上方显式条目兜底，
+    # 同名 preset（如 cordis 的 plugin-manager 遮蔽行）按 roots 顺序生效。
+    includeShippedRoot: false
     includeUserRoot: false
 
 - id: lark-run
@@ -75,13 +78,13 @@
   disabled: true
 
 # 0.1.6 上游新增默认行的处置：Web 终端以宿主系统用户起 PTY（full 是宿主
-# 执行 profile，终端会拿到真实宿主 shell，比 OCI 面更敏感）；插件管理面
-# 是未审计的供应链写通道。两者全部显式关闭。
+# 执行 profile，终端会拿到真实宿主 shell，比 OCI 面更敏感），显式关闭。
+# 插件管理：宿主 pluginManager 服务保留——cordis preset 的 tool-plugin-manager
+# 行依赖它（standard/ptc 同名行官方默认禁用）；浏览器面经两道闸收口：
+# 管理页行禁用 + edge RPC 白名单不含 pluginManager 方法（fail-closed 拒绝）。
 - id: terminal-controller
   disabled: true
 - id: ui-sidebar-terminal
-  disabled: true
-- id: plugin-manager
   disabled: true
 - id: ui-plugin-manager
   disabled: true
