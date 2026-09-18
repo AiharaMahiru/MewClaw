@@ -19,12 +19,14 @@ const MANIFEST = JSON.stringify({ id: "/", name: PRODUCT_NAME, short_name: "MewC
 const BRAND_STYLE = `.mewclaw-sidebar-name{font-family:"Maple Mono NF CN",monospace;font-weight:600}.mewclaw-brand-mark{--mewclaw-mark-bg:#fff;--mewclaw-mark-ink:#181717}.mewclaw-mark-bg{fill:var(--mewclaw-mark-bg)}.mewclaw-mark-ink{fill:var(--mewclaw-mark-ink);stroke:var(--mewclaw-mark-ink)}.mewclaw-mark-cutout{fill:var(--mewclaw-mark-bg);stroke:var(--mewclaw-mark-bg)}body[data-ds-dark-theme] .mewclaw-brand-mark{--mewclaw-mark-bg:#181717;--mewclaw-mark-ink:#fff}`;
 const STROKE_ONLY_STYLE = `.mewclaw-mark-ink[fill="none"],.mewclaw-mark-cutout[fill="none"],g.mewclaw-mark-ink,g.mewclaw-mark-cutout{fill:none}`;
 const HERO_STYLE = `.mewclaw-hero-brand{display:inline-flex;align-items:center;gap:12px;white-space:nowrap}.mewclaw-hero-copy{display:inline-block;font-size:22px;font-weight:600;line-height:32px;letter-spacing:-.02em}span:has(.mewclaw-hero-brand)+span{display:none}.mewclaw-sidebar-mark{width:24px;height:24px}`;
-// 官方前端无移动断点：侧栏列在手机上是侧推挤压而非覆盖（0.1.6 起 <1024px
-// 仅有折叠态 56px rail，仍占网格轨道）。利用 CSS Module 稳定后缀
-// （<hash>_<name>，重建仅哈希变化）把侧栏改为 fixed 覆盖；侧栏脱离 grid 后
-// centerCol 会掉进第一轨，需 grid-column:1/-1 跨全行。移动端由左上角菜单键 +
-// 左缘滑动手势开合完整会话抽屉，展开时带暗色遮罩、菜单键随之隐藏。
-// 桌面端侧栏背景是半透明（覆盖式抽屉会透出下层会话头部），移动端改为不透明——
+// 官方前端无移动断点：侧栏列在窄屏是侧推挤压而非覆盖（0.1.6 起 <1024px 即
+// narrow，仅给折叠态 56px rail 仍占网格轨道）。我们的移动适配断点与上游
+// narrow 对齐为 <1024（=max-width:1023px），覆盖手机/平板/横屏/窄窗口。
+// 利用 CSS Module 稳定后缀（<hash>_<name>，重建仅哈希变化）把侧栏改为
+// fixed 覆盖；侧栏脱离 grid 后 centerCol 会掉进第一轨，需 grid-column:1/-1
+// 跨全行。窄屏由左上角菜单键 + 左缘滑动手势开合完整会话抽屉，展开时带暗色
+// 遮罩、菜单键随之隐藏。
+// 桌面端侧栏背景是半透明（覆盖式抽屉会透出下层会话头部），窄屏改为不透明——
 // 等优先级规则后被官方样式表覆盖，需 !important。
 // 右坞开关去重（全视口）：官方右坞把唯一的展开入口注入会话头部角落
 // （data-sidebar-right-expand），与第三方坞簇开关职责重复——隐藏前者，坞簇
@@ -38,19 +40,20 @@ const DEDUPE_STYLE = `[data-sidebar-right-expand]{display:none!important}`;
 // 底色是 68% 透明毛玻璃（--dsw-alias-bg-layer-1 带 alpha）、无 backdrop 模糊——
 // 窄屏下底层聊天文字直接透上来。补 backdrop-filter 保住毛玻璃观感且可读；
 // 分栏拖拽柄在触屏无意义，同隐。
-const MOBILE_STYLE = `@media(max-width:768px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)!important}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}html.mewclaw-rail-open .mewclaw-rail-fab{display:none}[data-dsh-panel-host] [class*="_panel"]{-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}[class*="_handle"]{display:none}[class*="_centerCol"]{grid-column:1/-1}[class*="_titleRow"]{padding-left:48px!important}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}[class*="_titleRow"] [class*="_headerActions"],[class*="_titleRow"] [class*="_headerUtilities"]{display:none!important}}
+const MOBILE_STYLE = `@media(max-width:1023px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)!important}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}html.mewclaw-rail-open .mewclaw-rail-fab{display:none}[data-dsh-panel-host] [class*="_panel"]{-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}[class*="_handle"]{display:none}[class*="_centerCol"]{grid-column:1/-1}[class*="_titleRow"]{padding-left:48px!important}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}}
+@media(max-width:768px){[class*="_titleRow"] [class*="_headerActions"],[class*="_titleRow"] [class*="_headerUtilities"]{display:none!important}}
 .mewclaw-rail-edge,.mewclaw-rail-fab{display:none}
-@media(max-width:768px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}.mewclaw-rail-fab{display:inline-flex;position:fixed;top:7px;left:9px;z-index:108;width:36px;height:36px;align-items:center;justify-content:center;border:0;border-radius:10px;background:transparent;color:inherit;cursor:pointer;padding:0}[class*="_toggleCluster"]{top:calc(11px + env(safe-area-inset-top))!important}}`;
-// 移动端侧栏开合控制：左上角固定菜单键 + 左缘 16px 起笔右滑展开完整会话抽屉，
+@media(max-width:1023px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}.mewclaw-rail-fab{display:inline-flex;position:fixed;top:7px;left:9px;z-index:108;width:36px;height:36px;align-items:center;justify-content:center;border:0;border-radius:10px;background:transparent;color:inherit;cursor:pointer;padding:0}[class*="_toggleCluster"]{top:calc(11px + env(safe-area-inset-top))!important}}`;
+// 窄屏侧栏开合控制：左上角固定菜单键 + 左缘 16px 起笔右滑展开完整会话抽屉，
 // 抽屉上左滑或点遮罩收起并隐藏整条侧栏列。手势用 TouchEvent 而非 PointerEvent——
 // 左缘右滑会被浏览器声明为系统手势导致 pointermove 断流，touchmove 不受影响；
 // 起笔判定按触点坐标（热区元素可能被下层输入控件遮挡）。脚本仅 DOM 开合，
-// 不读凭证、不发请求；桌面视口 matchMedia 短路。
+// 不读凭证、不发请求；matchMedia 断点 1023px 与上游 narrow <1024 对齐。
 // 折叠态判定锚定 AppFrame 发布的 data-sidebar-collapsed 属性（0.1.6 起挂在
 // 布局 frame 上），不读 aria-label——其文案随界面语言变化。MutationObserver
 // 兜底所有收起路径（抽屉内官方开关、右坞开启联动、视口跨界）复位 OPEN。
 const MOBILE_RAIL_SCRIPT = `<script data-mewclaw-rail>(function(){
-if(!matchMedia("(max-width:768px)").matches)return;
+if(!matchMedia("(max-width:1023px)").matches)return;
 var OPEN="mewclaw-rail-open";
 function col(){return document.querySelector('[class*="_sidebarCol"]')}
 function toggleBtn(){var c=col();return c&&c.querySelector('[class*="_toggle"]')}
