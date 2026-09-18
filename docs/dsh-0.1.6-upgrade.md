@@ -174,10 +174,13 @@
 
 ### 组合与安全（§2.5）
 
-- 生产 overlay 显式禁用：`terminal-controller`（Web 终端=宿主 PTY 绕 OCI）、`ui-sidebar-terminal`、`ui-plugin-manager`、`plugin-manager`（供应链面）、`session-telemetry-otel`。
+- 生产 overlay 显式禁用：`terminal-controller`（Web 终端=宿主 PTY 绕 OCI）、`ui-sidebar-terminal`、`ui-plugin-manager`、`session-telemetry-otel`。
+- **`plugin-manager` 宿主服务保留**（打包校验实证）：dsh-base 以 `profileContext` 条件激活该服务，自建 worker 无 profile-backed host 故永不激活；但官方 `cordis` preset 的 `tool-plugin-manager` 行非禁用、硬依赖它，禁服务会让整个 cordis preset 挂载失败（boot-check 实测 `agent-preset/invalid`）。浏览器写面由 `ui-plugin-manager` 禁用 + edge RPC 白名单不含 pluginManager 方法（fail-closed）双层收口。
+- **cordis preset 本地遮蔽**：`agent-presets/cordis/` 复制官方 preset 仅 `tool-plugin-manager` 行置 `disabled: true`（与官方 standard/ptc 同处置）。同步发现 `includeShippedRoot` 默认 `true` 使内置根恒优先、配置根同名遮蔽失效——lightweight/full/web patch 按 oci 先例补 `includeShippedRoot: false`（官方根显式列最后兜底，roster 不变仅改同名优先级）。
 - `worker.production.yml` `sandbox-oci network: bridge` 断言修正（`network: none` 断言是测试过期，bridge 是刻意决策：容器出网装依赖、入站仍闭）。
 
 ### 核验证据
 
 - `pnpm verify` 全绿：258 测试文件 / 1626 用例通过、typecheck 0 错、lint、官方完整性（迁移期补丁豁免 0 项）、插件边界、工具 schema、capability matrix、`git diff --check`。
+- boot-check 实证：lightweight/full 两 profile 下 lark-lightweight/lark-standard/cordis/liangshen/standard/ptc/minimal 七 preset 全部挂载。
 - 会话格式：`SESSION_FORMAT_VERSION = 3` 两代相同，无迁移；冻结副本核验——8 个生产 v3 会话（zstd）在 0.1.6 持久化层只读恢复 421 事件全解码、sha256 前后一致零写入；迁移套件 23/23 绿。
