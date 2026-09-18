@@ -10,9 +10,9 @@ MewClaw 是基于 **DeepSeek Harness（DSH）与 Cordis** 的智能体平台，�
 
 桌面工作区云端配套已加入源码：自有插件支持本机文件工具、独立授权的 Shell 和目录双向同步。普通 Web 保持云端默认行为，桌面连接需显式启用 [部署 overlay](config/desktop-workspace.patch.yml)，不随 Git 更新自动上线。架构、安全边界和测试入口见 [工作区 SPEC](docs/specs/desktop-workspace.md) 与 [插件说明](packages/desktop/workspace/README.md)；桌面发行和原生授权界面由 `desktop` 分支维护。
 
-DSH 核心及官方插件锁定 `0.1.5-rc.2`（2026-09 自 rc.1 升级，见 [升级说明](docs/dsh-0.1.5-upgrade.md)）。lightweight 不再裁剪执行能力，保留模式 ID 并复用官方 standard；Scope、目录授权、审批及 OCI 边界不变。
+DSH 核心及官方插件锁定 `0.1.5-rc.2`（2026-09 自 rc.1 升级，见 [升级说明](docs/dsh-0.1.5-upgrade.md)）。上游 `0.1.6` 处于 alpha 阶段（评估与修复计划见 [0.1.6 升级评估](docs/dsh-0.1.6-upgrade.md)，等 `0.1.6-rc.x` 再执行适配）。lightweight 不再裁剪执行能力，保留模式 ID 并复用官方 standard；Scope、目录授权、审批及 OCI 边界不变。
 
-截至 **2026-09-12，生产基线为 `R13-admin-ui-20260912`**（构建自 commit `fee596e`，含 admin 控制面对齐 DSH Web UI 与 liquid glass 主题）。本机生产入口 `/opt/dsh/current` 指向 `releases/R13-admin-ui-20260912`；Git 分支后续提交不等于生产已发布——当前 master HEAD（`9041b4f`，admin 控制面层级精简）领先已发布 release 一个提交。
+截至 **2026-09-17，生产基线为 `R58-desktop-dev-reasoning-20260917`**（构建自 `desktop-dev@7c8dc2c`，含 `/auth/models` 推理强度元数据、liquid-glass backdrop-filter 修复及 R52–R57 全部主线修复）。本机生产入口 `/opt/dsh/current` 指向 `releases/R58-desktop-dev-reasoning-20260917`；Git 分支后续提交不等于生产已发布。
 
 - R3 已发布远程设置修复和四模式整合，见 [R3 设计说明](docs/specs/web-remote-settings-r3.md) 与 [生产验收记录](docs/evidence/r3-production-20260910.md)。
 - 早期 M0–M5 飞书迁移验收见 [历史证据](docs/evidence/m5-feishu-acceptance.md)，不代表后续新增功能已通过端到端验收。
