@@ -20,15 +20,12 @@ function agentPresetForSetup(ctx: Context, agent: Agent, fallback: string): stri
     const projected = ctx.sessionProjections.stateOf(session, "agentPreset");
     return typeof projected === "string" ? projected : fallback;
   }
-  // 兼容真实 Session 与轻量测试替身：前者提供 snapshotEvents，后者可能仅暴露 events。
+  // 轻量测试替身仅暴露 events；真实 Session 一律走上面的 registry 路径。
   const sessionRecord = session as unknown as {
-    snapshotEvents?: () => readonly unknown[];
     events?: readonly unknown[];
     header?: { agentPreset?: string };
   };
-  const events = typeof sessionRecord.snapshotEvents === "function"
-    ? sessionRecord.snapshotEvents()
-    : sessionRecord.events ?? [];
+  const events = sessionRecord.events ?? [];
   const selected = [...events].reverse().find((event): event is { type: "agent-preset/selected"; data: { agentPreset: string } } => {
     if (!event || typeof event !== "object") return false;
     const candidate = event as { type?: unknown; data?: unknown };

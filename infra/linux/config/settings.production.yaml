@@ -8,6 +8,8 @@ agent-default-model:
 llm-deepseek:
   baseURL: https://api.commandcode.ai/provider/v1
   apiKeyEnv: DEEPSEEK_API_KEY
+  # 0.1.6 起官方默认即 messages；relay 已实测支持 /v1/messages（401≠404），显式固化。
+  protocol: messages
   models:
     - id: deepseek-v4.1-flash
       name: DeepSeek V4.1 Flash

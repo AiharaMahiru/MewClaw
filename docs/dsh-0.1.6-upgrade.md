@@ -1,6 +1,6 @@
 # DSH 0.1.6 升级评估与修复计划
 
-> 状态：**评估阶段，未升级**。生产与 master 均锁定 `0.1.5-rc.2`（npm `next` tag 仍为 rc.2，是当前 RC 通道最新版）。上游于 2026-09-15/09-17 发布 `0.1.6-alpha.1`/`0.1.6-alpha.2`（tag `dsh-v0.1.6-alpha.*`）。本文档以 **master 为主开发分支** 记录变更面对本仓库的实证命中点与修复计划；等 `0.1.6-rc.x` 发布后按本文执行适配。
+> 状态：**已实施于 `upgrade/dsh-0.1.6-alpha.2`**。全部 `@deepseek-ai/dsh-*` 锁 `0.1.6-alpha.2`（npm `alpha` tag；`next` 仍停 rc.2）。评估命中点全部处理完毕，核验证据见 §五「实施记录」。
 
 信息来源：官方 release notes（deepseek-ai/deepseek-harness releases）、npm dist-tag 实况、本仓库逐条 grep 实证。标注「实证」的条目均有本仓库文件命中；标注「待证」的是官方语义需在候选上验证的点。
 
@@ -140,3 +140,44 @@
 | PTC/workflow 改名 → liangshen 挂不上 | 中 | Phase 1.4 重挂 + 组合测试钉住 |
 | 会话 API/slot 变化 → 侧栏 cwd/品牌锚失效 | 中 | Phase 1.3 + Phase 3.9 |
 | alpha 线持续流动，评估过期 | 低 | 以 rc.x release notes 为准重跑本文清单 |
+
+## 五、实施记录（`upgrade/dsh-0.1.6-alpha.2`）
+
+### 依赖面
+
+- 全部 219 个 `@deepseek-ai/*` spec `0.1.5-rc.2 → 0.1.6-alpha.2`；registry 盘点 216/219 有 alpha.2，缺的 3 个正是改名前旧包（`dsh-code-runtime{,-node}`→`dsh-ptc-runtime`、`dsh-workflow-worker-thread`→`dsh-workflow-ptc`），停在 0.1.5 为预期。
+- `dsh-better-sidebar 0.18.1 → 0.19.1`（peer `^0.1.5-rc.1` 覆盖 alpha.2）；组合测试断言同步。
+
+### 接口适配（§2.1/§2.2）
+
+- `dsh-sandbox-oci`：`confine`/`ShellExecutor.start` 改可取消异步签名（`runtime.ts`）；confine 内 await provision 探测结果，顺带修复旧版「探测未完成的假阴性拒绝」；R57 容器名冲突回收与 binding 失败逐出语义原样保留。新增「探测中 confine 等待」「abort 路径」用例；包测试 43/43 绿（含真机 provision→exec→dispose 零残留）。
+- `journal.ts` → `SessionProjectionRegistry`：注册 host-only `desktopWorkspaceState`（`WorkspaceState | null`，`stateVersion: 1`，zod 边界校验 owner/mode/generation）；`read()` 走 `ctx.sessionProjections.stateOf()`，写路径保留事件 append + `ctx.sessions.flush` 不变（fail-closed 语义不动）。四个测试文件装配 registry；`desktop-workspace` inject 增 `sessionProjections`。
+- `agent-bootstrap.ts`：registry 已是主路径，删除 deprecated `snapshotEvents` fallback（保留 `.events` 测试替身路径）。
+- **显式例外**：liangshen `tool-bootstrap.mjs` 保留 `snapshotEvents()`——状态机含非 JSON 字段（`presentationDisposer` 函数）且冷重建语义微妙，官方允许 existing logic 保留，属有记录的兼容性例外。
+- `model-seat`：`subagentAddress` 在 0.1.6 移到 client 端 sessions 集合，改经 `ctx.sessions` 以 `ISessions`（`dsh-api-session-controller/client`）类型化访问；顺带清掉该包 strict 模式类型债（`El.props` 非空化、`as unknown as El`、`SeatDomApi` portal），typecheck 归零。
+
+### RPC 白名单重审（§2.2）
+
+- 对照 0.1.6 全量 slash/dot 方法表 diff：`session/follow`、`goal/activation-changed` 等新增 scoped emit 进白名单；`workspaceFiles`/`officeToPdf` 的 `workspaceFileScopeId` 入归属提取链。
+- mux 流过滤：`observeRemoteMuxClientFrame` 对 open/control 帧按流类型校验归属，拒绝流合成 error 帧显式失败（不静默悬挂）；`session/follow` 专属语义，测试帧带真实归属参数；`maskedTextFrame` 补 16 位扩展长度。
+
+### preset 适配（§2.3）
+
+- liangshen `agent.cordis.yml`：行 id `workflow-worker-thread → workflow-ptc`（对齐上游 standard）；`tool-subagent` 补 `modelSelectionSettings: true`（上游 standard 同项）。
+- 包名残留：`workflow-worker-thread`/`code-runtime` 引用清零；`tests/composition.test.ts` 同步断言。
+
+### 模型路由（§2.4）
+
+- Relay 探测：`https://api.commandcode.ai/provider/v1/messages` 返回 401 Anthropic 错误格式（端点存在，非 404）——自定义 baseURL 下 Messages 协议可用。
+- `settings.production.yaml` 显式钉 `protocol: messages` 固化决策；`prompt-audit-model` 测试 mock 重写为 Messages SSE 序列（`message_start`→`content_block_*`→`message_delta stop_reason=end_turn`→`message_stop`），断言 `/v1/messages` + `x-api-key`。
+- `session-telemetry-otel` 生产 overlay 显式禁用（FEEDBACK_ONLY 上报 deepseeksvc.com，R58 已在跑的存量面借升级收掉）。
+
+### 组合与安全（§2.5）
+
+- 生产 overlay 显式禁用：`terminal-controller`（Web 终端=宿主 PTY 绕 OCI）、`ui-sidebar-terminal`、`ui-plugin-manager`、`plugin-manager`（供应链面）、`session-telemetry-otel`。
+- `worker.production.yml` `sandbox-oci network: bridge` 断言修正（`network: none` 断言是测试过期，bridge 是刻意决策：容器出网装依赖、入站仍闭）。
+
+### 核验证据
+
+- `pnpm verify` 全绿：258 测试文件 / 1626 用例通过、typecheck 0 错、lint、官方完整性（迁移期补丁豁免 0 项）、插件边界、工具 schema、capability matrix、`git diff --check`。
+- 会话格式：`SESSION_FORMAT_VERSION = 3` 两代相同，无迁移；冻结副本核验——8 个生产 v3 会话（zstd）在 0.1.6 持久化层只读恢复 421 事件全解码、sha256 前后一致零写入；迁移套件 23/23 绿。

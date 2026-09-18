@@ -46,3 +46,23 @@
     # 该提示对所有非 complete preset 生效，避免模型请求无意义的权限升级。
     - id: oci-workspace-guidance
       name: 'dsh-lark-web-bundle/agent-presets-oci/workspace-guidance.mjs'
+
+# 0.1.6 上游新增默认行的生产处置：Web 终端经 terminal/* Remote 以宿主
+# 系统用户起 PTY，绕过 OCI 沙箱边界，整个面显式关闭（远程方法同时未入
+# 用户白名单 + mux 帧策略 denied，纵深三层）。
+- id: terminal-controller
+  disabled: true
+- id: ui-sidebar-terminal
+  disabled: true
+
+# 插件管理面（安装/启停/移除运行时 bundle）是未审计的供应链写通道；
+# 生产组合由 cordis.yml 声明，禁止运行时改写。
+- id: plugin-manager
+  disabled: true
+- id: ui-plugin-manager
+  disabled: true
+
+# OTLP 会话遥测默认向 harness-telemetry.deepseeksvc.com 外发反馈事件；
+# 自建生产不向第三方端点外发会话数据，显式关闭。
+- id: session-telemetry-otel
+  disabled: true

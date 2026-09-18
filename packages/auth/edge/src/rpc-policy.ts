@@ -16,7 +16,7 @@ export interface RpcDecision {
   denied?: string;
 }
 
-const SESSION_METHODS = new Set(["session.export", "session.history", "session.search", "session.models", "session.prompt", "session.fork", "session.rename", "session.selectModel", "session.attachment", "session.updateQueue", "session.cancel", "session.page", "agentPreset.select", "goal.create", "goal.edit", "goal.pause", "goal.resume", "goal.complete", "goal.clear", "skill.list", "skills.list", "commands.list", "commands.execute", "fileReferences.list", "sessionReferenceResolver.candidates", "messageFeedback.list", "messageFeedback.put", "messageFeedback.delete", "workspace.insertSessionBefore", "workspace.archiveSession", "subagent.list", "subagent.history", "subagent.prompt", "subagent.interrupt", "subagents.list", "subagents.prompt", "subagents.interruptByParent"]);
+const SESSION_METHODS = new Set(["session.export", "session.history", "session.search", "session.models", "session.prompt", "session.fork", "session.rename", "session.selectModel", "session.attachment", "session.updateQueue", "session.cancel", "session.page", "agentPreset.select", "goal.create", "goal.edit", "goal.pause", "goal.resume", "goal.complete", "goal.clear", "goal.get", "skill.list", "skills.list", "commands.list", "commands.execute", "fileReferences.list", "sessionReferenceResolver.candidates", "messageFeedback.list", "messageFeedback.put", "messageFeedback.delete", "sessionFeedback.record", "workspace.insertSessionBefore", "workspace.archiveSession", "workspace.unarchiveSession", "subagent.list", "subagent.history", "subagent.prompt", "subagent.interrupt", "subagents.list", "subagents.prompt", "subagents.interruptByParent", "fileUploads.upload", "officeToPdf.render", "workspaceFiles.list", "workspaceFiles.read", "workspaceFiles.readAll", "workspaceFiles.readBytes", "workspaceFiles.readRelated", "workspaceFiles.stat"]);
 const REFERENCE_METHODS = new Set(["fileReferences.list", "sessionReferenceResolver.candidates"]);
 const SESSION_ID_REQUIRED_METHODS = new Set(["session.page", "skills.list"]);
 const WORKSPACE_METHODS = new Set(["workspace.rename", "workspace.delete", "workspace.insertBefore", "workspace.insertSessionBefore"]);
@@ -49,16 +49,25 @@ const USER_DIRECTORY_TYPERT_METHODS = new Set(["directoryPicker/list", "director
 const USER_TYPERT_METHODS = new Set([
   "agentPresets/select",
   "commands/list", "commands/execute", "dsh-web-ui-settings/describe",
-  "goals/clear", "goals/complete", "goals/create", "goals/edit", "goals/pause", "goals/resume",
-  "messageFeedback/delete", "messageFeedback/list", "messageFeedback/put",
+  "goals/clear", "goals/complete", "goals/create", "goals/edit", "goals/get", "goals/pause", "goals/resume",
+  "messageFeedback/delete", "messageFeedback/list", "messageFeedback/put", "sessionFeedback/record",
   "llm/providers", "llm/models",
   // 普通用户可对自己拥有的会话执行完整的 UI 生命周期操作；下方
   // SESSION_METHODS 归属检查仍会拒绝他人的会话。
   "session/attachment", "session/cancel", "session/create", "session/fork",
   "session/prompt", "session/rename", "session/selectModel", "session/updateQueue",
-  "workspace/archiveSession", "workspace/create", "workspace/insertBefore",
+  "workspace/archiveSession", "workspace/unarchiveSession", "workspace/create", "workspace/insertBefore",
   "workspace/insertSessionBefore", "workspace/rename", "workspace/delete",
   "subagents/list", "subagents/prompt", "subagents/interruptByParent",
+  // 0.1.6 新增用户面：附件上传、Office 预览与会话内文件读取；
+  // 均以 sessionId/workspaceFileScopeId 做归属校验（SESSION_METHODS）。
+  "fileUploads/upload", "officeToPdf/generation", "officeToPdf/render",
+  "workspaceFiles/list", "workspaceFiles/read", "workspaceFiles/readAll",
+  "workspaceFiles/readBytes", "workspaceFiles/readRelated", "workspaceFiles/stat",
+  "permissionPresets/catalog",
+  // settings/mutate 仍受 ADMIN_ONLY 门禁约束：只有 isUserOnboardingMutation
+  // 认可的 onboarding 写入放行，其余变更请求继续 CAPABILITY_NOT_ALLOWED。
+  "settings/mutate",
   ...USER_READ_ONLY_TYPERT_METHODS, ...USER_DIRECTORY_TYPERT_METHODS,
 ]);
 
@@ -392,7 +401,8 @@ function sessionIds(method: string, args: Record<string, unknown>): string[] {
     ].filter((value): value is string => value !== undefined);
   }
   const request = recordValue(args.request);
-  const sessionId = stringValue(args.sessionId) ?? stringValue(args.agentId) ?? stringValue(request?.sessionId);
+  // workspaceFileScopeId 是 0.1.6 workspaceFiles/officeToPdf 的会话范围参数名。
+  const sessionId = stringValue(args.sessionId) ?? stringValue(args.agentId) ?? stringValue(args.workspaceFileScopeId) ?? stringValue(request?.sessionId);
   return sessionId ? [sessionId] : [];
 }
 

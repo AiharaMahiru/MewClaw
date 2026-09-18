@@ -23,17 +23,20 @@ describe("审计模型协议", () => {
 
   it("官方插件复用设置与凭证引用，调用仅到配置的审计模型地址", async () => {
     const dshHome = await mkdtemp(join(tmpdir(), "dsh-audit-model-test-"));
-    const requests: { url: string | undefined; authorization: string | undefined; body: string }[] = [];
+    const requests: { url: string | undefined; apiKey: string | undefined; body: string }[] = [];
     const server = createServer((request, response) => {
-      const received = { url: request.url, authorization: request.headers.authorization, body: "" };
+      const received = { url: request.url, apiKey: request.headers["x-api-key"] as string | undefined, body: "" };
       requests.push(received);
       request.on("data", (chunk: Buffer) => { received.body += chunk.toString(); });
       request.on("end", () => {
       response.writeHead(200, { "content-type": "text/event-stream" });
       response.end([
-      'data: {"choices":[{"delta":{"content":"{\\"allow\\":false}"},"finish_reason":null}]}',
-      'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}',
-      "data: [DONE]",
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":1,"output_tokens":0}}}',
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"{\\"allow\\":false}"}}',
+      'data: {"type":"content_block_stop","index":0}',
+      'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":1}}',
+      'data: {"type":"message_stop"}',
       ].join("\n\n") + "\n\n");
       });
     });
@@ -55,8 +58,8 @@ describe("审计模型协议", () => {
         ]),
       });
       await expect(model.generate(input())).resolves.toBe('{"allow":false}');
-      expect(requests).toEqual([{ url: "/v1/chat/completions", authorization: "Bearer synthetic-stale-control-key", body: expect.any(String) }]);
-      expect(JSON.parse(requests[0]!.body)).toMatchObject({ model: "deepseek/deepseek-v4.1-flash", thinking: { type: "disabled" } });
+      expect(requests).toEqual([{ url: "/v1/messages", apiKey: "synthetic-stale-control-key", body: expect.any(String) }]);
+      expect(JSON.parse(requests[0]!.body)).toMatchObject({ model: "deepseek/deepseek-v4.1-flash", thinking: { type: "disabled" }, stream: true });
     } finally {
       await model?.close();
       await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
