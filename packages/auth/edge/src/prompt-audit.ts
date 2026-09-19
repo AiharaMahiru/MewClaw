@@ -47,13 +47,14 @@ export function createPromptAuditor(model: PromptAuditModel, options: { timeoutM
         timer = setTimeout(() => { abort.abort(); reject(new Error("AUDIT_TIMEOUT")); }, options.timeoutMs);
       });
       const output = await Promise.race([model.generate({ system: PROMPT_AUDIT_SYSTEM, text, signal: abort.signal }), expired]);
-      if (output.length > 256) return "unavailable";
+      const deny = (category: string): PromptAuditResult => { console.warn(`[prompt-audit] ${category}`); return "unavailable"; };
+      if (output.length > 256) return deny("prompt audit: oversized decision");
       // 仅兼容完整 JSON 围栏；不能从任意文本、嵌套对象或冲突判定中挑选 allow。
       const trimmed = output.trim();
       const fenced = /^```(?:json)?\s*\n([\s\S]*?)\n```$/iu.exec(trimmed);
       const parsed: unknown = JSON.parse(fenced?.[1] ?? trimmed);
-      if (!isRecord(parsed) || Object.keys(parsed).length !== 1) return "unavailable";
-      return parsed.decision === "allow" || parsed.decision === "block" ? parsed.decision : "unavailable";
+      if (!isRecord(parsed) || Object.keys(parsed).length !== 1) return deny("prompt audit: malformed decision");
+      return parsed.decision === "allow" || parsed.decision === "block" ? parsed.decision : deny("prompt audit: invalid decision");
     } finally {
       if (timer) clearTimeout(timer);
       abort.abort();
@@ -86,7 +87,7 @@ export function createPromptAuditor(model: PromptAuditModel, options: { timeoutM
   };
 }
 
-/** 图片是明确不审计的附件；文字仍审计，未知多模态块继续失败关闭。 */
+/** 附件（图片/文件）是明确不审计的载荷；文字仍审计，未知多模态块继续失败关闭。 */
 export function promptAuditInput(decision: RpcDecision): { kind: "skip" } | { kind: "text"; text: string } | { kind: "unsupported" } {
   const { method, args } = decision;
   const request = isRecord(args.request) ? args.request : args;
@@ -113,7 +114,7 @@ export function promptAuditInput(decision: RpcDecision): { kind: "skip" } | { ki
     input = request.action;
   }
   const texts: string[] = [];
-  let hasImage = false;
+  let hasAttachment = false;
   if (input.text !== undefined) {
     if (typeof input.text !== "string") return { kind: "unsupported" };
     texts.push(input.text);
@@ -122,9 +123,17 @@ export function promptAuditInput(decision: RpcDecision): { kind: "skip" } | { ki
     if (!Array.isArray(input.content)) return { kind: "unsupported" };
     for (const part of input.content) {
       if (!isRecord(part)) return { kind: "unsupported" };
+      // 附件 wire 两种形态：session.prompt 内联（image 带 mediaType+data、file 带
+      // receiptId），updateQueue 编辑用 attachment 引用。附件本体不审计，文字仍审计。
       if (part.type === "image") {
-        if (typeof part.mediaType !== "string" || !IMAGE_MEDIA_TYPES.has(part.mediaType) || typeof part.data !== "string") return { kind: "unsupported" };
-        hasImage = true;
+        const inline = typeof part.mediaType === "string" && IMAGE_MEDIA_TYPES.has(part.mediaType) && typeof part.data === "string";
+        if (!inline && !isRecord(part.attachment)) return { kind: "unsupported" };
+        hasAttachment = true;
+        continue;
+      }
+      if (part.type === "file") {
+        if (typeof part.receiptId !== "string" && !isRecord(part.attachment)) return { kind: "unsupported" };
+        hasAttachment = true;
         continue;
       }
       if ((part.type !== "text" && part.type !== "reasoning") || typeof part.text !== "string") return { kind: "unsupported" };
@@ -133,7 +142,7 @@ export function promptAuditInput(decision: RpcDecision): { kind: "skip" } | { ki
   }
   const text = texts.join("\n");
   if (text.trim()) return { kind: "text", text };
-  return hasImage ? { kind: "skip" } : { kind: "unsupported" };
+  return hasAttachment ? { kind: "skip" } : { kind: "unsupported" };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

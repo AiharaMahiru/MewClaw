@@ -115,6 +115,17 @@ describe("发送载荷提取", () => {
     expect(extract("session.prompt", { content: [{ type: "image", mediaType: "image/png", data: "hidden" }, { type: "text", text: "请描述图片" }] })).toEqual({ kind: "text", text: "请描述图片" });
   });
 
+  it("0.1.6 file 附件不进入审计：文件-only 跳过，文件+文字仍审计文字", () => {
+    const file = { type: "file", receiptId: "receipt-1" };
+    expect(extract("session.prompt", { request: { content: [file] } })).toEqual({ kind: "skip" });
+    expect(extract("session.prompt", { request: { content: [file, { type: "text", text: "读取这个表" }] } })).toEqual({ kind: "text", text: "读取这个表" });
+    // updateQueue 编辑用 attachment 引用形态；缺引用字段仍失败关闭。
+    const ref = { type: "file", attachment: { attachmentId: "a1", name: "表.xlsx", bytes: 3 } };
+    expect(extract("session.updateQueue", { request: { action: { kind: "edit", content: [ref, { type: "text", text: "改成读这个" }] } } })).toEqual({ kind: "text", text: "改成读这个" });
+    expect(extract("session.prompt", { request: { content: [{ type: "file" }] } })).toEqual({ kind: "unsupported" });
+    expect(extract("session.prompt", { request: { content: [{ type: "image", attachment: { attachmentId: "a1", name: "图.png", bytes: 3 } }] } })).toEqual({ kind: "skip" });
+  });
+
   it("不会审计只读请求", () => {
     expect(extract("session.history", {})).toEqual({ kind: "skip" });
   });

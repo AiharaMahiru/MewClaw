@@ -20,6 +20,8 @@ DSH 核心及官方插件锁定 `0.1.6-alpha.2`（2026-09 自 `0.1.5-rc.2` 升�
 
 截至 **2026-09-19，生产基线为 `R61-mobile-rail-1023-20260919`**（构建自 `desktop-dev@e1efc7e`，在 R60 基础上把移动端抽屉适配断点由 `≤768px` 对齐到 DSH 0.1.6 原生 `narrow <1024px`——768–1023px 的平板/折叠屏/窄窗口此前既无定制菜单键也只受 56px rail 挤压；顶栏控件收纳仍保持 `≤768px`）。本机生产入口 `/opt/dsh/current` 指向 `releases/R61-mobile-rail-1023-20260919`；Git 分支后续提交不等于生产已发布。
 
+
+
 ## 分支协作
 
 - [`master`](https://github.com/AiharaMahiru/MewClaw/tree/master)：Web、共享插件和云端服务。
