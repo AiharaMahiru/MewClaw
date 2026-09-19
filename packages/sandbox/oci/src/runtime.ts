@@ -186,7 +186,20 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
     const control = controlToChild && controlFromChild
       ? DuplexStream.from({ writable: controlToChild, readable: controlFromChild })
       : undefined;
+    // fd7 的宿主端是 socketpair，容器端经 conmon 复制持有——podman exec 客户端
+    // 退出或终止都不会带动它 EOF。不显式断开则两侧互等成死锁：容器进程等宿主
+    // 关通道（hostClosed），'close' 事件等 stdio[7] EOF，handle.done 永不落定。
+    let childControl: DuplexStream | undefined;
     const settleControl = (error?: Error) => {
+      if (childControl) {
+        // 先 FIN（对端按协议收 hostClosed）再强关——双保险应对容器进程
+        // 不消费通道的场景。收尾路径不向调用方抛错。
+        try {
+          childControl.end();
+          childControl.destroy();
+        } catch { /* 关闭尽力而为 */ }
+        childControl = undefined;
+      }
       if (error) controlToChild?.destroy(error);
       else controlToChild?.end();
       if (error) controlFromChild?.destroy(error);
@@ -224,6 +237,11 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
             settleControl(error);
             reject(error);
           });
+          child.once("exit", () => {
+            // podman exec 客户端一死，exec 会话由 conmon 续命：主动断开 fd7，
+            // 让容器内进程观察到控制通道关闭并退出，'close' 才有机会触发。
+            settleControl();
+          });
           child.once("close", (code, signal) => {
             if (killTimer) clearTimeout(killTimer);
             stdoutCollector?.close();
@@ -234,10 +252,13 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
 
           // 控制管道两端接通：写侧进 child fd7，读侧回 handle。
           // （ChildProcess.stdio 类型只声明到 fd4，fd7 是 --preserve-fds 语义位。）
-          const childControl = (child.stdio as unknown as Array<Readable | Writable | null | undefined> | undefined)?.[SUBPROCESS_CONTROL_FD];
+          childControl = (child.stdio as unknown as Array<Readable | Writable | null | undefined> | undefined)?.[SUBPROCESS_CONTROL_FD] as DuplexStream | undefined;
           if (wantsControl && childControl) {
+            // 容器端 abrupt close/reset 也要落到桥的收尾上，不能让 socket
+            // 'error' 成为无人认领的 unhandled error。
+            childControl.on("error", (cause) => settleControl(cause instanceof Error ? cause : new Error(String(cause))));
             controlToChild!.pipe(childControl as Writable);
-            (childControl as Readable).pipe(controlFromChild!);
+            childControl.pipe(controlFromChild!);
           }
 
           // stdin 批次写入（{ data } 形态：写后关闭）。
@@ -277,6 +298,10 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
     const terminate = (): void => {
       if (terminated || !child || child.exitCode !== null) return;
       terminated = true;
+      // 先断开控制通道：容器内 PTC 引导进程以 fd7 关闭为宿主终止信号
+      // （run_code 协议的 hostClosed），仅杀 podman exec 客户端够不到
+      // conmon 托管的 exec 进程。
+      settleControl();
       child.kill("SIGTERM");
       killTimer = setTimeout(() => {
         child?.kill("SIGKILL");
