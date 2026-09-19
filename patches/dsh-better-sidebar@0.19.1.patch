@@ -1,39 +1,138 @@
 diff --git a/lib/client-registry.js b/lib/client-registry.js
-index 09bb7dcd5f5c9e81ba054c4d1f0db0248e3d4333..c91afcd353fa0648e2c113829f24aaf1191e3d1d 100644
+index 09bb7dc..92fa830 100644
 --- a/lib/client-registry.js
 +++ b/lib/client-registry.js
-@@ -3490,6 +3490,8 @@ window.__ModuleLoader__.load({
+@@ -3477,7 +3477,7 @@ window.__ModuleLoader__.load({
+ 		* Register the turn-tail interception (returns the disposer).
+ 		*
+ 		* The slot is a CHILD slot the host's ui-conversation declares in its
+-		* `conversation.chat.node` children table (kind: chain, scope: session).
++		* `conversation.chat.node` children table (kind: list, scope: session).
+ 		* Registering it directly races the declaration — the ui-slots core's
+ 		* load-time validation throws "not declared (a parent entry's children
+ 		* table must declare it)" when the parent entry is not on the ledger yet.
+@@ -3488,14 +3488,17 @@ window.__ModuleLoader__.load({
+ 		* @deepseek-ai/dsh-client-ui-deliverables' registration of the same slot.
+ 		*/
  		function registerTurnTailInterception(ctx, store) {
++			// patched: 0.1.6 起该槽位为 list 语义——select 仅对 chain 生效；
++			// 改为组件内自选择（对齐官方 ui-deliverables 的 DeliverablesTail）。
++			const TurnTailEntry = (props) => {
++				if (store.getSuspended()) return null;
++				if (store.getPrefs().tabsEnabled["editor"] === false) return null;
++				const matched = selectProducedFiles(props);
++				return matched === null ? null : (0, react_jsx_runtime.jsx)(SidebarProducedFiles, { ...props, matched });
++			};
  			return ctx.slots.inject("conversation.chat.turnTail", () => ctx.slots.register({
  				name: "conversation.chat.turnTail",
-+				// patched: 0.1.6 ui-slots 要求 list 槽位注册携带 options.id
+-				select: (owner) => {
+-					if (store.getSuspended()) return null;
+-					if (store.getPrefs().tabsEnabled["editor"] === false) return null;
+-					return selectProducedFiles(owner);
+-				},
+-				priority: -1,
 +				id: "dsh-better-sidebar",
- 				select: (owner) => {
- 					if (store.getSuspended()) return null;
- 					if (store.getPrefs().tabsEnabled["editor"] === false) return null;
+ 				registrant: "dsh-better-sidebar",
+ 				inject: (sessionId) => ({
+ 					openInSidebar: (path) => {
+@@ -3505,7 +3508,7 @@ window.__ModuleLoader__.load({
+ 						revealInExplorer(ctx, store, sessionId, files);
+ 					}
+ 				})
+-			}, SidebarProducedFiles));
++			}, TurnTailEntry));
+ 		}
+ 		//#endregion
+ 		//#region node_modules/.pnpm/clsx@2.1.1/node_modules/clsx/dist/clsx.mjs
 diff --git a/lib/client.js b/lib/client.js
-index f137630721b2f11268ad498c0bda41851c96bdf1..258dc20758680f98f7f58209be69a4372a91e511 100644
+index f137630..19cdfd7 100644
 --- a/lib/client.js
 +++ b/lib/client.js
-@@ -3490,6 +3490,8 @@ window.__ModuleLoader__.load({
+@@ -3477,7 +3477,7 @@ window.__ModuleLoader__.load({
+ 		* Register the turn-tail interception (returns the disposer).
+ 		*
+ 		* The slot is a CHILD slot the host's ui-conversation declares in its
+-		* `conversation.chat.node` children table (kind: chain, scope: session).
++		* `conversation.chat.node` children table (kind: list, scope: session).
+ 		* Registering it directly races the declaration — the ui-slots core's
+ 		* load-time validation throws "not declared (a parent entry's children
+ 		* table must declare it)" when the parent entry is not on the ledger yet.
+@@ -3488,14 +3488,17 @@ window.__ModuleLoader__.load({
+ 		* @deepseek-ai/dsh-client-ui-deliverables' registration of the same slot.
+ 		*/
  		function registerTurnTailInterception(ctx, store) {
++			// patched: 0.1.6 起该槽位为 list 语义——select 仅对 chain 生效；
++			// 改为组件内自选择（对齐官方 ui-deliverables 的 DeliverablesTail）。
++			const TurnTailEntry = (props) => {
++				if (store.getSuspended()) return null;
++				if (store.getPrefs().tabsEnabled["editor"] === false) return null;
++				const matched = selectProducedFiles(props);
++				return matched === null ? null : (0, react_jsx_runtime.jsx)(SidebarProducedFiles, { ...props, matched });
++			};
  			return ctx.slots.inject("conversation.chat.turnTail", () => ctx.slots.register({
  				name: "conversation.chat.turnTail",
-+				// patched: 0.1.6 ui-slots 要求 list 槽位注册携带 options.id
+-				select: (owner) => {
+-					if (store.getSuspended()) return null;
+-					if (store.getPrefs().tabsEnabled["editor"] === false) return null;
+-					return selectProducedFiles(owner);
+-				},
+-				priority: -1,
 +				id: "dsh-better-sidebar",
- 				select: (owner) => {
- 					if (store.getSuspended()) return null;
- 					if (store.getPrefs().tabsEnabled["editor"] === false) return null;
+ 				registrant: "dsh-better-sidebar",
+ 				inject: (sessionId) => ({
+ 					openInSidebar: (path) => {
+@@ -3505,7 +3508,7 @@ window.__ModuleLoader__.load({
+ 						revealInExplorer(ctx, store, sessionId, files);
+ 					}
+ 				})
+-			}, SidebarProducedFiles));
++			}, TurnTailEntry));
+ 		}
+ 		//#endregion
+ 		//#region node_modules/.pnpm/clsx@2.1.1/node_modules/clsx/dist/clsx.mjs
 diff --git a/src/client/intercept.tsx b/src/client/intercept.tsx
-index b4f130bcdb4170b3cb065558a08d091032b7ec33..c5834d9ace6c80860260b1918641cf8b65d53ed8 100644
+index b4f130b..1410a33 100644
 --- a/src/client/intercept.tsx
 +++ b/src/client/intercept.tsx
-@@ -112,6 +112,8 @@ export function SidebarProducedFiles(props: {
+@@ -99,7 +99,7 @@ export function SidebarProducedFiles(props: {
+  * Register the turn-tail interception (returns the disposer).
+  *
+  * The slot is a CHILD slot the host's ui-conversation declares in its
+- * `conversation.chat.node` children table (kind: chain, scope: session).
++ * `conversation.chat.node` children table (kind: list, scope: session).
+  * Registering it directly races the declaration — the ui-slots core's
+  * load-time validation throws "not declared (a parent entry's children
+  * table must declare it)" when the parent entry is not on the ledger yet.
+@@ -110,22 +110,21 @@ export function SidebarProducedFiles(props: {
+  * @deepseek-ai/dsh-client-ui-deliverables' registration of the same slot.
+  */
  export function registerTurnTailInterception(ctx: Context, store: SidebarStore): () => void {
++  // patched: 0.1.6 起该槽位为 list 语义——select 仅对 chain 生效；
++  // 改为组件内自选择（对齐官方 ui-deliverables 的 DeliverablesTail）。
++  const TurnTailEntry = (props: Omit<Parameters<typeof SidebarProducedFiles>[0], 'matched'>) => {
++    if (store.getSuspended()) return null
++    if (store.getPrefs().tabsEnabled['editor'] === false) return null
++    const matched = selectProducedFiles(props)
++    return matched === null ? null : <SidebarProducedFiles {...props} matched={matched} />
++  }
    return ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({
      name: 'conversation.chat.turnTail',
-+    // patched: 0.1.6 ui-slots 要求 list 槽位注册携带 options.id
+-    // Decline the takeover while the editor tab type is disabled in the side
+-    // card settings: the produced-files row falls back to the default
+-    // deliverables behavior instead of offering chips that cannot open. Also
+-    // while the sidebar is externally disabled (aionui-panel chosen).
+-    select: (owner) => {
+-      if (store.getSuspended()) return null
+-      if (store.getPrefs().tabsEnabled['editor'] === false) return null
+-      return selectProducedFiles(owner)
+-    },
+-    priority: -1,
 +    id: 'dsh-better-sidebar',
-     // Decline the takeover while the editor tab type is disabled in the side
-     // card settings: the produced-files row falls back to the default
-     // deliverables behavior instead of offering chips that cannot open. Also
+     registrant: 'dsh-better-sidebar',
+     inject: (sessionId: string) => ({
+       openInSidebar: (path: string) => { openSidebarFile(ctx, store, sessionId, path) },
+       onShowInFolder: (files: readonly string[]) => { revealInExplorer(ctx, store, sessionId, files) },
+     }),
+-  }, SidebarProducedFiles))
++  }, TurnTailEntry))
+ }
