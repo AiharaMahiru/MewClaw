@@ -43,6 +43,16 @@
     preparedSessionCacheSize: 5
     writeBatchMaxDelayMs: 200
 
+# 模型侧宿主文件读边界：上游 dsh-tool-fs 的 read 不设防是单人底座语义，多租户
+# 部署经官方 tools.guard() 收口到会话 cwd 与附件/技能根（SPEC：docs/specs/webui.md）。
+- insert:
+    - id: fs-read-guard
+      name: 'dsh-lark-web-bundle/fs-read-guard.mjs'
+      config:
+        readableRoots:
+          - !!js dshHomePath('attachments/v1')
+          - !!js dshHomePath('skills')
+
 # 官方 dsh Web Host 自带唯一的 userQuestions provider，并通过 /api 与事件
 # 通道驱动官方问题面板。Web profile 不再加载飞书专用 provider，避免违反
 # dsh-user-questions 的单 provider 契约；飞书专用 profile 继续保留该插件。
