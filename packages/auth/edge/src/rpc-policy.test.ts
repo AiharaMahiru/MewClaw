@@ -81,6 +81,9 @@ describe("RPC authorization policy", () => {
     );
     expect(slashCreate).toMatchObject({ method: "session.create", args: { request: {} } });
     expect((slashCreate.args.request as Record<string, unknown>).agentPreset).toBeUndefined();
+    // 缺省 cwd 必须回写进转发请求：校验按用户工作区根判定，不回写则
+    // worker 落到 process.cwd()，OCI provision 拒绝执行且资源登记错位。
+    expect((slashCreate.args.request as Record<string, unknown>).cwd).toBe(accessPolicy(userA, roots).workspaceRoot);
     expect(slashCreate.denied).toBeUndefined();
     const nestedPreset = await authorizeRpc(
       { method: "session/create", payload: { args: { request: { cwd: "D:/workspaces/users/user-a", agentPreset: "lark-lightweight" } } } },
@@ -109,6 +112,8 @@ describe("RPC authorization policy", () => {
     const service = new AuthService({ store, mail: { sendVerification: async () => undefined, sendPasswordReset: async () => undefined } });
     const decision = await authorizeRpc({ method: "session.create", payload: { args: {} } }, { service, user: userA, roots });
     expect(decision.args.agentPreset).toBe("lark-lightweight");
+    // dotted 形态同样回写缺省 cwd。
+    expect(decision.args.cwd).toBe(accessPolicy(userA, roots).workspaceRoot);
     const filtered = await filterRpcResponse({ result: { value: { items: [{ sessionId: "owned", cwd: "D:/workspaces/users/user-a" }, { sessionId: "foreign", cwd: "D:/other" }] } } }, { ...decision, method: "session.list" }, { service, user: userA, roots });
     expect((filtered.result as { value: { items: unknown[] } }).value.items).toHaveLength(1);
   });
@@ -264,6 +269,28 @@ describe("RPC authorization policy", () => {
     )).resolves.not.toMatchObject({ denied: expect.any(String) });
     await expect(authorizeRpc(
       { method: "session/page", payload: { args: { request: { sessionId: "foreign" } } } },
+      { service, user: userA, roots },
+      "session/page",
+    )).resolves.toMatchObject({ denied: "RESOURCE_NOT_ALLOWED" });
+    // 官方客户端的真实寻址形态：sessionId 嵌在 request.address 里。
+    await expect(authorizeRpc(
+      { method: "session/page", payload: { args: { request: { address: { kind: "session", sessionId: "owned" }, throughSeq: 100 } } } },
+      { service, user: userA, roots },
+      "session/page",
+    )).resolves.not.toMatchObject({ denied: expect.any(String) });
+    await expect(authorizeRpc(
+      { method: "session/page", payload: { args: { request: { address: { kind: "session", sessionId: "foreign" }, throughSeq: 100 } } } },
+      { service, user: userA, roots },
+      "session/page",
+    )).resolves.toMatchObject({ denied: "RESOURCE_NOT_ALLOWED" });
+    // subagent 地址按父会话归属判定（与 mux scopedStreamSessionId 同语义）。
+    await expect(authorizeRpc(
+      { method: "session/page", payload: { args: { request: { address: { kind: "subagent", parentSessionId: "owned", childSessionId: "child-x", mode: "continuable" }, throughSeq: 10 } } } },
+      { service, user: userA, roots },
+      "session/page",
+    )).resolves.not.toMatchObject({ denied: expect.any(String) });
+    await expect(authorizeRpc(
+      { method: "session/page", payload: { args: { request: { address: { kind: "subagent", parentSessionId: "foreign", childSessionId: "child-x", mode: "continuable" }, throughSeq: 10 } } } },
       { service, user: userA, roots },
       "session/page",
     )).resolves.toMatchObject({ denied: "RESOURCE_NOT_ALLOWED" });
