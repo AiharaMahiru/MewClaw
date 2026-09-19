@@ -1,0 +1,39 @@
+diff --git a/lib/client-registry.js b/lib/client-registry.js
+index 5c312c8994e7acd0e4f308346287612e0e56fe5b..6442402f54c40a5dfd252ae552f3ce31e6fa5cea 100644
+--- a/lib/client-registry.js
++++ b/lib/client-registry.js
+@@ -3477,6 +3477,8 @@ window.__ModuleLoader__.load({
+ 		function registerTurnTailInterception(ctx, store) {
+ 			return ctx.slots.inject("conversation.chat.turnTail", () => ctx.slots.register({
+ 				name: "conversation.chat.turnTail",
++				// patched: 0.1.6 ui-slots 要求 list 槽位注册携带 options.id
++				id: "dsh-better-sidebar",
+ 				select: (owner) => {
+ 					if (store.getSuspended()) return null;
+ 					if (store.getPrefs().tabsEnabled["editor"] === false) return null;
+diff --git a/lib/client.js b/lib/client.js
+index f37c1ebb18b3e2eea4456d10bbc1636385cf2a4b..c2f29f4d2952575c980694b36a9c3f629427d505 100644
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -3477,6 +3477,8 @@ window.__ModuleLoader__.load({
+ 		function registerTurnTailInterception(ctx, store) {
+ 			return ctx.slots.inject("conversation.chat.turnTail", () => ctx.slots.register({
+ 				name: "conversation.chat.turnTail",
++				// patched: 0.1.6 ui-slots 要求 list 槽位注册携带 options.id
++				id: "dsh-better-sidebar",
+ 				select: (owner) => {
+ 					if (store.getSuspended()) return null;
+ 					if (store.getPrefs().tabsEnabled["editor"] === false) return null;
+diff --git a/src/client/intercept.tsx b/src/client/intercept.tsx
+index 8630a8b8f522a0230b87bc4982e3aced58c812ef..1fb0fd47516423095de6214c20d64d991ddb96e1 100644
+--- a/src/client/intercept.tsx
++++ b/src/client/intercept.tsx
+@@ -130,6 +130,8 @@ export function SidebarProducedFiles(props: {
+ export function registerTurnTailInterception(ctx: Context, store: SidebarStore): () => void {
+   return ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({
+     name: 'conversation.chat.turnTail',
++    // patched: 0.1.6 ui-slots 要求 list 槽位注册携带 options.id
++    id: 'dsh-better-sidebar',
+     // Decline the takeover while the editor tab type is disabled in the side
+     // card settings: the produced-files row falls back to the default
+     // deliverables behavior instead of offering chips that cannot open. Also

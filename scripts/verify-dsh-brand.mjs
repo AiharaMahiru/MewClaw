@@ -62,7 +62,12 @@ for (const packageName of officialBrandPackages) {
   }
 }
 
-if (workspacePackage?.pnpm?.patchedDependencies !== undefined) failures.push("package.json 不得声明 patchedDependencies");
+// patchedDependencies 只允许打向第三方社区包（pnpm patch 把 diff 入库、
+// lockfile 记内容哈希，可评审且上游变动即失败）；官方 @deepseek-ai/* 包
+// 一律保持原样，补丁视为绕过完整性校验。
+for (const patched of Object.keys(workspacePackage?.pnpm?.patchedDependencies ?? {})) {
+  if (patched.startsWith("@deepseek-ai/")) failures.push(`patchedDependencies 不得覆盖官方包: ${patched}`);
+}
 if (brandPackage?.name !== "dsh-lark-mewclaw-brand") failures.push("品牌插件 package identity 错误");
 if (brandPackage?.dsh?.client?.platform !== "web") failures.push("品牌插件缺少 Web client 声明");
 for (const slot of ["conversation.hero.brand.mark", "sidebar.brand.mark", "sidebar.brand.name"]) {
