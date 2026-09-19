@@ -20,7 +20,7 @@ DSH 核心及官方插件锁定 `0.1.6-alpha.2`（2026-09 自 `0.1.5-rc.2` 升�
 
 截至 **2026-09-19，生产基线为 `R65-oci-ptc-control-20260919`**（构建自 `desktop-dev@cbb0a73`，在 R64 基础上修复 OCI 下 `run_code` 必败：subprocess `control` 管道经 `podman exec --preserve-fds` 透传 fd7 + 注入启动标记，`ptc-runtime` 经 overlay 指到镜像 node 与 `extraMounts` 只读载体挂载——liangshen/ptc 模式的容器内 TypeScript 编排恢复可用）。
 
-截至 **2026-09-20，生产基线前进至 `R66-edge-workspaceid-turnTail-20260920`**（SHA-256 `06d1b7c8…`）：修复 R64 回归——`session/create` 以 `workspaceId` 定位时被缺省 cwd 回写触发官方互斥校验，普通用户"打开工作区"全灭；另以 `pnpm patch` 修复社区包 `dsh-better-sidebar` 的 `conversation.chat.turnTail` 注册缺 `options.id`（0.1.6 ui-slots 强制），同步放开品牌门禁对非 `@deepseek-ai` 包的补丁限制并让打包暂存携带 `patches/`。本机生产入口 `/opt/dsh/current` 指向 `releases/R66-edge-workspaceid-turnTail-20260920`；Git 分支后续提交不等于生产已发布。
+截至 **2026-09-20，生产基线前进至 `R67-better-sidebar-list-port-20260920`**（SHA-256 `8255af4f…`）：R66 的 turnTail 补丁只补了 `options.id`——0.1.6 起该槽位为 **list** 语义，`select` 仅对 chain 生效，`props.matched` 恒 undefined 致组件崩溃；R67 把补丁改成与官方 `DeliverablesTail` 同形态的组件内自选择（无产出渲染 null，含 0.18.0 `lastProduced` 副作用），双版本补丁重生成。R66（SHA-256 `06d1b7c8…`）另修复 R64 回归——`session/create` 以 `workspaceId` 定位时被缺省 cwd 回写触发官方互斥校验，普通用户"打开工作区"全灭；并以 `pnpm patch` 机制修复社区包 `dsh-better-sidebar`、放开品牌门禁对非 `@deepseek-ai` 包的补丁限制、打包暂存携带 `patches/`。本机生产入口 `/opt/dsh/current` 指向 `releases/R67-better-sidebar-list-port-20260920`；Git 分支后续提交不等于生产已发布。
 
 
 ## 分支协作
