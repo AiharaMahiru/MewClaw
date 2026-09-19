@@ -19,7 +19,9 @@ import {
 } from "./release-fs-utils.js";
 import type { ReleaseContentEntry } from "./release-package.js";
 
-const BUILD_STAGE_DIRS = ["apps", "infra", "packages", "presets", "scripts", "skills"] as const;
+// patches/ 是 pnpm patchedDependencies 的补丁文件根：暂存必须带上，
+// 否则 frozen-lockfile 安装找不到补丁源。
+const BUILD_STAGE_DIRS = ["apps", "infra", "packages", "patches", "presets", "scripts", "skills"] as const;
 const BUILD_STAGE_FILES = [
   "eslint.config.js",
   "package.json",
