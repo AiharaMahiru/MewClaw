@@ -10,7 +10,9 @@
       "default": "./lib/index.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
+    "./fs-read-guard.mjs": "./fs-read-guard.mjs",
     "./agent-presets-oci/workspace-guidance.mjs": "./agent-presets-oci/workspace-guidance.mjs",
+    "./agent-presets-oci/attachment-staging.mjs": "./agent-presets-oci/attachment-staging.mjs",
     "./package.json": "./package.json"
   },
   "types": "./lib/types/index.d.ts",
@@ -19,6 +21,7 @@
     "lib",
     "cordis.patch.yml",
     "tool-schema.mjs",
+    "fs-read-guard.mjs",
     "agent-presets",
     "agent-presets-lightweight",
     "agent-presets-oci"
