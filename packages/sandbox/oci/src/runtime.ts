@@ -8,11 +8,11 @@
  */
 import { spawn as spawnProcess, type ChildProcess } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { createWriteStream, type WriteStream } from "node:fs";
-import { tmpdir } from "node:os";
+import { closeSync, createWriteStream, openSync, type WriteStream } from "node:fs";
+import { devNull, tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import type { Readable, Writable } from "node:stream";
-import { PassThrough } from "node:stream";
+import { Duplex as DuplexStream, PassThrough } from "node:stream";
 
 import type { Context } from "@deepseek-ai/cordis";
 import { SandboxProvider, SandboxUnavailableError, type ConfinedArgv, type SandboxPolicy } from "@deepseek-ai/dsh-sandbox";
@@ -25,6 +25,7 @@ import {
   type SubprocessSpawnSpec,
   type SubprocessTerminalEnvironment,
 } from "@deepseek-ai/dsh-subprocess";
+import { SUBPROCESS_CONTROL_ENV, SUBPROCESS_CONTROL_FD } from "@deepseek-ai/dsh-subprocess/control";
 
 import type { ResolvedSandboxConfig } from "./config.js";
 import type { OciContainerRuntime, ProvisionedContainer } from "./container.js";
@@ -160,6 +161,12 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
     let terminated = false;
     let killTimer: NodeJS.Timeout | undefined;
 
+    const wantsControl = spec.stdio.control === "pipe";
+    // 标记名由控制通道启动协议保留，消费方不得占用（与宿主实现同契约）。
+    if (spec.env && Object.entries(spec.env).some(([key, value]) => key.toUpperCase() === SUBPROCESS_CONTROL_ENV && value !== undefined)) {
+      throw new Error(`${SUBPROCESS_CONTROL_ENV} is reserved for subprocess control-channel setup`);
+    }
+
     // 收集器先建（collected 字段只读，不能后赋值）。
     const stdoutCollector = typeof spec.stdio.stdout === "object"
       ? new BoundedCollector(spec.stdio.stdout.maxBytes, spec.stdio.stdout.spill?.maxBytes)
@@ -172,6 +179,20 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
       ...(stderrCollector ? { stderr: stderrCollector } : {}),
     };
 
+    // 控制通道桥：handle 同步返回而 child 异步产生——先造双向桥，
+    // spawn 落定后把桥两端接到 child.stdio[fd7]（--preserve-fds 透传）。
+    const controlToChild = wantsControl ? new PassThrough() : undefined;
+    const controlFromChild = wantsControl ? new PassThrough() : undefined;
+    const control = controlToChild && controlFromChild
+      ? DuplexStream.from({ writable: controlToChild, readable: controlFromChild })
+      : undefined;
+    const settleControl = (error?: Error) => {
+      if (error) controlToChild?.destroy(error);
+      else controlToChild?.end();
+      if (error) controlFromChild?.destroy(error);
+      else controlFromChild?.end();
+    };
+
     const outcome = new Promise<SubprocessOutcome>((resolve, reject) => {
       void this.bindingFor(spec.cwd)
         .then((binding) => {
@@ -181,21 +202,43 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
             binding.containerCwd,
             spec.env,
             spec.stdio.stdin !== "ignore",
+            wantsControl,
           );
-          const stdio: ["pipe" | "ignore" | "inherit", "pipe" | "ignore" | "inherit", "pipe" | "ignore" | "inherit"] = [
+          const stdio: Array<"pipe" | "ignore" | "inherit" | number> = [
             spec.stdio.stdin === "ignore" ? "ignore" : "pipe",
             spec.stdio.stdout === "inherit" ? "inherit" : "pipe",
             spec.stdio.stderr === "inherit" ? "inherit" : "pipe",
           ];
+          // fd3..fd6 用 /dev/null 占位，控制管道固定落 fd7（--preserve-fds 序号透传）。
+          let devNullFd: number | undefined;
+          if (wantsControl) {
+            devNullFd = openSync(devNull, "r");
+            while (stdio.length < SUBPROCESS_CONTROL_FD) stdio.push(devNullFd);
+            stdio.push("pipe");
+          }
           child = spawnProcess(this.config.podmanPath, args, { windowsHide: true, stdio });
+          // 占位 fd 已被 child 继承，宿主副本立即归还。
+          if (devNullFd !== undefined) closeSync(devNullFd);
 
-          child.once("error", (error) => reject(error));
+          child.once("error", (error) => {
+            settleControl(error);
+            reject(error);
+          });
           child.once("close", (code, signal) => {
             if (killTimer) clearTimeout(killTimer);
             stdoutCollector?.close();
             stderrCollector?.close();
+            settleControl();
             resolve({ exitCode: code, signal: signal as NodeJS.Signals | null });
           });
+
+          // 控制管道两端接通：写侧进 child fd7，读侧回 handle。
+          // （ChildProcess.stdio 类型只声明到 fd4，fd7 是 --preserve-fds 语义位。）
+          const childControl = (child.stdio as unknown as Array<Readable | Writable | null | undefined> | undefined)?.[SUBPROCESS_CONTROL_FD];
+          if (wantsControl && childControl) {
+            controlToChild!.pipe(childControl as Writable);
+            (childControl as Readable).pipe(controlFromChild!);
+          }
 
           // stdin 批次写入（{ data } 形态：写后关闭）。
           if (typeof spec.stdio.stdin === "object" && "data" in spec.stdio.stdin) {
@@ -220,7 +263,11 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
             child.stderr!.on("data", (chunk: Buffer) => stderrCollector.push(chunk));
           }
         })
-        .catch(reject);
+        .catch((error) => {
+          // provision 失败时 child 从未产生：控制桥也要收尾，读者不能悬空。
+          settleControl(error instanceof Error ? error : new Error(String(error)));
+          reject(error);
+        });
     });
 
     const stdinStream = spec.stdio.stdin === "pipe" ? new PassThrough() : undefined;
@@ -243,8 +290,9 @@ export class OciSubprocessRuntime extends SubprocessRuntime {
       stdin: spec.stdio.stdin === "pipe" ? (stdinStream as Writable) : undefined,
       stdout: spec.stdio.stdout === "pipe" ? (stdoutStream as Readable) : undefined,
       stderr: spec.stdio.stderr === "pipe" ? (stderrStream as Readable) : undefined,
-      // fd7 控制管道是本地宿主原语，OCI 边界不暴露该通道。
-      control: undefined,
+      // fd7 控制通道经 --preserve-fds 进容器（PTC run_code 工具回调用路）；
+      // 未请求时仍是 undefined（与宿主实现同契约）。
+      control,
       collected,
       done: outcome,
       terminate,

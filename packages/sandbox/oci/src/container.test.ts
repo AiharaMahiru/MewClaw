@@ -142,6 +142,31 @@ describe("OciContainerRuntime", () => {
       .toEqual(["exec", "--workdir=/workspace", "c1", "rg", "needle"]);
   });
 
+  it("execArgs 控制通道：--preserve-fds 透传 fd3..fd7 + 注入启动标记", async () => {
+    const cfg = await tempConfig();
+    const runtime = new OciContainerRuntime({ config: cfg, runFile: mockRun() });
+    const args = runtime.execArgs("c1", ["node", "worker.js"], "/workspace", { NO_COLOR: "1" }, false, true);
+    expect(args).toEqual([
+      "exec", "--preserve-fds=5", "--env=DSH_SUBPROCESS_CONTROL=pipe",
+      "--workdir=/workspace", "--env=NO_COLOR=1", "c1", "node", "worker.js",
+    ]);
+  });
+
+  it("provision：extraMounts 追加只读 bind 挂载（在工作区挂载之后）", async () => {
+    const cfg = await tempConfig();
+    cfg.extraMounts.push({ source: "/opt/host/lib", target: "/opt/dsh-ptc-runtime" });
+    const runFile = mockRun();
+    const runtime = new OciContainerRuntime({ config: cfg, runFile });
+    const handle = await runtime.provision("scope-1", "quota-1", cfg.workspaceRoot);
+    const runArgs = runFile.mock.calls[0]![1] as string[];
+    const mounts = runArgs.flatMap((arg, i) => arg === "--mount" ? [runArgs[i + 1]!] : []);
+    expect(mounts).toHaveLength(2);
+    expect(mounts[0]).toContain(`target=/workspace`);
+    expect(mounts[0]).toContain(",rw");
+    expect(mounts[1]).toBe("type=bind,source=/opt/host/lib,target=/opt/dsh-ptc-runtime,ro");
+    await handle.cleanup();
+  });
+
   it("provision：命名冲突回收孤儿容器后重试一次（warn 留审计）", async () => {
     const cfg = await tempConfig();
     const warn = vi.fn();

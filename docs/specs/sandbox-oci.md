@@ -30,6 +30,17 @@ class OciSubprocessRuntime extends SubprocessRuntime {
   resolveExecutable(command, env?, signal?): Promise<string>
   // spawnTerminal 不支持（throw）
 }
+```
+
+`stdio.control === 'pipe'` 的子进程控制通道（fd7，`dsh-subprocess` 启动协议）经
+`podman exec --preserve-fds` 透传：fd3..fd6 以 `/dev/null` 占位、控制 socket 落 fd7，
+同时注入 `DSH_SUBPROCESS_CONTROL=pipe` 启动标记（该名保留，spec.env 占用即拒绝）。
+handle.control 是宿主侧 Duplex 桥（child 异步产生，桥先建后接）。消费方：
+`ptc-runtime`（`run_code` 的容器内 worker 工具回调用路）——OCI overlay 用
+`nodeExecutable`/`bootstrapPath` 两个官方 Config 字段把它指到镜像 node 与
+ro 载体挂载；工具回调仍逐走过宿主注册表，容器内进程不获得额外宿主权限。
+
+```ts
 // 2) confine 透传（容器即边界；同世界包裹不再叠加）
 class OciSandbox extends SandboxProvider {
   confine(argv, policy): ConfinedArgv  // { argv, enforcement: 'full', denialSignatures: [...] }
@@ -57,6 +68,9 @@ interface Config {
   storageLimitBytes?: number
   /** 本机开发逃逸开关；显式 true 在生产拒绝。 */
   localInsecure?: false
+  /** 工作区之外的只读载体挂载（永远 ro；source 宿主绝对路径，target 容器内
+      /workspace 之外的绝对路径）。用于工具链/引导脚本类不可变载体。 */
+  extraMounts?: { source: string; target: string }[]
 }
 ```
 
@@ -80,9 +94,10 @@ quota 必须在插件装载期 fail loud，不能被 truthiness 静默替换。
 - 命令以 `bash -c` 执行（登录 shell 会替换镜像 PATH，禁用）；
 - DSH 打包的 `@vscode/ripgrep` 只能按包布局映射到镜像内 `/usr/bin/rg`；其他宿主绝对路径不得映射，避免把宿主文件系统路径带入容器；
 - prompt `file` 附件：上游把附件投影为宿主逐字节副本路径，该路径只对宿主侧 `read` 可见且仅限 UTF-8 文本——OCI 下容器执行面够不到它。`agent-presets-oci/attachment-staging.mjs` 在 `user/message` 落盘与 `agent/pre-step` 准入两处把每个 file 引用按 `<attachmentId 前 8 位>-<文件名>` 逐字节拷入会话工作区 `.attachments/`（同附件幂等跳过、超限跳过），并经独立系统段告知模型该相对路径对文件工具与容器 Bash 同时可见；挂载面不变，不把附件存储目录挂进容器（权限与跨会话暴露都不允许）；
+- `run_code`（PTC/liangshen）：worker 进程在容器内执行——`ptc-runtime` 的 `nodeExecutable` 指镜像内固定 node 路径（宿主 `process.execPath` 不映射），`bootstrapPath` 指 `extraMounts` ro 挂载内的 `process.js`；fd7 控制通道经 `--preserve-fds` 透传，bootstrap 载体不得放可写工作区（模型可写，载体必须不可变）；
 - 本 Provider 的 `spawnTerminal` 继续 fail closed。OCI preset 不把 pipe 适配器伪装成 PTY；需要持久状态的 Bash Consumer 通过普通管道启动一个 Agent 所有的 Bash 进程，并在 Agent dispose 或超时时终止它；
 - Windows 9P 挂载不支持 Unix 模式位：`DOTNET_CLI_HOME` 与 `NUGET_PACKAGES` 置于 bounded `/tmp` tmpfs，`UseAppHost=false`；
-- provision 与命令执行的环境分离：前者只注入固定运行时与缓存变量；后者只透传 `NO_COLOR`、`TERM`、`PAGER`、`GIT_PAGER`。宿主路径、`DSH_*` 与任何密钥变量均不得进入容器；
+- provision 与命令执行的环境分离：前者只注入固定运行时与缓存变量；后者只透传 `NO_COLOR`、`TERM`、`PAGER`、`GIT_PAGER`。宿主路径、`DSH_*` 与任何密钥变量均不得进入容器——唯一例外是 `stdio.control === 'pipe'` 时由 Provider 自己注入的 `DSH_SUBPROCESS_CONTROL=pipe` 启动标记（非用户环境，消费方 spec.env 占用同名即拒绝）；
 - 失败路径不得残留容器（前后镜像-容器集合对比测试锁死）。
 
 失败模式表：

@@ -3,7 +3,7 @@
  * mock node:child_process 的 spawn，覆盖 spawn 流管道、收集缓冲、
  * terminate 升级、confine 透传与未就绪 fail closed。
  */
-import { PassThrough } from "node:stream";
+import { Duplex as DuplexStream, PassThrough, Writable } from "node:stream";
 
 import { Context } from "@deepseek-ai/cordis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -86,6 +86,71 @@ describe("OciSubprocessRuntime.spawn", () => {
     const args = spawnMock.mock.calls[0]![1] as string[];
     expect(args).toContain("/usr/bin/rg");
     expect(args).not.toContain(packaged);
+    child.once.mock.calls.find(([event]) => event === "close")![1](0, null);
+    await expect(handle.done).resolves.toEqual({ exitCode: 0, signal: null });
+  });
+
+  it("control 管道：--preserve-fds + 启动标记 + fd7 双向桥", async () => {
+    const runFile = vi.fn(async () => undefined);
+    const core = new OciContainerRuntime({ config, runFile });
+    // 模拟 fd7 socket：写侧捕获（不回声），读侧独立可注入——PassThrough 会把
+    // 写入回放到读侧，与真实 socket 语义不符。
+    const toChildFrames: string[] = [];
+    const fromChild = new PassThrough();
+    const childControl = DuplexStream.from({
+      writable: new Writable({ write: (chunk, _enc, cb) => { toChildFrames.push(String(chunk)); cb(); } }),
+      readable: fromChild,
+    });
+    const child = { ...makeChild(), stdio: { 7: childControl } };
+    spawnMock.mockReturnValue(child);
+    const runtime = new OciSubprocessRuntime(fakeCtx(), core, config);
+    const handle = runtime.spawn({
+      argv: ["/usr/local/bin/node", "/opt/dsh-ptc-runtime/process.js", "134217728"],
+      cwd: workspaceRoot,
+      env: { DSH_SUBPROCESS_CONTROL: undefined },
+      stdio: { stdin: "ignore" as const, stdout: "pipe" as const, stderr: "pipe" as const, control: "pipe" as const },
+      graceMs: 5000,
+    });
+    // handle.control 同步可用（桥在 child 落定前已建）。
+    expect(handle.control).toBeDefined();
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
+    const [, args, opts] = spawnMock.mock.calls[0]! as [string, string[], { stdio: unknown[] }];
+    expect(args).toContain("--preserve-fds=5");
+    expect(args).toContain("--env=DSH_SUBPROCESS_CONTROL=pipe");
+    // stdio 垫到 fd7：3..6 占位、7 是 pipe。
+    expect(opts.stdio).toHaveLength(8);
+    expect(opts.stdio[7]).toBe("pipe");
+    // 桥双向通：child→handle 读侧；handle 写侧→child。
+    fromChild.write("frame-from-child");
+    await vi.waitFor(() => expect((handle.control as PassThrough).read()?.toString()).toBe("frame-from-child"));
+    handle.control!.write("frame-to-child");
+    await vi.waitFor(() => expect(toChildFrames.join("")).toBe("frame-to-child"));
+    child.once.mock.calls.find(([event]) => event === "close")![1](0, null);
+    await expect(handle.done).resolves.toEqual({ exitCode: 0, signal: null });
+  });
+
+  it("control 未请求：handle.control 仍是 undefined；spec.env 占用标记名即拒绝", async () => {
+    const runFile = vi.fn(async () => undefined);
+    const core = new OciContainerRuntime({ config, runFile });
+    const child = makeChild();
+    spawnMock.mockReturnValue(child);
+    const runtime = new OciSubprocessRuntime(fakeCtx(), core, config);
+    const handle = runtime.spawn({
+      argv: ["bash", "-c", "echo hi"],
+      cwd: workspaceRoot,
+      stdio: { stdin: "ignore", stdout: "pipe", stderr: "pipe" },
+      graceMs: 5000,
+    });
+    expect(handle.control).toBeUndefined();
+    expect(() => runtime.spawn({
+      argv: ["bash"],
+      cwd: workspaceRoot,
+      env: { DSH_SUBPROCESS_CONTROL: "pipe" },
+      stdio: { stdin: "ignore" as const, stdout: "pipe" as const, stderr: "pipe" as const, control: "pipe" as const },
+      graceMs: 5000,
+    })).toThrow(/DSH_SUBPROCESS_CONTROL is reserved/);
+    // 首个 spawn 正常收尾（不留悬空 done 污染后续用例）。
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
     child.once.mock.calls.find(([event]) => event === "close")![1](0, null);
     await expect(handle.done).resolves.toEqual({ exitCode: 0, signal: null });
   });
