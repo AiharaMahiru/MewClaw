@@ -89,6 +89,13 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
 - 移动端抽屉不透明：官方侧栏背景为半透明 `rgba(28 28 35 / .5)`，桌面内联
   无碍但作为覆盖层会透出下层内容；`≤1023px` 下 `sidebarCol` 背景改不透明
   （官方样式表同级规则在其后，须 `!important`）；
+- 液态玻璃下坞面板不透明（全视口）：liquid-glass 把 `--dsw-alias-bg-layer-1`
+  降为 68–78% alpha，better-sidebar 坞面板是纯 `div`（非 dialog/menu 语义），
+  吃不到 surfaces 的 backdrop-filter；移动端虽有品牌层补 `blur(20px)`，但部分
+  WebView 声明支持 backdrop-filter 却不真实渲染（软渲染/GPU 黑名单），桌面端
+  坞面板本无模糊补偿。`html[data-mew-glass]` 下 `[data-dsh-panel]` /
+  `[data-dsh-float-window]` 抬回不透明 `var(--mew-canvas)`，可读性不依赖模糊
+  是否真实渲染；
 - 右坞开关去重（全视口）：官方右坞把唯一展开入口注入会话头部角落
   （`data-sidebar-right-expand`），与第三方坞簇开关职责重复；隐藏前者，
   坞簇开关为默认右侧栏按钮。锚定 data 属性而非 `aria-label`——后者文案
