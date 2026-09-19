@@ -468,6 +468,16 @@ GET 需要有效 Web 会话，DELETE 还需要 CSRF；管理员接口拒绝普�
 任意本机目录策略。转发不得向 `args` 顶层注入 `path`，也不能以默认根目录的检查代替
 对嵌套目标路径的检查，否则会触发 `gateway/arguments-invalid` 或漏检目标目录。
 
+同一规则适用于 `session/create` 的 `cwd`：普通用户缺省时按工作区根校验**并回写**
+进转发请求——只校验不回写会让 Worker 落到 `process.cwd()`（部署目录），OCI
+provision 拒绝执行、宿主读边界以错误 cwd 放开整个发布目录、会话资源也登记错位。
+管理员缺省保持 Worker 原语义（`process.cwd()`，仓库内代理的既定用途）。
+
+会话归属提取同样按官方真实寻址形态：`session/page`、mux `session/follow` 的
+`sessionId` 嵌在 `request.address` 里（`session` 地址取 `sessionId`，`subagent`
+地址按 `parentSessionId` 归属判定——子会话是父会话资源树的成员）。按顶层
+`request.sessionId` 推断会把官方翻页请求误判为无归属并拒绝。
+
 `/share/<id>/*` 是独立公共数据面，不进入官方 RPC envelope。它支持 HTTP/API、SSE 与
 WebSocket，拒绝 `CONNECT`/`TRACE`，并只代理到固定 loopback Preview App；浏览器不能提供
 upstream、宿主端口或内部认证头。未知、过期和已撤销 ID 统一返回 404，避免枚举状态。
