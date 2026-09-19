@@ -254,6 +254,7 @@ export class AuthEdgeServer {
     if (decision && this.#config.promptAudit?.enabled !== false) {
       const input = promptAuditInput(decision);
       if (input.kind !== "skip") {
+        if (input.kind === "unsupported") console.warn(`[prompt-audit] 不支持的审计输入: ${decision.method}`);
         const result = input.kind === "text" && this.#promptAuditor
           ? await this.#promptAuditor.audit(input.text).catch(() => "unavailable" as const)
           : "unavailable";
