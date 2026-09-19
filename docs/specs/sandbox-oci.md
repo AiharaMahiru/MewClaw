@@ -40,6 +40,13 @@ handle.control 是宿主侧 Duplex 桥（child 异步产生，桥先建后接）
 `nodeExecutable`/`bootstrapPath` 两个官方 Config 字段把它指到镜像 node 与
 ro 载体挂载；工具回调仍逐走过宿主注册表，容器内进程不获得额外宿主权限。
 
+**fd7 生命周期不变量**：fd7 的宿主端是 socketpair，容器端由 conmon 复制持有——
+`podman exec` 客户端退出或被 kill 都不会带动它 EOF。因此运行时必须在 child
+`exit`/`close`/`terminate`/`error` 四条收尾路径上**主动断开 fd7**（end+destroy，
+幂等）：容器内进程以 fd7 关闭为宿主终止信号（PTC 协议的 hostClosed），不显式断开
+则两侧互等成死锁——容器进程等 hostClosed、`'close'` 事件等 stdio[7] EOF、
+`handle.done` 永不落定。terminate 顺序固定为先断 fd7 再 SIGTERM 客户端。
+
 ```ts
 // 2) confine 透传（容器即边界；同世界包裹不再叠加）
 class OciSandbox extends SandboxProvider {
@@ -125,7 +132,7 @@ quota 必须在插件装载期 fail loud，不能被 truthiness 静默替换。
 
 ## 8 测试契约
 
-- `unit`：配置校验（生产拒绝逃逸开关）、路径规范化；
+- `unit`：配置校验（生产拒绝逃逸开关）、路径规范化；fd7 控制通道收尾（客户端先 exit 须主动断开并送达容器端 EOF、terminate 先断 fd7 再 SIGTERM、断开幂等）；
 - `e2e`（真实 Podman）：.NET 构建/运行于绑定挂载工作区；清理前留活后台进程 → 验证 `rm --force --ignore`；失败路径零残留（前后镜像-容器集合对比）；
 - `security`：网络/降权/只读根/挂载范围，以及命令级环境变量拒绝透传断言。
 

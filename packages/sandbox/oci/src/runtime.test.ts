@@ -3,7 +3,8 @@
  * mock node:child_process 的 spawn，覆盖 spawn 流管道、收集缓冲、
  * terminate 升级、confine 透传与未就绪 fail closed。
  */
-import { Duplex as DuplexStream, PassThrough, Writable } from "node:stream";
+import { PassThrough } from "node:stream";
+import { createServer, Socket } from "node:net";
 
 import { Context } from "@deepseek-ai/cordis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -40,6 +41,21 @@ function makeChild() {
     exitCode: null as number | null,
   };
   return child;
+}
+
+/**
+ * 真实 socket 对（loopback）模拟 fd7 通道——Duplex.from 的 destroy 会抛
+ * AbortError，而真实 net.Socket 不会；收尾路径的断言需要真实语义。
+ */
+async function socketPair(): Promise<{ hostEnd: Socket; containerEnd: Socket }> {
+  const server = createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as { port: number }).port;
+  const containerEnd = new Socket();
+  const hostEnd = new Promise<Socket>((resolve) => server.once("connection", resolve));
+  await new Promise<void>((resolve) => containerEnd.connect(port, "127.0.0.1", resolve));
+  server.close();
+  return { hostEnd: await hostEnd, containerEnd };
 }
 
 const workspaceRoot = process.platform === "win32"
@@ -93,14 +109,8 @@ describe("OciSubprocessRuntime.spawn", () => {
   it("control 管道：--preserve-fds + 启动标记 + fd7 双向桥", async () => {
     const runFile = vi.fn(async () => undefined);
     const core = new OciContainerRuntime({ config, runFile });
-    // 模拟 fd7 socket：写侧捕获（不回声），读侧独立可注入——PassThrough 会把
-    // 写入回放到读侧，与真实 socket 语义不符。
-    const toChildFrames: string[] = [];
-    const fromChild = new PassThrough();
-    const childControl = DuplexStream.from({
-      writable: new Writable({ write: (chunk, _enc, cb) => { toChildFrames.push(String(chunk)); cb(); } }),
-      readable: fromChild,
-    });
+    // 真实 socket 对：hostEnd 扮演 worker 持有的 fd7 端，containerEnd 扮演容器内端。
+    const { hostEnd: childControl, containerEnd } = await socketPair();
     const child = { ...makeChild(), stdio: { 7: childControl } };
     spawnMock.mockReturnValue(child);
     const runtime = new OciSubprocessRuntime(fakeCtx(), core, config);
@@ -121,12 +131,61 @@ describe("OciSubprocessRuntime.spawn", () => {
     expect(opts.stdio).toHaveLength(8);
     expect(opts.stdio[7]).toBe("pipe");
     // 桥双向通：child→handle 读侧；handle 写侧→child。
-    fromChild.write("frame-from-child");
+    containerEnd.write("frame-from-child");
     await vi.waitFor(() => expect((handle.control as PassThrough).read()?.toString()).toBe("frame-from-child"));
     handle.control!.write("frame-to-child");
-    await vi.waitFor(() => expect(toChildFrames.join("")).toBe("frame-to-child"));
+    await vi.waitFor(() => expect(containerEnd.read()?.toString()).toBe("frame-to-child"));
     child.once.mock.calls.find(([event]) => event === "close")![1](0, null);
     await expect(handle.done).resolves.toEqual({ exitCode: 0, signal: null });
+    containerEnd.destroy();
+  });
+
+  it("podman exec 客户端先退出时 fd7 主动断开，done 不悬挂", async () => {
+    const runFile = vi.fn(async () => undefined);
+    const core = new OciContainerRuntime({ config, runFile });
+    const { hostEnd: childControl, containerEnd } = await socketPair();
+    const containerClosed = new Promise<void>((resolve) => containerEnd.once("close", () => resolve()));
+    const child = { ...makeChild(), stdio: { 7: childControl } };
+    spawnMock.mockReturnValue(child);
+    const runtime = new OciSubprocessRuntime(fakeCtx(), core, config);
+    const handle = runtime.spawn({
+      argv: ["/usr/local/bin/node", "/opt/dsh-ptc-runtime/process.js", "134217728"],
+      cwd: workspaceRoot,
+      stdio: { stdin: "ignore" as const, stdout: "pipe" as const, stderr: "pipe" as const, control: "pipe" as const },
+      graceMs: 5000,
+    });
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
+    // 客户端退出（exit）而 exec 会话被 conmon 续命：fd7 socketpair 仍开。
+    // 不主动断开则 'close' 等 stdio[7] EOF 永不触发——run_code 的
+    // handle.done 悬挂正是这个形态。
+    child.once.mock.calls.find(([event]) => event === "exit")![1](0, null);
+    await vi.waitFor(() => expect(childControl.destroyed).toBe(true));
+    // 断开必须送达容器端（EOF），容器进程才能观察到通道关闭并退出。
+    await containerClosed;
+    // 容器进程随后退出，stdio EOF，'close' 正常落定。
+    child.once.mock.calls.find(([event]) => event === "close")![1](0, null);
+    await expect(handle.done).resolves.toEqual({ exitCode: 0, signal: null });
+  });
+
+  it("terminate 先断 fd7 再杀客户端：容器进程按协议收关机信号", async () => {
+    const runFile = vi.fn(async () => undefined);
+    const core = new OciContainerRuntime({ config, runFile });
+    const { hostEnd: childControl, containerEnd } = await socketPair();
+    const containerClosed = new Promise<void>((resolve) => containerEnd.once("close", () => resolve()));
+    const child = { ...makeChild(), stdio: { 7: childControl } };
+    spawnMock.mockReturnValue(child);
+    const runtime = new OciSubprocessRuntime(fakeCtx(), core, config);
+    const handle = runtime.spawn({
+      argv: ["/usr/local/bin/node", "/opt/dsh-ptc-runtime/process.js", "134217728"],
+      cwd: workspaceRoot,
+      stdio: { stdin: "ignore" as const, stdout: "pipe" as const, stderr: "pipe" as const, control: "pipe" as const },
+      graceMs: 5000,
+    });
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
+    handle.terminate();
+    expect(childControl.destroyed).toBe(true);
+    await containerClosed;
+    expect(child.kill).toHaveBeenCalledWith("SIGTERM");
   });
 
   it("control 未请求：handle.control 仍是 undefined；spec.env 占用标记名即拒绝", async () => {
