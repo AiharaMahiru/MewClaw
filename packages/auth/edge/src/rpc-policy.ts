@@ -121,7 +121,11 @@ export async function authorizeRpc(body: Record<string, unknown>, options: RpcPo
     const workspaceId = stringValue(nextRequest.workspaceId) ?? stringValue(nextArgs.workspaceId);
     if (workspaceId && !(await ownsResource(options, "workspace", workspaceId))) return { ...decision, denied: "RESOURCE_NOT_ALLOWED" };
     const cwd = stringValue(nextRequest.cwd) ?? stringValue(nextArgs.cwd) ?? policy.workspaceRoot;
-    if (options.user.role !== "admin") {
+    // 官方 descriptor 要求 workspaceId 与 cwd 互斥（gateway/bad-request）：
+    // 客户端以 workspaceId 定位时不得回写 cwd，否则"打开工作区"会话全灭；
+    // 此时 cwd 校验也跳过——路径由 worker 按 workspace 解析，恶意双字段由
+    // worker 的 xor 校验 fail-closed。
+    if (options.user.role !== "admin" && !workspaceId) {
       if (!(await isPathWithinReal(policy.workspaceRoot, cwd))) return { ...decision, denied: "WORKSPACE_PATH_NOT_ALLOWED" };
       // 缺省 cwd 按用户工作区根校验，必须把同一值回写进转发请求：
       // 缺省时 worker 落到 process.cwd()（部署目录），OCI provision 拒绝

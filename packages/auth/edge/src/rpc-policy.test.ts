@@ -95,6 +95,26 @@ describe("RPC authorization policy", () => {
     await expect(authorizeRpc({ method: "session.create", payload: { args: { cwd: "D:/other" } } }, { service, user: userA, roots })).resolves.toMatchObject({ denied: "WORKSPACE_PATH_NOT_ALLOWED" });
   });
 
+  it("leaves workspaceId-located session.create untouched instead of injecting cwd", async () => {
+    const store = new MemoryAuthStore();
+    const service = new AuthService({ store, mail: { sendVerification: async () => undefined, sendPasswordReset: async () => undefined } });
+    await service.saveResource({ resourceType: "workspace", resourceId: "own-workspace", userId: "user-a", resourcePath: "D:/workspaces/users/user-a", createdAt: "2026-01-01T00:00:00.000Z" });
+    // 官方 descriptor 要求 workspaceId 与 cwd 互斥：UI"打开工作区"链路
+    // 只带 workspaceId，回写 cwd 会让请求被 gateway/bad-request 全灭。
+    const decision = await authorizeRpc(
+      { method: "session/create", payload: { args: { request: { workspaceId: "own-workspace" } } } },
+      { service, user: userA, roots },
+      "session/create",
+    );
+    expect(decision.denied).toBeUndefined();
+    expect(decision.args.request).toEqual({ workspaceId: "own-workspace" });
+    await expect(authorizeRpc(
+      { method: "session/create", payload: { args: { request: { workspaceId: "foreign-workspace" } } } },
+      { service, user: userA, roots },
+      "session/create",
+    )).resolves.toMatchObject({ denied: "RESOURCE_NOT_ALLOWED" });
+  });
+
   it("allows administrators to create workspaces and sessions at any local path", async () => {
     const service = new AuthService({ store: new MemoryAuthStore(), mail: { sendVerification: async () => undefined, sendPasswordReset: async () => undefined } });
     const path = "C:/Users/ATWER";

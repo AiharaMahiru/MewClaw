@@ -471,7 +471,10 @@ GET 需要有效 Web 会话，DELETE 还需要 CSRF；管理员接口拒绝普�
 同一规则适用于 `session/create` 的 `cwd`：普通用户缺省时按工作区根校验**并回写**
 进转发请求——只校验不回写会让 Worker 落到 `process.cwd()`（部署目录），OCI
 provision 拒绝执行、宿主读边界以错误 cwd 放开整个发布目录、会话资源也登记错位。
-管理员缺省保持 Worker 原语义（`process.cwd()`，仓库内代理的既定用途）。
+`workspaceId` 与 `cwd` 在官方 descriptor 中互斥：请求以 `workspaceId` 定位工作区时
+edge 不做 cwd 校验、也不回写缺省值（路径由 Worker 按 workspace 归属解析；恶意双
+字段由 Worker 的 xor 校验 fail-closed）。管理员缺省保持 Worker 原语义
+（`process.cwd()`，仓库内代理的既定用途）。
 
 会话归属提取同样按官方真实寻址形态：`session/page`、mux `session/follow` 的
 `sessionId` 嵌在 `request.address` 里（`session` 地址取 `sessionId`，`subagent`
