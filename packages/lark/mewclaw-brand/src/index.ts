@@ -44,6 +44,15 @@ const MOBILE_STYLE = `@media(max-width:1023px){[class*="_sidebarCol"]{position:f
 @media(max-width:768px){[class*="_titleRow"] [class*="_headerActions"],[class*="_titleRow"] [class*="_headerUtilities"]{display:none!important}}
 .mewclaw-rail-edge,.mewclaw-rail-fab{display:none}
 @media(max-width:1023px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}.mewclaw-rail-fab{display:inline-flex;position:fixed;top:7px;left:9px;z-index:108;width:36px;height:36px;align-items:center;justify-content:center;border:0;border-radius:10px;background:transparent;color:inherit;cursor:pointer;padding:0}[class*="_toggleCluster"]{top:calc(11px + env(safe-area-inset-top))!important}}`;
+// 液态玻璃把 --dsw-alias-bg-layer-1 降到 68–78% alpha，而 better-sidebar 坞面板
+// 是纯 div（非 dialog/menu 语义），吃不到 surfaces 的 backdrop-filter——可读性
+// 全押在上面那条移动模糊规则上；但部分移动端 WebView 声明支持 backdrop-filter
+// 却实际不渲染（软渲染/GPU 黑名单），且桌面端坞面板本无模糊补偿——文字互透是
+// 全视口缺陷。玻璃启用时把坞内面板/底坞/浮窗抬回不透明面 --mew-canvas
+// （liquid-glass 在同一 data-mew-glass 属性上定义该 token，属性存在即 token
+// 存在），可读性不再依赖模糊是否真实渲染。锚定插件自有的 data-dsh-panel /
+// data-dsh-float-window 语义属性，不随 CSS Modules 哈希名漂移。
+const GLASS_PANEL_STYLE = `html[data-mew-glass] [data-dsh-panel-host] :is([data-dsh-panel],[data-dsh-float-window]){background-color:var(--mew-canvas)}`;
 // 窄屏侧栏开合控制：左上角固定菜单键 + 左缘 16px 起笔右滑展开完整会话抽屉，
 // 抽屉上左滑或点遮罩收起并隐藏整条侧栏列。手势用 TouchEvent 而非 PointerEvent——
 // 左缘右滑会被浏览器声明为系统手势导致 pointermove 断流，touchmove 不受影响；
@@ -92,7 +101,7 @@ export function apply(ctx: Context, options?: MewClawBrandOptions): void {
     .replace(/<title>[^<]*<\/title>/u, `<title>${PRODUCT_NAME}</title>`)
     .replace(/(<link\b[^>]*rel="icon"[^>]*href=")[^"]*(")/u, `$1${FAVICON_PATH}$2`)
     .replace(/(<link\b[^>]*rel="manifest"[^>]*href=")[^"]*(")/u, `$1${MANIFEST_PATH}$2`)
-    .replace("</head>", `${BOOT_HEAD_SCRIPT}<style data-mewclaw-brand>${BRAND_STYLE}${STROKE_ONLY_STYLE}${HERO_STYLE}${DEDUPE_STYLE}${mobileStyle}${BOOT_STYLE}</style></head>`)
+    .replace("</head>", `${BOOT_HEAD_SCRIPT}<style data-mewclaw-brand>${BRAND_STYLE}${STROKE_ONLY_STYLE}${HERO_STYLE}${DEDUPE_STYLE}${GLASS_PANEL_STYLE}${mobileStyle}${BOOT_STYLE}</style></head>`)
     .replace(/<body([^>]*)>/u, `<body$1>${BOOT_MARKUP}`)
     .replace("</body>", `${options?.mobile === false ? "" : MOBILE_RAIL_SCRIPT}${BOOT_END_SCRIPT}</body>`)));
   ctx.effect(() => ctx.webServer.register({ kind: "exact", path: FAVICON_PATH, handler: (_req, res) => respond(res, "image/svg+xml; charset=utf-8", FAVICON_RESPONSE) }));

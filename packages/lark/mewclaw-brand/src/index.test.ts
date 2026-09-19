@@ -92,6 +92,9 @@ describe("dsh-lark-mewclaw-brand", () => {
     // 右坞去重锚定官方展开按钮的 data 属性（aria-label 文案随语言失效）
     expect(html).toContain("[data-sidebar-right-expand]{display:none!important}");
     expect(html).not.toContain('[aria-label="Open right sidebar"]');
+    // 液态玻璃下坞面板抬回不透明面：backdrop-filter 在部分移动端 WebView
+    // 声明支持却不渲染，可读性不能依赖模糊真实生效（全视口规则，桌面同缺陷）
+    expect(html).toContain('html[data-mew-glass] [data-dsh-panel-host] :is([data-dsh-panel],[data-dsh-float-window]){background-color:var(--mew-canvas)}');
     // 侧栏开合控制器（§6 移动适配）：左上角菜单键 + 左缘热区滑动 + 外点关闭
     expect(html).toContain("data-mewclaw-rail");
     expect(html).toContain("mewclaw-rail-edge");
