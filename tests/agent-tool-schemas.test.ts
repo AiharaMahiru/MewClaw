@@ -34,7 +34,11 @@ function anyService(): unknown {
 
 function createContext(registered: unknown[], effects: unknown[]): unknown {
   const base: Record<string, unknown> = {
-    tools: { register: (definition: unknown) => { registered.push(definition); return () => undefined; } },
+    tools: {
+      register: (definition: unknown) => { registered.push(definition); return () => undefined; },
+      // tools.guard 注册执行围栏（fs-read-guard），返回值此处不消费。
+      guard: () => () => undefined,
+    },
     on: () => () => undefined,
     // effect 回调照常执行：插件在 effect 里做贡献的也覆盖到。
     effect: (register: () => unknown) => { effects.push(register()); return () => undefined; },

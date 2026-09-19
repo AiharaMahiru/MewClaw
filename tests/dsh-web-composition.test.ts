@@ -241,7 +241,10 @@ describe("官方 dsh Web 组合", () => {
     const manifest = JSON.parse(await readFile(repositoryPath("package.json"), "utf8")) as {
       pnpm?: { patchedDependencies?: Record<string, string> };
     };
-    expect(manifest.pnpm?.patchedDependencies).toBeUndefined();
+    // 与 verify-dsh-brand 同义：补丁只允许打向第三方社区包，官方包保持原样。
+    for (const patched of Object.keys(manifest.pnpm?.patchedDependencies ?? {})) {
+      expect(patched.startsWith("@deepseek-ai/")).toBe(false);
+    }
     const gitconfig = await readFile(repositoryPath("infra/linux/config/gitconfig"), "utf8");
     expect(gitconfig).toContain("directory = /var/lib/dsh/workspaces/*");
     expect(gitconfig).not.toContain("directory = *\n");
@@ -317,7 +320,9 @@ describe("官方 dsh Web 组合", () => {
     const manifest = JSON.parse(await readFile(repositoryPath("package.json"), "utf8")) as {
       pnpm?: { patchedDependencies?: Record<string, string> };
     };
-    expect(manifest.pnpm?.patchedDependencies).toBeUndefined();
+    for (const patched of Object.keys(manifest.pnpm?.patchedDependencies ?? {})) {
+      expect(patched.startsWith("@deepseek-ai/")).toBe(false);
+    }
   });
 
   it("第三方 Web 用户可见 roster 保持可重放快照", async () => {

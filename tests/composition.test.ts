@@ -3,6 +3,7 @@
  * 网关组合不得含任何工具/agent 行；worker 组合不得含 lark 客户端/卡片行。
  * 解析真实 bundle patch 文件（loadOverlayPatches），防误改回耦合。
  */
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -17,6 +18,7 @@ interface PatchRow {
   id?: string;
   name?: string;
   disabled?: unknown;
+  group?: unknown;
   config?: Record<string, unknown>;
   insert?: unknown;
 }
@@ -180,6 +182,47 @@ describe("worker 组合（技能与 overlay）", () => {
       expect.objectContaining({ id: "sandbox", disabled: true }),
       expect.objectContaining({ id: "sandbox-oci", name: "dsh-sandbox-oci" }),
     ]));
+  });
+
+  it("生产链（systemd --patch 序）下 sandbox-oci 保留 PTC 运行时挂载", () => {
+    // applyEntryPatches 对 config 是整对象替换：worker.production.yml 若漏写
+    // extraMounts，oci.overlay.yml 插入的挂载会被静默抹除，run_code 必败。
+    const workerRequire = createRequire(repositoryPath("apps/lark-worker/package.json"));
+    const manifest = JSON.parse(
+      readFileSync(repositoryPath("apps/lark-worker/package.json"), "utf8"),
+    ) as { dsh?: { profile?: { bundles?: string[] } } };
+    const bundlePaths = (manifest.dsh?.profile?.bundles ?? []).map((bundle) => {
+      const pkgPath = workerRequire.resolve(`${bundle}/package.json`);
+      const patch = (JSON.parse(readFileSync(pkgPath, "utf8")) as {
+        dsh?: { bundle?: { patch?: string } };
+      }).dsh?.bundle?.patch;
+      return typeof patch === "string" && patch.length > 0
+        ? resolve(dirname(pkgPath), patch)
+        : workerRequire.resolve(`${bundle}/cordis.patch.yml`);
+    });
+    const patches = [
+      ...bundlePaths.flatMap((path) => loadOverlayPatches("composition-test", path)),
+      ...loadOverlayPatches("composition-test", repositoryPath("apps/lark-worker/full.overlay.yml")),
+      ...loadOverlayPatches("composition-test", repositoryPath("apps/lark-worker/oci.overlay.yml")),
+      ...loadOverlayPatches("composition-test", repositoryPath("infra/linux/overlays/worker.production.yml")),
+    ];
+    const flatten = (entries: PatchRow[]): PatchRow[] =>
+      entries.flatMap((row) => [row, ...(row.group && Array.isArray(row.config) ? flatten(row.config as PatchRow[]) : [])]);
+    const rows = flatten(composeEntries(patches, () => undefined) as PatchRow[]);
+    const sandbox = rows.find((row) => row.id === "sandbox-oci");
+    expect(sandbox?.config?.extraMounts).toEqual([
+      expect.objectContaining({ target: "/opt/dsh-ptc-runtime" }),
+    ]);
+    // oci.overlay 今后给 sandbox-oci 新增的每个键都必须在 production.yml 重写
+    // （值可覆盖，键不可缺），否则整对象替换语义下生产静默丢失。
+    const ociInsert = overlayPatches("apps/lark-worker/oci.overlay.yml")
+      .flatMap((patch) => (Array.isArray(patch.insert) ? patch.insert : []))
+      .find((row): row is PatchRow => isPatchRow(row) && row.id === "sandbox-oci");
+    expect(Object.keys(sandbox?.config ?? {}))
+      .toEqual(expect.arrayContaining(Object.keys(ociInsert?.config ?? {})));
+    // 挂载目标与 ptc-runtime 引导路径必须同目录，否则容器内 bootstrap 不可达。
+    const ptc = rows.find((row) => row.id === "ptc-runtime");
+    expect(ptc?.config?.bootstrapPath).toBe("/opt/dsh-ptc-runtime/process.js");
   });
 
 });
