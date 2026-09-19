@@ -79,6 +79,7 @@ quota 必须在插件装载期 fail loud，不能被 truthiness 静默替换。
 - 每个 provision 的容器必须有显式清理路径：`podman rm --force --ignore <generated-name>`，**不经 shell**，`finally` 中执行；
 - 命令以 `bash -c` 执行（登录 shell 会替换镜像 PATH，禁用）；
 - DSH 打包的 `@vscode/ripgrep` 只能按包布局映射到镜像内 `/usr/bin/rg`；其他宿主绝对路径不得映射，避免把宿主文件系统路径带入容器；
+- prompt `file` 附件：上游把附件投影为宿主逐字节副本路径，该路径只对宿主侧 `read` 可见且仅限 UTF-8 文本——OCI 下容器执行面够不到它。`agent-presets-oci/attachment-staging.mjs` 在 `user/message` 落盘与 `agent/pre-step` 准入两处把每个 file 引用按 `<attachmentId 前 8 位>-<文件名>` 逐字节拷入会话工作区 `.attachments/`（同附件幂等跳过、超限跳过），并经独立系统段告知模型该相对路径对文件工具与容器 Bash 同时可见；挂载面不变，不把附件存储目录挂进容器（权限与跨会话暴露都不允许）；
 - 本 Provider 的 `spawnTerminal` 继续 fail closed。OCI preset 不把 pipe 适配器伪装成 PTY；需要持久状态的 Bash Consumer 通过普通管道启动一个 Agent 所有的 Bash 进程，并在 Agent dispose 或超时时终止它；
 - Windows 9P 挂载不支持 Unix 模式位：`DOTNET_CLI_HOME` 与 `NUGET_PACKAGES` 置于 bounded `/tmp` tmpfs，`UseAppHost=false`；
 - provision 与命令执行的环境分离：前者只注入固定运行时与缓存变量；后者只透传 `NO_COLOR`、`TERM`、`PAGER`、`GIT_PAGER`。宿主路径、`DSH_*` 与任何密钥变量均不得进入容器；

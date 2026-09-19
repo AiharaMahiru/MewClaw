@@ -47,6 +47,11 @@
     - id: oci-workspace-guidance
       name: 'dsh-lark-web-bundle/agent-presets-oci/workspace-guidance.mjs'
 
+    # prompt file 附件按会话拷入工作区 .attachments/（SPEC：docs/specs/sandbox-oci.md），
+    # 宿主文件工具与容器 Bash 共享同一相对路径；不把附件存储目录挂进容器。
+    - id: oci-attachment-staging
+      name: 'dsh-lark-web-bundle/agent-presets-oci/attachment-staging.mjs'
+
 # 0.1.6 上游新增默认行的生产处置：Web 终端经 terminal/* Remote 以宿主
 # 系统用户起 PTY，绕过 OCI 沙箱边界，整个面显式关闭（远程方法同时未入
 # 用户白名单 + mux 帧策略 denied，纵深三层）。

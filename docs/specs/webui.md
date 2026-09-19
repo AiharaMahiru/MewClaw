@@ -109,6 +109,21 @@ agent preset 必须与执行隔离 profile 成对选择：
   用户目录 preset（包括历史 Liangshen 同步目录）仍不在 full/OCI roster 中；`liangshen`
   来自仓库 system root，避免静默改变权限边界。
 
+模型侧宿主文件读边界（2026-09-19 起，`dsh-lark-web-bundle/fs-read-guard.mjs`）：
+
+- 上游 `dsh-tool-fs` 只对 write/edit 调用 `sandboxPolicy.resolvePolicy`，read 不设防是
+  官方单人底座语义；多租户 Web 部署中会话 cwd 才是租户边界，故经官方
+  `ctx.tools.guard()` 扩展点补读侧 fence，不写上游源码。
+- fence 覆盖 `read`、`read_image` 的 `file_path` 与 `str_replace_editor` 的 `view`
+  命令（目录列举同样收口）；目标经 `realpath` 解析（跟随最深现存祖先），必须落在
+  会话 `header.cwd` 或 `readableRoots` 配置根之下，否则同步拒绝并把理由作为工具
+  错误回给模型。
+- `readableRoots` 默认只放行 `$DSH_HOME/attachments/v1`（模型侧文件句柄的读面）
+  与 `$DSH_HOME/skills`（技能包附属文件）；无会话 cwd 的内部调用不收口。
+- write/edit/str_replace 不叠加本 fence：上游 `checkedTarget` 已执行 workspace-write
+  与 danger-full-access 升级通道，双 fence 会破坏审批语义。glob/grep/bash 在 OCI
+  profile 下只看见 `/workspace` 挂载，天然同界。
+
 官方 `dsh-web-app` 必须保留以下能力行：
 
 | 能力域 | 官方组合 |
