@@ -18,7 +18,7 @@
 
 DSH 核心及官方插件锁定 `0.1.6-alpha.2`（2026-09 自 `0.1.5-rc.2` 升级，评估与实施记录见 [0.1.6 升级文档](docs/dsh-0.1.6-upgrade.md)）。lightweight 不再裁剪执行能力，保留模式 ID 并复用官方 standard；Scope、目录授权、审批及 OCI 边界不变。
 
-截至 **2026-09-19，生产基线为 `R62-prompt-audit-file-20260919`**（构建自 `desktop-dev@b3f18d2`，在 R61 基础上修复安全审计附件回归：0.1.6 `{type:"file",receiptId}`/`attachment` 引用 part 未纳入审计输入枚举，携带非图片附件的 prompt 被 fail-closed 静默拒绝为 security-unavailable；附件按图片同政策跳过、文字仍审计，全部静默拒绝路径补 warn）。本机生产入口 `/opt/dsh/current` 指向 `releases/R62-prompt-audit-file-20260919`；Git 分支后续提交不等于生产已发布。
+截至 **2026-09-19，生产基线为 `R63-oci-attach-guard-20260919`**（构建自 `desktop-dev@d0781f1`，在 R62 基础上修复 OCI 执行面两处偏差：prompt file 附件按会话拷入工作区 `.attachments/` 使容器执行面可消费二进制附件；`read`/`read_image`/`str_replace_editor view` 宿主读经官方 `tools.guard()` 收口到会话 cwd 与附件/技能根，堵住跨租户文件读取）。本机生产入口 `/opt/dsh/current` 指向 `releases/R63-oci-attach-guard-20260919`；Git 分支后续提交不等于生产已发布。
 
 
 ## 分支协作
