@@ -60,6 +60,9 @@
     workspaceRoot: /var/lib/dsh/workspaces
     tokenEnv: WORKER_TOKEN
 
+# cordis overlay 的 config 是整对象替换而非深合并：oci.overlay.yml insert 的
+# sandbox-oci.config 在此被本块完全覆盖，oci 侧后续新增的任何键（如
+# extraMounts）都必须在这里重复列出，否则生产静默丢失。
 - id: sandbox-oci
   config:
     image: !!js process.env.DSH_SANDBOX_IMAGE
@@ -67,6 +70,17 @@
     # 供容器内 apt/pip/npm/cargo 拉依赖。oci.overlay.yml 默认行仍保持 none。
     network: bridge
     workspaceRoot: /var/lib/dsh/workspaces
+    # 与 oci.overlay.yml 的 insert 保持同步（整对象替换语义，见上方注释）：
+    # PTC run_code 的容器内引导脚本经此只读载体挂载进入。
+    extraMounts:
+      - source: !!js process.cwd() + '/node_modules/@deepseek-ai/dsh-ptc-runtime-node/lib'
+        target: '/opt/dsh-ptc-runtime'
+    # 与 oci.overlay.yml 相同（当前与实现默认值一致，显式钉住防上游改默认值漂移）。
+    resources:
+      cpus: 2
+      memoryMiB: 4096
+      pids: 256
+      tmpfsMiB: 512
 
 # Files 面板 /sidebar/file 媒体路由（预览与 download=1 共用上限）默认 20MB 会挡住
 # 大产物文件并整页裸 JSON。生产放宽到 10GB；该路由整文件读入内存再回写，
