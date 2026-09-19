@@ -10,6 +10,14 @@ import { isAbsolute, resolve } from "node:path";
 
 export type SandboxNetworkMode = "none" | "bridge";
 
+/** 只读工具链载体挂载（PTC 引导脚本等；永远 ro，不提供可写挂载入口）。 */
+export interface SandboxExtraMount {
+  /** 宿主源路径（绝对；type=bind 下不存在的源 → provision fail closed）。 */
+  source: string;
+  /** 容器内目标（绝对；不得是 / 或落在 /workspace 下——会被工作区 bind 掩盖）。 */
+  target: string;
+}
+
 export interface ResolvedSandboxConfig {
   image: string;
   podmanPath: string;
@@ -19,6 +27,8 @@ export interface ResolvedSandboxConfig {
   workspaceRoot: string;
   /** 每 quota 用户存储上限（字节，默认 3 GiB）。 */
   storageLimitBytes: number;
+  /** 工作区之外的只读载体挂载（缺省空）。 */
+  extraMounts: SandboxExtraMount[];
 }
 
 export interface SandboxConfigInput {
@@ -29,6 +39,7 @@ export interface SandboxConfigInput {
   resources?: { cpus: number; memoryMiB: number; pids: number; tmpfsMiB: number };
   workspaceRoot: string;
   storageLimitBytes?: number;
+  extraMounts?: SandboxExtraMount[];
 }
 
 export class SandboxConfigurationError extends Error {
@@ -83,6 +94,21 @@ function immutableImage(image: string): boolean {
   return segment.includes(":") && !segment.toLowerCase().endsWith(":latest");
 }
 
+/** 载体挂载边界：source 是宿主路径（平台绝对）；target 是容器内 POSIX 路径
+ * （Windows podman 下也始终以 / 起头），不得是 / 或落在 /workspace 下。 */
+function resolveExtraMounts(mounts: SandboxExtraMount[] | undefined): SandboxExtraMount[] {
+  return (mounts ?? []).map((mount, index) => {
+    if (!isAbsolute(mount.source)) {
+      throw new SandboxConfigurationError(`extraMounts[${index}].source 必须是绝对路径`);
+    }
+    const target = mount.target;
+    if (!target.startsWith("/") || target === "/" || target === "/workspace" || target.startsWith("/workspace/")) {
+      throw new SandboxConfigurationError(`extraMounts[${index}].target 必须是 /workspace 之外的容器内绝对路径`);
+    }
+    return { source: mount.source, target };
+  });
+}
+
 export function resolveSandboxConfig(input: SandboxConfigInput): ResolvedSandboxConfig {
   if (!immutableImage(input.image)) {
     throw new SandboxConfigurationError("镜像必须使用固定标签或 digest（latest 拒绝）");
@@ -105,5 +131,6 @@ export function resolveSandboxConfig(input: SandboxConfigInput): ResolvedSandbox
     resources,
     workspaceRoot: resolveWorkspaceRoot(input.workspaceRoot),
     storageLimitBytes: resolveStorageLimit(input.storageLimitBytes),
+    extraMounts: resolveExtraMounts(input.extraMounts),
   };
 }

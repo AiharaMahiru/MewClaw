@@ -15,6 +15,8 @@ import { realpath } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 
+import { SUBPROCESS_CONTROL_ENV, SUBPROCESS_CONTROL_FD } from "@deepseek-ai/dsh-subprocess/control";
+
 import type { ResolvedSandboxConfig } from "./config.js";
 
 const executeFile = promisify(execFile);
@@ -156,6 +158,10 @@ export class OciContainerRuntime {
       ...environmentArgs(workspaceLimitBytes),
       "--tmpfs", `/tmp:rw,nosuid,nodev,size=${config.resources.tmpfsMiB}m`,
       "--mount", `type=bind,source=${workspace},target=${CONTAINER_WORKSPACE},rw`,
+      // 只读载体挂载（工具链/引导脚本）：配置侧已校验 target 不与 /workspace 冲突。
+      ...config.extraMounts.flatMap((mount) => [
+        "--mount", `type=bind,source=${mount.source},target=${mount.target},ro`,
+      ]),
       config.image,
       "-c", "sleep infinity",
     ];
@@ -188,6 +194,8 @@ export class OciContainerRuntime {
    * exec 参数：仅传递无敏感展示变量；容器内以指定 cwd 执行 argv（不 shell
    * 解释）。只有调用方确实需要 stdin 管道时才保留 `-i`，否则像 ripgrep
    * 这类默认搜索 cwd 的命令会误把关闭的 stdin 当成搜索输入。
+   * controlChannel 为 true 时透传 fd3..fd7（--preserve-fds）并注入启动标记，
+   * 让容器进程在 fd7 上拿到子进程控制通道（PTC run_code 的工具回调用路）。
    */
   execArgs(
     name: string,
@@ -195,9 +203,13 @@ export class OciContainerRuntime {
     cwd: string,
     env?: NodeJS.ProcessEnv,
     keepStdin = true,
+    controlChannel = false,
   ): string[] {
     const envArgs = executionEnvironmentArgs(env);
-    return ["exec", ...(keepStdin ? ["-i"] : []), `--workdir=${cwd}`, ...envArgs, name, ...argv];
+    const controlArgs = controlChannel
+      ? [`--preserve-fds=${SUBPROCESS_CONTROL_FD - 2}`, `--env=${SUBPROCESS_CONTROL_ENV}=pipe`]
+      : [];
+    return ["exec", ...(keepStdin ? ["-i"] : []), ...controlArgs, `--workdir=${cwd}`, ...envArgs, name, ...argv];
   }
 
   /** 停用：清理全部已 provision 容器（finally 语义；清后验证，残留重试一次）。 */
