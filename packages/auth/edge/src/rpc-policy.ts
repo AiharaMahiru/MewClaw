@@ -121,7 +121,15 @@ export async function authorizeRpc(body: Record<string, unknown>, options: RpcPo
     const workspaceId = stringValue(nextRequest.workspaceId) ?? stringValue(nextArgs.workspaceId);
     if (workspaceId && !(await ownsResource(options, "workspace", workspaceId))) return { ...decision, denied: "RESOURCE_NOT_ALLOWED" };
     const cwd = stringValue(nextRequest.cwd) ?? stringValue(nextArgs.cwd) ?? policy.workspaceRoot;
-    if (options.user.role !== "admin" && !(await isPathWithinReal(policy.workspaceRoot, cwd))) return { ...decision, denied: "WORKSPACE_PATH_NOT_ALLOWED" };
+    if (options.user.role !== "admin") {
+      if (!(await isPathWithinReal(policy.workspaceRoot, cwd))) return { ...decision, denied: "WORKSPACE_PATH_NOT_ALLOWED" };
+      // 缺省 cwd 按用户工作区根校验，必须把同一值回写进转发请求：
+      // 缺省时 worker 落到 process.cwd()（部署目录），OCI provision 拒绝
+      // 执行、宿主读边界以错误 cwd 放开整个发布目录、会话资源也登记到
+      // 错误路径。管理员缺省保留 process.cwd()（仓库内代理的既定语义）。
+      if (request) nextRequest.cwd = cwd;
+      else nextArgs.cwd = cwd;
+    }
     return { ...decision, body: withArgs(body, nextArgs), args: nextArgs };
   }
   if (method === "host.listDirectory" || method === "directoryPicker.list") {
@@ -401,8 +409,17 @@ function sessionIds(method: string, args: Record<string, unknown>): string[] {
     ].filter((value): value is string => value !== undefined);
   }
   const request = recordValue(args.request);
-  // workspaceFileScopeId 是 0.1.6 workspaceFiles/officeToPdf 的会话范围参数名。
-  const sessionId = stringValue(args.sessionId) ?? stringValue(args.agentId) ?? stringValue(args.workspaceFileScopeId) ?? stringValue(request?.sessionId);
+  // workspaceFileScopeId 是 0.1.6 workspaceFiles/officeToPdf 的会话范围参数名；
+  // request.address 是 session/page、session/follow 的寻址形态：session 地址
+  // 直接取 sessionId，subagent 地址按父会话归属判定（与 mux
+  // scopedStreamSessionId 同语义，子会话是父会话资源树的成员）。
+  const address = recordValue(request?.address);
+  const sessionId = stringValue(args.sessionId)
+    ?? stringValue(args.agentId)
+    ?? stringValue(args.workspaceFileScopeId)
+    ?? stringValue(request?.sessionId)
+    ?? stringValue(address?.sessionId)
+    ?? stringValue(address?.parentSessionId);
   return sessionId ? [sessionId] : [];
 }
 
