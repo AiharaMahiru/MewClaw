@@ -35,6 +35,10 @@ export const Config: z<Config> = z.object({
   workspaceRoot: z.string().required(),
   storageLimitBytes: z.number(),
   localInsecure: z.boolean(),
+  extraMounts: z.array(z.object({
+    source: z.string().required(),
+    target: z.string().required(),
+  })),
 });
 
 export function apply(ctx: Context, config: Config): void {
@@ -49,6 +53,7 @@ export function apply(ctx: Context, config: Config): void {
     ...(config.resources === undefined ? {} : { resources: config.resources }),
     workspaceRoot: config.workspaceRoot,
     ...(config.storageLimitBytes === undefined ? {} : { storageLimitBytes: config.storageLimitBytes }),
+    ...(config.extraMounts === undefined ? {} : { extraMounts: config.extraMounts }),
   });
   const core = new OciContainerRuntime({ config: resolved });
   // Service 子类构造即自动注册（SubprocessRuntime/SandboxProvider 的静态

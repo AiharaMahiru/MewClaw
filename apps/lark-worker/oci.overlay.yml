@@ -41,6 +41,11 @@
           memoryMiB: 4096
           pids: 256
           tmpfsMiB: 512
+        # 只读载体挂载：PTC run_code 的容器内引导脚本（自包含 lib/process.js）。
+        # 不放工作区——模型对工作区可写，载体必须是不可变的镜像侧文件。
+        extraMounts:
+          - source: !!js process.cwd() + '/node_modules/@deepseek-ai/dsh-ptc-runtime-node/lib'
+            target: '/opt/dsh-ptc-runtime'
 
     # 容器内 Bash 使用 /workspace，宿主文件工具仍以会话 cwd 解析路径。
     # 该提示对所有非 complete preset 生效，避免模型请求无意义的权限升级。
@@ -51,6 +56,14 @@
     # 宿主文件工具与容器 Bash 共享同一相对路径；不把附件存储目录挂进容器。
     - id: oci-attachment-staging
       name: 'dsh-lark-web-bundle/agent-presets-oci/attachment-staging.mjs'
+
+# PTC run_code 运行时（liangshen/ptc preset）：执行世界是容器——node 用镜像
+# 内固定路径，bootstrap 经 sandbox-oci 的 ro 载体挂载进入；fd7 控制通道由
+# OCI subprocess 经 --preserve-fds 透传，工具回调仍过宿主注册表。
+- id: ptc-runtime
+  config:
+    nodeExecutable: '/usr/local/bin/node'
+    bootstrapPath: '/opt/dsh-ptc-runtime/process.js'
 
 # 0.1.6 上游新增默认行的生产处置：Web 终端经 terminal/* Remote 以宿主
 # 系统用户起 PTY，绕过 OCI 沙箱边界，整个面显式关闭（远程方法同时未入
