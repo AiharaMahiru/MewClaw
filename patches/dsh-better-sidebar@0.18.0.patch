@@ -188,3 +188,168 @@ index 0000000..a100002 100644
 +  if (wco.present && wco.height > 0) return wco.height
    if (env.titlebarInset > 0) return env.titlebarInset
    if (scheme === 'preset') return presetStripFor(preset, env) ?? 0
+diff --git a/lib/client.js b/lib/client.js
+index 0000000..0000000 100644
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -3516,12 +3516,22 @@
+ 		* disposer (disposes the inject fiber, which restores the original method
+ 		* descriptor — HMR-safe).
+ 		*/
++		/**
++		* Resolve the on-screen session id. Runtimes ≥0.1.6 removed
++		* `SidebarSessionList.current`: the main-view session is the row whose
++		* `retainedBy.mainView` count is positive (the same derivation upstream
++		* ui-layout / ui-workspace use). A legacy `current` field still wins when a
++		* pre-0.1.6 runtime populates it.
++		*/
++		function currentSessionIdOf(list) {
++			return list?.current ?? Object.values(list?.byId ?? {}).find((s) => (s.retainedBy?.mainView ?? 0) > 0)?.id;
++		}
+ 		function registerOpenPathInterception(ctx, store) {
+ 			const fiber = ctx.inject(["remote.session"], (fctx) => {
+ 				fctx.effect(() => {
+ 					return wrapOpenWorkspacePath(fctx.get("remote.session"), {
+ 						takeoverEnabled: () => !store.getSuspended() && store.getPrefs().interceptOpenPath !== false && store.getPrefs().tabsEnabled["editor"] !== false,
+-						currentSessionId: () => ctx.sessions.list.getSnapshot().current,
++						currentSessionId: () => currentSessionIdOf(ctx.sessions.list.getSnapshot()),
+ 						openInSidebar: (path, sessionId) => {
+ 							openSidebarFile(ctx, store, sessionId, path);
+ 						},
+@@ -14826,7 +14836,7 @@
+ 			}, []);
+ 			const layoutViewportHeight = visualViewportHeight ?? viewport.height;
+ 			const sessionList = (0, react.useSyncExternalStore)((0, react.useMemo)(() => (callback) => ctx.sessions.list.subscribe(callback), [ctx]), (0, react.useCallback)(() => ctx.sessions.list.getSnapshot(), [ctx]));
+-			const current = sessionList.current;
++			const current = currentSessionIdOf(sessionList);
+ 			const snapshot = (0, react.useSyncExternalStore)((0, react.useCallback)((callback) => store.subscribe(callback), [store]), (0, react.useCallback)(() => store.getSnapshot(), [store]));
+ 			(0, react.useEffect)(() => {
+ 				store.setSession(current);
+diff --git a/lib/client-registry.js b/lib/client-registry.js
+index 0000000..0000000 100644
+--- a/lib/client-registry.js
++++ b/lib/client-registry.js
+@@ -3516,12 +3516,22 @@
+ 		* disposer (disposes the inject fiber, which restores the original method
+ 		* descriptor — HMR-safe).
+ 		*/
++		/**
++		* Resolve the on-screen session id. Runtimes ≥0.1.6 removed
++		* `SidebarSessionList.current`: the main-view session is the row whose
++		* `retainedBy.mainView` count is positive (the same derivation upstream
++		* ui-layout / ui-workspace use). A legacy `current` field still wins when a
++		* pre-0.1.6 runtime populates it.
++		*/
++		function currentSessionIdOf(list) {
++			return list?.current ?? Object.values(list?.byId ?? {}).find((s) => (s.retainedBy?.mainView ?? 0) > 0)?.id;
++		}
+ 		function registerOpenPathInterception(ctx, store) {
+ 			const fiber = ctx.inject(["remote.session"], (fctx) => {
+ 				fctx.effect(() => {
+ 					return wrapOpenWorkspacePath(fctx.get("remote.session"), {
+ 						takeoverEnabled: () => !store.getSuspended() && store.getPrefs().interceptOpenPath !== false && store.getPrefs().tabsEnabled["editor"] !== false,
+-						currentSessionId: () => ctx.sessions.list.getSnapshot().current,
++						currentSessionId: () => currentSessionIdOf(ctx.sessions.list.getSnapshot()),
+ 						openInSidebar: (path, sessionId) => {
+ 							openSidebarFile(ctx, store, sessionId, path);
+ 						},
+@@ -14826,7 +14836,7 @@
+ 			}, []);
+ 			const layoutViewportHeight = visualViewportHeight ?? viewport.height;
+ 			const sessionList = (0, react.useSyncExternalStore)((0, react.useMemo)(() => (callback) => ctx.sessions.list.subscribe(callback), [ctx]), (0, react.useCallback)(() => ctx.sessions.list.getSnapshot(), [ctx]));
+-			const current = sessionList.current;
++			const current = currentSessionIdOf(sessionList);
+ 			const snapshot = (0, react.useSyncExternalStore)((0, react.useCallback)((callback) => store.subscribe(callback), [store]), (0, react.useCallback)(() => store.getSnapshot(), [store]));
+ 			(0, react.useEffect)(() => {
+ 				store.setSession(current);
+diff --git a/src/context-types.ts b/src/context-types.ts
+index 0000000..0000000 100644
+--- a/src/context-types.ts
++++ b/src/context-types.ts
+@@ -145,6 +145,12 @@
+   parentId?: string
+   /** Whether the session's agent is currently running. */
+   running?: boolean
++  /**
++   * Reference counts by retention source (runtime SessionReferenceSource).
++   * `mainView > 0` marks the session on screen — the 0.1.6+ replacement for
++   * the removed `SidebarSessionList.current` field.
++   */
++  retainedBy?: Readonly<Partial<Record<string, number>>>
+ }
+ 
+ /** One healthy subagent catalog child row (structural mirror of the runtime). */
+@@ -307,7 +313,12 @@
+ 
+ /** The client session list snapshot the sidebar subscribes to. */
+ export interface SidebarSessionList {
+-  current: string | undefined
++  /**
++   * On-screen session id. Removed from runtime snapshots in 0.1.6 — derive
++   * it via {@link currentSessionIdOf} (mainView retention); only pre-0.1.6
++   * runtimes still populate this field.
++   */
++  current?: string | undefined
+   byId: Record<string, SidebarSessionSummary>
+   /** Direct durable catalogs keyed by their selected parent address. */
+   subagentsByParent?: Readonly<Record<string, SidebarSubagentCatalog>>
+@@ -319,6 +330,17 @@
+   jobsBySession?: Readonly<Record<string, readonly SidebarJobView[]>>
+ }
+ 
++/**
++ * Resolve the on-screen session id. Runtimes ≥0.1.6 removed
++ * `SidebarSessionList.current`: the main-view session is the row whose
++ * `retainedBy.mainView` count is positive (the same derivation upstream
++ * ui-layout / ui-workspace use). A legacy `current` field still wins when a
++ * pre-0.1.6 runtime populates it.
++ */
++export function currentSessionIdOf(list: SidebarSessionList): string | undefined {
++  return list.current ?? Object.values(list.byId).find((s) => (s.retainedBy?.mainView ?? 0) > 0)?.id
++}
++
+ /** The client sessions service face (only the list feed is needed). */
+ export interface SidebarSessionsService {
+   list: {
+diff --git a/src/client/Sidebar.tsx b/src/client/Sidebar.tsx
+index 0000000..0000000 100644
+--- a/src/client/Sidebar.tsx
++++ b/src/client/Sidebar.tsx
+@@ -33,6 +33,7 @@
+ import clsx from 'clsx'
+ import { IconCloseFill14, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { Context, SidebarSessionList } from '../context-types.ts'
++import { currentSessionIdOf } from '../context-types.ts'
+ import { appendToDraft, insertFileReference } from './conversation-draft.ts'
+ import {
+   BOTTOM_MIN, PANEL_MIN, activateTab, agentUuidOf, allLeaves, closeFloatByTab, closeTab, dockFloat, firstLeaf, floatTab,
+@@ -290,7 +291,7 @@
+     useMemo(() => (callback: () => void) => ctx.sessions.list.subscribe(callback), [ctx]),
+     useCallback(() => ctx.sessions.list.getSnapshot(), [ctx]),
+   )
+-  const current = sessionList.current
++  const current = currentSessionIdOf(sessionList)
+ 
+   // Per-session sidebar state.
+   const snapshot = useSyncExternalStore(
+diff --git a/src/client/intercept.tsx b/src/client/intercept.tsx
+index 0000000..0000000 100644
+--- a/src/client/intercept.tsx
++++ b/src/client/intercept.tsx
+@@ -8,6 +8,7 @@
+  */
+ import { IconCodeOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { Context } from '../context-types.ts'
++import { currentSessionIdOf } from '../context-types.ts'
+ import { firstLeaf, revealPaths, togglePanel, type SidebarStore } from './state.ts'
+ import { t } from './locales.ts'
+ import { resolveSidebarPath, selectProducedFiles } from './produced-files.ts'
+@@ -174,7 +175,7 @@
+         takeoverEnabled: () => !store.getSuspended()
+           && store.getPrefs().interceptOpenPath !== false
+           && store.getPrefs().tabsEnabled['editor'] !== false,
+-        currentSessionId: () => ctx.sessions.list.getSnapshot().current,
++        currentSessionId: () => currentSessionIdOf(ctx.sessions.list.getSnapshot()),
+         openInSidebar: (path, sessionId) => { openSidebarFile(ctx, store, sessionId, path) },
+         revealInExplorer: (_path, sessionId) => { revealInExplorer(ctx, store, sessionId, lastProduced) },
+       })

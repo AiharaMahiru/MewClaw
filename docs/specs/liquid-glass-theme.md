@@ -35,7 +35,7 @@
 
 会话面包屑使用header内的nav；该导航从通用玻璃面板选择器中排除，透明、无阴影、无滤镜。标题按钮及面包屑点击/禁用行为不变，其他nav保持原主题。
 
-横向tablist为透明无框容器，无圆角、阴影或滤镜，8px间隙；直接tab子项32px最小高度和14px水平内边距，aria-selected驱动2px底边选中态，不使用背景选中块。header/banner/toolbar不加玻璃框。不改点击/键盘处理器、ID或aria-controls。窄屏内部横向滚动，纵向aria-orientation=vertical不采用横向规则。
+横向tablist为透明无框容器，无圆角、阴影或滤镜，8px间隙；直接tab子项32px最小高度和14px水平内边距，aria-selected驱动2px底边选中态，不使用背景选中块。header/banner/toolbar不加玻璃框。不改点击/键盘处理器、ID或aria-controls。窄屏内部横向滚动，纵向aria-orientation=vertical不采用横向规则。dockkit 面板条（`data-dockkit-strip`，官方右侧栏等宿主面板头）整体排除——其自带 stripFill/chrome 右缘布局，fit-content 收编会把抽屉头按钮挤离右缘（移动端实测 strip 390→184px），收编仅限内容区语义 tablist。
 
 视觉统一修订：通用底面和插件预览统一中性灰白/石墨，不再使用绿色色阶；补齐官方实际消费的 sidebar-fill、input-major、menu、selector、sidebar-nav-item-active token。菜单容器18px、弹窗24px、菜单项10px圆角；菜单内边距8px，相邻语义项4px间距。不再给所有按钮追加玻璃阴影，浮层内部按钮和菜单项无重复阴影。参考 gracefullight/liquid-glass 的低着色分层思路，未引入额外依赖或复制其组件。保留状态色、圆形图标按钮及官方布局逻辑。
 

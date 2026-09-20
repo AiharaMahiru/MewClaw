@@ -82,7 +82,10 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   抽屉上左滑、`pointerdown` 落在列外（遮罩）、抽屉内折叠键、右坞开启
   联动收起或视口跨界即收起——`MutationObserver` 监听
   `data-sidebar-collapsed` 出现即复位 `mewclaw-rail-open`，覆盖全部收起
-  路径。手势监听用 TouchEvent 而非
+  路径。官方右侧栏抽屉展开（`data-sidebar-right-open="true"`）时
+  fab/edge 整体隐藏——其 z-index（108/109）高于抽屉（40），透出会与
+  抽屉头按钮视觉堆叠，edge 热区还会拦截抽屉左缘触控。手势监听用
+  TouchEvent 而非
   PointerEvent——左缘右滑会被浏览器声明为系统手势令 pointermove 断流，
   touchmove 不受影响。脚本只做 DOM 开合，不读凭证、不发请求，
   `matchMedia` 在桌面视口短路；

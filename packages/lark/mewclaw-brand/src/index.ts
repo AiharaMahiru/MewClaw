@@ -46,7 +46,7 @@ const MOBILE_STYLE = `@media(max-width:1023px){[class*="_sidebarCol"]{position:f
 @media(max-width:768px){[class*="_titleRow"] [class*="_headerActions"],[class*="_titleRow"] [class*="_headerUtilities"]{display:none!important}}
 @media(max-width:767.98px){[data-sidebar-right-panel="fullscreen"]{position:fixed!important;inset:0!important;width:100%!important;max-width:none!important}}
 .mewclaw-rail-edge,.mewclaw-rail-fab{display:none}
-@media(max-width:1023px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}.mewclaw-rail-fab{display:inline-flex;position:fixed;top:7px;left:9px;z-index:108;width:36px;height:36px;align-items:center;justify-content:center;border:0;border-radius:10px;background:transparent;color:inherit;cursor:pointer;padding:0}[class*="_toggleCluster"]{top:calc(11px + env(safe-area-inset-top))!important}}`;
+@media(max-width:1023px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}.mewclaw-rail-fab{display:inline-flex;position:fixed;top:7px;left:9px;z-index:108;width:36px;height:36px;align-items:center;justify-content:center;border:0;border-radius:10px;background:transparent;color:inherit;cursor:pointer;padding:0}[class*="_toggleCluster"]{top:calc(11px + env(safe-area-inset-top))!important}body:has([data-sidebar-right-open="true"]) :is(.mewclaw-rail-fab,.mewclaw-rail-edge){display:none}}`;
 // 文件预览顶栏也是一条 flex 行：官方 pane/editor 容器没有完整的 min-width:0
 // 收缩链时，路径输入框的最小内容宽度会把固定操作按钮推出手机视口。按 CSS Module
 // 稳定后缀覆盖 better-sidebar 坞面板与官方右侧栏，输入框以 width:0 参与剩余宽度分配。
@@ -69,6 +69,9 @@ const GLASS_PANEL_STYLE = `html[data-mew-glass] :is([data-dsh-panel-host] :is([d
 // 折叠态判定锚定 AppFrame 发布的 data-sidebar-collapsed 属性（0.1.6 起挂在
 // 布局 frame 上），不读 aria-label——其文案随界面语言变化。MutationObserver
 // 兜底所有收起路径（抽屉内官方开关、右坞开启联动、视口跨界）复位 OPEN。
+// 右侧栏抽屉态（data-sidebar-right-open）下 fab/edge 整体隐藏：二者 z-index
+// (108/109) 高于抽屉（40），透出会与抽屉头按钮视觉堆叠，edge 热区还会拦截
+// 抽屉左缘触控。
 const MOBILE_RAIL_SCRIPT = `<script data-mewclaw-rail>(function(){
 if(!matchMedia("(max-width:1023px)").matches)return;
 var OPEN="mewclaw-rail-open";

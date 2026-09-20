@@ -23,4 +23,11 @@ describe("双色SVG壁纸与语义材质", () => {
     expect(blurred.length).toBeGreaterThan(0);
     for (const rule of blurred) expect(rule).not.toMatch(/aside|\bnav\b/u);
   });
+  it("横向 tablist 收编不碰 dockkit 面板条", () => {
+    // dockkit 自管 stripFill/chrome 右缘布局；玻璃 fit-content 规则若命中
+    // 会把右侧栏抽屉头按钮挤离右缘（移动端实测 strip 390→184px）。
+    const tablistRules = SURFACE_STYLES.split("}").filter((rule) => rule.includes('[role="tablist"]'));
+    expect(tablistRules.length).toBeGreaterThan(0);
+    for (const rule of tablistRules) expect(rule).toContain(':not([data-dockkit-strip])');
+  });
 });
