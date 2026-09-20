@@ -44,6 +44,10 @@ Auth 使用独立 Cordis Context 挂载官方设置、凭证和 DeepSeek Provide
 启用配置：AUTH_PROMPT_AUDIT_ENABLED，缺省 true，显式 false 仅用于隔离环境。
 AUTH_PROMPT_AUDIT_TIMEOUT_MS 缺省 10000，范围 100–10000（审计延迟硬上限 10 秒，超时即失败关闭）。
 AUTH_PROMPT_AUDIT_MAX_CONCURRENT 缺省 4，范围 1–32；并发满立即失败关闭，不排无限队列。
+AUTH_PROMPT_AUDIT_FALLBACK_MODEL 缺省未配置：配置后，主模型单次调用失败即在
+同一 deepseek-official 路由内切换备用模型再试一次——凭证/配额/模型禁用等确定性 code
+同样是模型维度故障，切换仍然有意义；仅调用方中止（预算耗尽）不切换。切换以
+`[prompt-audit]` warn 落日志（只含已消毒的失败类别，不透传上游正文）。
 瞬态失败允许一次重试：传输断流、5xx、STREAM_CLOSED 等快失败在完整预算内再试一次；
 超时（预算已耗尽）与确定性 finish code（凭证、配额、模型禁用、NO_CODE）不重试，
 连续两次瞬态失败仍失败关闭。审计模型走独立 ctx.llm.stream()，不经 agent loop
@@ -71,6 +75,9 @@ boot-check 不初始化模型，不解析审计凭证，不产生外部调用。
 自有DeepSeek路由插件复用官方Adapter，通过配置把唯一可见逻辑模型 deepseek-v4.1-flash
 映射为CommandCode端点要求的 deepseek/deepseek-v4.1-flash。Gemini Web2API不再注册为模型Provider；Gemini搜索MCP是独立工具能力，继续保留。
 审计与普通请求共用此映射；仅审计调用显式 reasoningEffort=off，对应 thinking.type=disabled。
+审计不再单点依赖 deepseek-v4.1-flash：AUTH_PROMPT_AUDIT_FALLBACK_MODEL 指定备用逻辑模型
+（生产 glm-5.3-flash），主模型任何失败（含确定性 code——其语义为模型维度而非请求维度）
+且调用方未中止时切换再试一次；备用模型失败仍失败关闭。
 不通过全局 thinking=disabled 限制普通会话。必须用本地 HTTP 捕获实际 model/thinking 字段，不能只检查字符串或进程状态。
 响应只能为完整 decision JSON（兼容完整代码围栏）。多个判定、嵌套对象、异常结束、截断都不能放行。
 审计故障记录结束类型与稳定错误码，禁止记录输入、密钥、原始输出或供应商错误正文。

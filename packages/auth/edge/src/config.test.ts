@@ -21,6 +21,11 @@ describe("resolveAuthConfig", () => {
     expect(() => resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_TIMEOUT_MS: "0" })).toThrow();
     expect(() => resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_MAX_CONCURRENT: "100" })).toThrow();
   });
+  it("备用审计模型可选配置，空值不落配置", () => {
+    expect(resolveAuthConfig(base).promptAudit?.fallbackModel).toBeUndefined();
+    expect(resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_FALLBACK_MODEL: " glm-5.3-flash " }).promptAudit?.fallbackModel).toBe("glm-5.3-flash");
+    expect(resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_FALLBACK_MODEL: "  " }).promptAudit?.fallbackModel).toBeUndefined();
+  });
   it("normalizes browser origins and derives loopback upstreams", () => {
     const config = resolveAuthConfig({ ...base, DSH_WEB_INTERNAL_PORT: "3081", AUTH_ADMIN_URL: "http://127.0.0.1:8791/" });
     expect(config.publicOrigin).toBe("http://127.0.0.1:3080");

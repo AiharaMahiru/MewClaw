@@ -27,7 +27,7 @@ export interface AuthEdgeConfig {
   /** 桌面推理 SSE 调用上限；默认 120 秒，界于 1 秒与 10 分钟。 */
   desktopInferenceTimeoutMs?: number;
   /** 默认开启；显式关闭仅用于不提供模型的隔离环境。 */
-  promptAudit?: { enabled: boolean; timeoutMs: number; maxConcurrent: number };
+  promptAudit?: { enabled: boolean; timeoutMs: number; maxConcurrent: number; fallbackModel?: string };
   mail: MailConfig;
   feishu?: FeishuConfig;
 }
@@ -115,6 +115,7 @@ export function resolveAuthConfig(environment: Record<string, string | undefined
       enabled: auditEnabled(environment.AUTH_PROMPT_AUDIT_ENABLED),
       timeoutMs: boundedInteger(environment.AUTH_PROMPT_AUDIT_TIMEOUT_MS, 10_000, 100, 10_000),
       maxConcurrent: boundedInteger(environment.AUTH_PROMPT_AUDIT_MAX_CONCURRENT, 4, 1, 32),
+      ...(environment.AUTH_PROMPT_AUDIT_FALLBACK_MODEL?.trim() ? { fallbackModel: environment.AUTH_PROMPT_AUDIT_FALLBACK_MODEL.trim() } : {}),
     },
     userModelEncryptionKey: required(environment.AUTH_USER_MODEL_ENCRYPTION_KEY, "AUTH_USER_MODEL_ENCRYPTION_KEY"),
     mail,

@@ -36,11 +36,15 @@ export async function apply(ctx: Context): Promise<void> {
         AUTH_USER_MODEL_ENCRYPTION_KEY: process.env.AUTH_USER_MODEL_ENCRYPTION_KEY ?? "A".repeat(43),
       }
     : process.env;
+  const config = (await import("dsh-lark-auth-edge")).resolveAuthConfig(environment);
   const runtime = await runAuthApp({
-    config: (await import("dsh-lark-auth-edge")).resolveAuthConfig(environment),
+    config,
     bootCheck,
     dependencies: {
-      createAuditModel: () => createPromptAuditModel({ launchEnvironment: launchEnvironmentOf(ctx) }),
+      createAuditModel: () => createPromptAuditModel({
+        launchEnvironment: launchEnvironmentOf(ctx),
+        ...(config.promptAudit?.fallbackModel ? { fallbackModel: config.promptAudit.fallbackModel } : {}),
+      }),
       createSharedModels: () => createSharedModelRuntime({ launchEnvironment: launchEnvironmentOf(ctx) }),
     },
   });

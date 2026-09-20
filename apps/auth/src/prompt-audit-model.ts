@@ -14,6 +14,8 @@ export interface PromptAuditModelOptions {
   dshHome?: string;
   launchEnvironment: LaunchEnvironmentSnapshot;
   maxTokens?: number;
+  /** 主审计模型失败时在同一路由内切换的备用逻辑模型。 */
+  fallbackModel?: string;
 }
 
 /** 独立审计上下文只复用官方配置和模型能力，不挂载 Worker、会话或工具。 */
@@ -31,6 +33,7 @@ export async function createPromptAuditModel(options: PromptAuditModelOptions): 
       (request) => ctx.llm.stream(request),
       async () => { await ctx.fiber.dispose(); },
       options.maxTokens ?? 512,
+      { ...(options.fallbackModel ? { fallbackModel: options.fallbackModel } : {}) },
     );
   } catch (error) {
     await ctx.fiber.dispose();
@@ -43,40 +46,59 @@ export function createPromptAuditModelClient(
   stream: (request: GenerateOptions) => AsyncIterable<StreamChunk>,
   close: () => Promise<void>,
   maxTokens: number,
+  options: { fallbackModel?: string } = {},
 ): PromptAuditModel {
+  const attempt = async (input: { system: string; text: string; signal: AbortSignal }, model: string): Promise<string> => {
+    const { system, text, signal } = input;
+    signal.throwIfAborted();
+    let output = "";
+    let completed = false;
+    for await (const chunk of stream({
+      provider: "deepseek-official",
+      model,
+      reasoningEffort: ReasoningEffortId("off"),
+      system,
+      messages: [createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text }] })],
+      maxTokens,
+      signal,
+    })) {
+      signal.throwIfAborted();
+      if (completed) throw new Error("prompt audit: unexpected data after finish");
+      if (chunk.type === "text-delta") {
+        if (output.length + chunk.text.length > maxTokens * 8) throw new Error("prompt audit: oversized model response");
+        output += chunk.text;
+      }
+      if (chunk.type === "finish") {
+        if (chunk.reason.kind !== "stop") {
+          const code = "failure" in chunk.reason && /^[A-Z0-9_]+$/u.test(chunk.reason.failure.code)
+            ? chunk.reason.failure.code : "NO_CODE";
+          throw new Error(`prompt audit: finish ${chunk.reason.kind} ${code}`);
+        }
+        completed = true;
+      }
+    }
+    signal.throwIfAborted();
+    if (!completed || !output.trim()) throw new Error("prompt audit: missing model response");
+    return output;
+  };
   return {
     close,
-    async generate({ system, text, signal }) {
-      signal.throwIfAborted();
-      let output = "";
-      let completed = false;
-      for await (const chunk of stream({
-        provider: "deepseek-official",
-        model: "deepseek-v4.1-flash",
-        reasoningEffort: ReasoningEffortId("off"),
-        system,
-        messages: [createUserMessage({ source: { kind: "user" }, content: [{ type: "text", text }] })],
-        maxTokens,
-        signal,
-      })) {
-        signal.throwIfAborted();
-        if (completed) throw new Error("prompt audit: unexpected data after finish");
-        if (chunk.type === "text-delta") {
-          if (output.length + chunk.text.length > maxTokens * 8) throw new Error("prompt audit: oversized model response");
-          output += chunk.text;
-        }
-        if (chunk.type === "finish") {
-          if (chunk.reason.kind !== "stop") {
-            const code = "failure" in chunk.reason && /^[A-Z0-9_]+$/u.test(chunk.reason.failure.code)
-              ? chunk.reason.failure.code : "NO_CODE";
-            throw new Error(`prompt audit: finish ${chunk.reason.kind} ${code}`);
-          }
-          completed = true;
-        }
+    async generate(input) {
+      try {
+        return await attempt(input, "deepseek-v4.1-flash");
+      } catch (error) {
+        // 凭证/配额/模型禁用等确定性 code 也是模型维度故障，备用模型同样值得尝试；
+        // 只有调用方中止（预算耗尽）才不切换。
+        if (!options.fallbackModel || input.signal.aborted) throw error;
+        console.warn(`[prompt-audit] 主审计模型失败，切换备用模型 ${options.fallbackModel}: ${auditFailureSummary(error)}`);
+        return await attempt(input, options.fallbackModel);
       }
-      signal.throwIfAborted();
-      if (!completed || !output.trim()) throw new Error("prompt audit: missing model response");
-      return output;
     },
   };
+}
+
+/** 日志只允许已消毒的失败类别，不透传上游错误正文或异常对象。 */
+function auditFailureSummary(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  return /^prompt audit: [a-z0-9 _:-]+$/iu.test(message) ? message : "prompt audit: upstream error";
 }
