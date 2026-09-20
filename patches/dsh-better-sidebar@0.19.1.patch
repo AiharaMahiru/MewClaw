@@ -136,3 +136,44 @@ index b4f130b..1410a33 100644
 -  }, SidebarProducedFiles))
 +  }, TurnTailEntry))
  }
+diff --git a/lib/client-registry.js b/lib/client-registry.js
+index 0000000..a100000 100644
+--- a/lib/client-registry.js
++++ b/lib/client-registry.js
+@@ -15171,6 +15171,8 @@ window.__ModuleLoader__.load({
+ 		function computeTitleBarStrip(env, wco, scheme, preset, customStripPx) {
+ 			if (scheme === "web") return 0;
+-			if (wco.present) return wco.height;
++			// patched: WCO 仅在报告有效高度时才算权威——visible:true 但零高 rect
++			// 是退化读数（Electron 初始化期/坏读数），不得否决 inset/preset/custom。
++			if (wco.present && wco.height > 0) return wco.height;
+ 			if (env.titlebarInset > 0) return env.titlebarInset;
+ 			if (scheme === "preset") return presetStripFor(preset, env) ?? 0;
+ 			if (scheme === "custom") return customStripPx;
+diff --git a/lib/client.js b/lib/client.js
+index 0000000..a100001 100644
+--- a/lib/client.js
++++ b/lib/client.js
+@@ -15171,6 +15171,8 @@ window.__ModuleLoader__.load({
+ 		function computeTitleBarStrip(env, wco, scheme, preset, customStripPx) {
+ 			if (scheme === "web") return 0;
+-			if (wco.present) return wco.height;
++			// patched: WCO 仅在报告有效高度时才算权威——visible:true 但零高 rect
++			// 是退化读数（Electron 初始化期/坏读数），不得否决 inset/preset/custom。
++			if (wco.present && wco.height > 0) return wco.height;
+ 			if (env.titlebarInset > 0) return env.titlebarInset;
+ 			if (scheme === "preset") return presetStripFor(preset, env) ?? 0;
+ 			if (scheme === "custom") return customStripPx;
+diff --git a/src/client/titlebar-strip.ts b/src/client/titlebar-strip.ts
+index 0000000..a100002 100644
+--- a/src/client/titlebar-strip.ts
++++ b/src/client/titlebar-strip.ts
+@@ -31,5 +31,7 @@
+ ): number {
+   if (scheme === 'web') return 0
+-  if (wco.present) return wco.height
++  // patched: WCO 仅在报告有效高度时才算权威——visible:true 但零高 rect
++  // 是退化读数（Electron 初始化期/坏读数），不得否决 inset/preset/custom。
++  if (wco.present && wco.height > 0) return wco.height
+   if (env.titlebarInset > 0) return env.titlebarInset
+   if (scheme === 'preset') return presetStripFor(preset, env) ?? 0
