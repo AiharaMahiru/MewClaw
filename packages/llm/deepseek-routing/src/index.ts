@@ -4,7 +4,7 @@ import type {} from "@deepseek-ai/dsh-credentials";
 import type {} from "@deepseek-ai/dsh-deepseek-llm-api-extensions";
 import type {} from "@deepseek-ai/dsh-fs";
 import { launchEnvironmentOf } from "@deepseek-ai/dsh-launch-environment";
-import { assertUsableApiKey, LlmAdapter, LlmError, resolveImageAttachmentAccess, type GenerateOptions, type LlmModelInfo, type LlmProviderInfo, type LlmResolvedModelInfo, type PreparedAdapterCall, type ResolvedRetryPolicy, type StreamChunk } from "@deepseek-ai/dsh-llm";
+import { assertUsableApiKey, LlmAdapter, LlmError, resolveImageAttachmentAccess, type ContentBlock, type GenerateOptions, type LlmModelInfo, type LlmProviderInfo, type LlmResolvedModelInfo, type Message, type PreparedAdapterCall, type ResolvedRetryPolicy, type StreamChunk } from "@deepseek-ai/dsh-llm";
 import { Config as OfficialConfig, DeepSeekAdapter, resolveAdapterOptions, type Config as OfficialDeepSeekConfig, type DeepSeekConnectionOptions } from "@deepseek-ai/dsh-llm-deepseek";
 import type {} from "@deepseek-ai/dsh-settings";
 import z from "@deepseek-ai/schemastery";
@@ -58,12 +58,12 @@ export class RoutedDeepSeekAdapter extends LlmAdapter {
     this.assertEnabled(model, state);
     const logicalModel = await this.delegate.resolveModel(provider, model, signal);
     const prepared = await this.delegate.prepareCall(provider, this.wireModel(model, state), signal);
-    return { model: logicalModel, stream: (options) => prepared.stream({ ...options, model: this.wireModel(options.model, state) }) };
+    return { model: logicalModel, stream: (options) => prepared.stream(projectDeepSeekMessages({ ...options, model: this.wireModel(options.model, state) })) };
   }
   override async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     const state = this.snapshot();
     this.assertEnabled(options.model, state);
-    yield* this.delegate.stream({ ...options, model: this.wireModel(options.model, state) });
+    yield* this.delegate.stream(projectDeepSeekMessages({ ...options, model: this.wireModel(options.model, state) }));
   }
   private wireModel(model: string, state: RoutingSnapshot): string {
     const wire = state.aliases[model] ?? model;
@@ -73,6 +73,46 @@ export class RoutedDeepSeekAdapter extends LlmAdapter {
   private assertEnabled(model: string, state: RoutingSnapshot): void {
     if (state.disabled.has(model)) throw new LlmError(`DeepSeek model "${model}" is disabled.`, "MODEL_DISABLED");
   }
+}
+
+/**
+ * DeepSeek Messages can encode reasoning only in assistant turns. Older
+ * session/tool histories may contain a reasoning block inside a user or
+ * tool-result turn; preserve the durable log but project those blocks out of
+ * this provider request. Assistant reasoning remains untouched for replay and
+ * provider thinking continuity.
+ */
+function projectDeepSeekMessages(options: GenerateOptions): GenerateOptions {
+  let changed = false;
+  const projectBlocks = (blocks: ContentBlock[]): ContentBlock[] => {
+    let projected: ContentBlock[] | undefined;
+    for (let index = 0; index < blocks.length; index += 1) {
+      const block = blocks[index];
+      if (block === undefined) continue;
+      if (block.type === "reasoning") {
+        projected ??= blocks.slice(0, index);
+        changed = true;
+        continue;
+      }
+      if (block.type === "tool-result") {
+        const content = projectBlocks(block.content);
+        if (content !== block.content) {
+          projected ??= blocks.slice(0, index);
+          projected.push({ ...block, content });
+          changed = true;
+          continue;
+        }
+      }
+      projected?.push(block);
+    }
+    return projected ?? blocks;
+  };
+  const messages: Message[] = options.messages.map((message) => {
+    if (message.role !== "user") return message;
+    const content = projectBlocks(message.content);
+    return content === message.content ? message : { ...message, content };
+  });
+  return changed ? { ...options, messages } : options;
 }
 
 export function apply(ctx: Context, config: Config): void {

@@ -12,14 +12,16 @@
 
 ## 1 目的与边界
 
-包装官方 `DeepSeekAdapter`，只处理**逻辑/wire 模型 ID 路由与目录收敛**：
+包装官方 `DeepSeekAdapter`，处理**逻辑/wire 模型 ID 路由、目录收敛与 Messages 兼容投影**：
 
 - 对模型目录只公开允许的 DeepSeek 模型（当前仅 `deepseek-v4.1-flash`）；
 - 逻辑 ID（`deepseek-v4.1-flash`）在出站时映射为 wire ID
   （`deepseek/deepseek-v4.1-flash`）；
-- 隐藏/禁用模型在任何网络请求之前拒绝（`MODEL_DISABLED`）。
+- 隐藏/禁用模型在任何网络请求之前拒绝（`MODEL_DISABLED`）；
+- 仅在出站到 DeepSeek Messages 前移除 user/tool-result 中该协议无法表达的
+  `reasoning` 块，不改持久化会话，并保留 assistant reasoning 用于回放与 thinking 连续性。
 
-非目标：传输、图片附件、Files API、thinking 扩展、重试策略——全部委托官方
+非目标：传输、图片附件、Files API、thinking 生成/回放、重试策略——全部委托官方
 Adapter 原样透传；不新增凭证面（沿用 `apiKeyEnv` 凭证引用）。
 
 ## 2 服务契约
@@ -34,6 +36,7 @@ class RoutedDeepSeekAdapter extends LlmAdapter {
   // 透传：providerInfo/providerRetryPolicy/imageRequestPricing
   // 收敛：listModels 过滤为 visibleModels
   // 路由：resolveModel/prepareCall/stream 先 assertEnabled，再把 model 映射为 wire ID
+  // 兼容：prepareCall().stream/stream 共用 provider 边界投影，只清理 user/tool-result reasoning
 }
 ```
 
@@ -83,6 +86,8 @@ pi-ai profile 的同名策略在 `settings.production.yaml` 逐 provider 配置�
 | settings 更新为重试策略不同值 | `registration.replace` 重注册 adapter |
 | settings 更新为非法值 | 保留 last-good 快照，错误日志，不炸在途流 |
 | 别名端点命中 disabled | 装载 fail loud |
+| user/tool-result 历史内含 `reasoning` | 持久化内容不变；DeepSeek 出站请求中移除这些块 |
+| assistant 历史内含 `reasoning` | 保留并交由官方 Adapter 序列化为 thinking |
 
 ## 7 安全与信任
 
@@ -95,7 +100,8 @@ pi-ai profile 的同名策略在 `settings.production.yaml` 逐 provider 配置�
 
 - `unit`：默认把 V4.1 Flash 映射为 `deepseek/deepseek-v4.1-flash` wire ID；空别名
   字典保留必需映射；目录只公开 V4.1 Flash；请求序列化用 wire model 而返回身份仍
-  为逻辑 ID；直接指定被隐藏模型在网络请求前拒绝。
+  为逻辑 ID；直接指定被隐藏模型在网络请求前拒绝；`prepareCall().stream`
+  与直接 `stream` 都移除 user/tool-result reasoning，同时保留 assistant reasoning。
 
 ## 9 迁移映射
 

@@ -89,12 +89,22 @@ describe("dsh-lark-mewclaw-brand", () => {
     expect(html).toContain("background-color:rgb(28 28 35)!important");
     expect(html).toContain('[class*="_titleRow"] [class*="_headerActions"]');
     expect(html).toContain('[class*="_titleRow"] [class*="_headerUtilities"]');
-    // 右坞去重锚定官方展开按钮的 data 属性（aria-label 文案随语言失效）
-    expect(html).toContain("[data-sidebar-right-expand]{display:none!important}");
+    // 文件预览顶部工具栏的 flex 收缩链：窄屏下父级与编辑器容器允许收缩，
+    // 路径输入框让出固定操作按钮，避免工具栏把页面撑出视口。
+    expect(html).toContain(':is([data-dsh-panel-host],[data-sidebar-right-panel]) :is([class*="_paneContent"],[class*="_paneTab"],[class*="_editor"]){min-width:0;max-width:100%}');
+    expect(html).toContain(':is([data-dsh-panel-host],[data-sidebar-right-panel]) [class*="_editorHeader"]{min-width:0;width:100%;max-width:100%;box-sizing:border-box;gap:4px;padding-inline:4px;overflow:hidden}');
+    expect(html).toContain(':is([data-dsh-panel-host],[data-sidebar-right-panel]) [class*="_editorPathInput"]{flex:1 1 0;min-width:0;width:0;max-width:100%');
+    // 官方展开按钮只在折叠态渲染，品牌层不得把它全局隐藏。
+    // push 面板必须保持官方 top:0/bottom:0 几何，不留顶部灰条、不压缩高度；
+    // 官方自动 fullscreen 断点（viewportWidth < 768）则显式铺满移动视口。
+    expect(html).not.toContain("[data-sidebar-right-expand]{display:none!important}");
+    expect(html).toContain('[data-sidebar-right-panel="push"]{top:0!important;bottom:0!important}');
+    expect(html).toContain('@media(max-width:767.98px){[data-sidebar-right-panel="fullscreen"]{position:fixed!important;inset:0!important;width:100%!important;max-width:none!important}}');
+    expect(html).not.toContain('top:38px!important');
     expect(html).not.toContain('[aria-label="Open right sidebar"]');
-    // 液态玻璃下坞面板抬回不透明面：backdrop-filter 在部分移动端 WebView
-    // 声明支持却不渲染，可读性不能依赖模糊真实生效（全视口规则，桌面同缺陷）
-    expect(html).toContain('html[data-mew-glass] [data-dsh-panel-host] :is([data-dsh-panel],[data-dsh-float-window]){background-color:var(--mew-canvas)}');
+    // 液态玻璃下坞面板与官方右侧栏均抬回不透明面：backdrop-filter 在部分
+    // 移动端 WebView 声明支持却不渲染，可读性不能依赖模糊真实生效。
+    expect(html).toContain('html[data-mew-glass] :is([data-dsh-panel-host] :is([data-dsh-panel],[data-dsh-float-window]),[data-sidebar-right-panel],[data-sidebar-right-float-host] > :first-child){background-color:var(--mew-canvas)}');
     // 侧栏开合控制器（§6 移动适配）：左上角菜单键 + 左缘热区滑动 + 外点关闭
     expect(html).toContain("data-mewclaw-rail");
     expect(html).toContain("mewclaw-rail-edge");

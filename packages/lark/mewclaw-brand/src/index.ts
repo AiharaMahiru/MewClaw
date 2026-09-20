@@ -28,10 +28,12 @@ const HERO_STYLE = `.mewclaw-hero-brand{display:inline-flex;align-items:center;g
 // 遮罩、菜单键随之隐藏。
 // 桌面端侧栏背景是半透明（覆盖式抽屉会透出下层会话头部），窄屏改为不透明——
 // 等优先级规则后被官方样式表覆盖，需 !important。
-// 右坞开关去重（全视口）：官方右坞把唯一的展开入口注入会话头部角落
-// （data-sidebar-right-expand），与第三方坞簇开关职责重复——隐藏前者，坞簇
-// 开关作为默认右侧栏按钮。锚定 data 属性而非 aria-label，避免文案随语言失效。
-const DEDUPE_STYLE = `[data-sidebar-right-expand]{display:none!important}`;
+// 官方右坞的展开入口只在折叠态渲染，不能用全局 CSS 隐藏；否则右坞收起后
+// 没有任何可见的恢复入口。官方 push 面板以 top:0/bottom:0 填满右侧轨道，
+// DockSurface 的 tab strip 就是面板顶部；不得为“对齐内容”下移整个面板，否则会同时
+// 产生顶部灰条、可用高度缩短与 chrome/icon 错位。显式归零只是防止品牌/主题层污染
+// 官方几何，不改变右坞自身的展开、收起和尺寸逻辑。
+const RIGHT_PANEL_STYLE = `[data-sidebar-right-panel="push"]{top:0!important;bottom:0!important}`;
 // 会话头部顶栏在手机上溢出：隐藏桌面专属控件容器——_headerActions（模式徽标、
 // 云端位置选择器、jobs/schedule/终端等槽位集合）与 _headerUtilities（外部编辑器
 // 入口）。按容器隐藏与语言无关；顶栏仅剩面包屑与 More actions。
@@ -42,17 +44,23 @@ const DEDUPE_STYLE = `[data-sidebar-right-expand]{display:none!important}`;
 // 分栏拖拽柄在触屏无意义，同隐。
 const MOBILE_STYLE = `@media(max-width:1023px){[class*="_sidebarCol"]{position:fixed;top:0;bottom:0;left:0;z-index:120;height:100dvh;transform:translateX(-110%);visibility:hidden;transition:transform .24s ease,visibility .24s;background-color:rgb(28 28 35)!important}html.mewclaw-rail-open [class*="_sidebarCol"]{transform:none;visibility:visible}html.mewclaw-rail-open .mewclaw-rail-fab{display:none}[data-dsh-panel-host] [class*="_panel"]{-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}[class*="_handle"]{display:none}[class*="_centerCol"]{grid-column:1/-1}[class*="_titleRow"]{padding-left:48px!important}html.mewclaw-rail-open [class*="_centerCol"]::after{content:"";position:fixed;inset:0;z-index:110;background:rgb(0 0 0/.38)}}
 @media(max-width:768px){[class*="_titleRow"] [class*="_headerActions"],[class*="_titleRow"] [class*="_headerUtilities"]{display:none!important}}
+@media(max-width:767.98px){[data-sidebar-right-panel="fullscreen"]{position:fixed!important;inset:0!important;width:100%!important;max-width:none!important}}
 .mewclaw-rail-edge,.mewclaw-rail-fab{display:none}
 @media(max-width:1023px){.mewclaw-rail-edge{display:block;position:fixed;left:0;top:0;bottom:0;width:16px;z-index:109;touch-action:pan-y}.mewclaw-rail-fab{display:inline-flex;position:fixed;top:7px;left:9px;z-index:108;width:36px;height:36px;align-items:center;justify-content:center;border:0;border-radius:10px;background:transparent;color:inherit;cursor:pointer;padding:0}[class*="_toggleCluster"]{top:calc(11px + env(safe-area-inset-top))!important}}`;
+// 文件预览顶栏也是一条 flex 行：官方 pane/editor 容器没有完整的 min-width:0
+// 收缩链时，路径输入框的最小内容宽度会把固定操作按钮推出手机视口。按 CSS Module
+// 稳定后缀覆盖 better-sidebar 坞面板与官方右侧栏，输入框以 width:0 参与剩余宽度分配。
+const MOBILE_EDITOR_STYLE = `@media(max-width:1023px){:is([data-dsh-panel-host],[data-sidebar-right-panel]) :is([class*="_paneContent"],[class*="_paneTab"],[class*="_editor"]){min-width:0;max-width:100%}:is([data-dsh-panel-host],[data-sidebar-right-panel]) [class*="_editorHeader"]{min-width:0;width:100%;max-width:100%;box-sizing:border-box;gap:4px;padding-inline:4px;overflow:hidden}:is([data-dsh-panel-host],[data-sidebar-right-panel]) [class*="_editorPathInput"]{flex:1 1 0;min-width:0;width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}:is([data-dsh-panel-host],[data-sidebar-right-panel]) [class*="_editorModeButton"]{padding-inline:5px}:is([data-dsh-panel-host],[data-sidebar-right-panel]) [class*="_editorStatus"]{min-width:0;max-width:6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}`;
 // 液态玻璃把 --dsw-alias-bg-layer-1 降到 68–78% alpha，而 better-sidebar 坞面板
 // 是纯 div（非 dialog/menu 语义），吃不到 surfaces 的 backdrop-filter——可读性
 // 全押在上面那条移动模糊规则上；但部分移动端 WebView 声明支持 backdrop-filter
 // 却实际不渲染（软渲染/GPU 黑名单），且桌面端坞面板本无模糊补偿——文字互透是
-// 全视口缺陷。玻璃启用时把坞内面板/底坞/浮窗抬回不透明面 --mew-canvas
+// 全视口缺陷。玻璃启用时把坞内面板、官方右侧栏和浮窗抬回不透明面 --mew-canvas
 // （liquid-glass 在同一 data-mew-glass 属性上定义该 token，属性存在即 token
-// 存在），可读性不再依赖模糊是否真实渲染。锚定插件自有的 data-dsh-panel /
-// data-dsh-float-window 语义属性，不随 CSS Modules 哈希名漂移。
-const GLASS_PANEL_STYLE = `html[data-mew-glass] [data-dsh-panel-host] :is([data-dsh-panel],[data-dsh-float-window]){background-color:var(--mew-canvas)}`;
+// 存在），可读性不再依赖模糊是否真实渲染。锚定各宿主的 data 属性，不随 CSS
+// Modules 哈希名漂移：better-sidebar 用 data-dsh-panel，官方右侧栏用
+// data-sidebar-right-panel，浮层宿主用 data-sidebar-right-float-host。
+const GLASS_PANEL_STYLE = `html[data-mew-glass] :is([data-dsh-panel-host] :is([data-dsh-panel],[data-dsh-float-window]),[data-sidebar-right-panel],[data-sidebar-right-float-host] > :first-child){background-color:var(--mew-canvas)}`;
 // 窄屏侧栏开合控制：左上角固定菜单键 + 左缘 16px 起笔右滑展开完整会话抽屉，
 // 抽屉上左滑或点遮罩收起并隐藏整条侧栏列。手势用 TouchEvent 而非 PointerEvent——
 // 左缘右滑会被浏览器声明为系统手势导致 pointermove 断流，touchmove 不受影响；
@@ -95,13 +103,13 @@ const FAVICON_RESPONSE = FAVICON_SVG.replace("</style>", `.ink[fill="none"],.cut
 
 /** Host 品牌资源与 HTML 元数据均通过 WebServer 的公开路由/transform 扩展点提供。 */
 export function apply(ctx: Context, options?: MewClawBrandOptions): void {
-  const mobileStyle = options?.mobile === false ? "" : MOBILE_STYLE;
+  const mobileStyle = options?.mobile === false ? "" : `${MOBILE_STYLE}${MOBILE_EDITOR_STYLE}`;
   ctx.effect(() => ctx.webServer.tapIndex((html) => html
     .replace(/<html(?:\s+lang="[^"]*")?>/u, '<html lang="zh-CN">')
     .replace(/<title>[^<]*<\/title>/u, `<title>${PRODUCT_NAME}</title>`)
     .replace(/(<link\b[^>]*rel="icon"[^>]*href=")[^"]*(")/u, `$1${FAVICON_PATH}$2`)
     .replace(/(<link\b[^>]*rel="manifest"[^>]*href=")[^"]*(")/u, `$1${MANIFEST_PATH}$2`)
-    .replace("</head>", `${BOOT_HEAD_SCRIPT}<style data-mewclaw-brand>${BRAND_STYLE}${STROKE_ONLY_STYLE}${HERO_STYLE}${DEDUPE_STYLE}${GLASS_PANEL_STYLE}${mobileStyle}${BOOT_STYLE}</style></head>`)
+    .replace("</head>", `${BOOT_HEAD_SCRIPT}<style data-mewclaw-brand>${BRAND_STYLE}${STROKE_ONLY_STYLE}${HERO_STYLE}${RIGHT_PANEL_STYLE}${GLASS_PANEL_STYLE}${mobileStyle}${BOOT_STYLE}</style></head>`)
     .replace(/<body([^>]*)>/u, `<body$1>${BOOT_MARKUP}`)
     .replace("</body>", `${options?.mobile === false ? "" : MOBILE_RAIL_SCRIPT}${BOOT_END_SCRIPT}</body>`)));
   ctx.effect(() => ctx.webServer.register({ kind: "exact", path: FAVICON_PATH, handler: (_req, res) => respond(res, "image/svg+xml; charset=utf-8", FAVICON_RESPONSE) }));

@@ -89,23 +89,32 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
 - 移动端抽屉不透明：官方侧栏背景为半透明 `rgba(28 28 35 / .5)`，桌面内联
   无碍但作为覆盖层会透出下层内容；`≤1023px` 下 `sidebarCol` 背景改不透明
   （官方样式表同级规则在其后，须 `!important`）；
-- 液态玻璃下坞面板不透明（全视口）：liquid-glass 把 `--dsw-alias-bg-layer-1`
-  降为 68–78% alpha，better-sidebar 坞面板是纯 `div`（非 dialog/menu 语义），
-  吃不到 surfaces 的 backdrop-filter；移动端虽有品牌层补 `blur(20px)`，但部分
-  WebView 声明支持 backdrop-filter 却不真实渲染（软渲染/GPU 黑名单），桌面端
-  坞面板本无模糊补偿。`html[data-mew-glass]` 下 `[data-dsh-panel]` /
-  `[data-dsh-float-window]` 抬回不透明 `var(--mew-canvas)`，可读性不依赖模糊
-  是否真实渲染；
-- 右坞开关去重（全视口）：官方右坞把唯一展开入口注入会话头部角落
-  （`data-sidebar-right-expand`），与第三方坞簇开关职责重复；隐藏前者，
-  坞簇开关为默认右侧栏按钮。锚定 data 属性而非 `aria-label`——后者文案
-  随界面语言变化（zh 下为 "打开右侧边栏"，英文选择器恒不匹配）；
+- 液态玻璃下坞面板与官方右侧栏不透明（全视口）：liquid-glass 把
+  `--dsw-alias-bg-layer-1`/`--dsw-alias-bg-base` 降为透明色，better-sidebar
+  坞面板是纯 `div`（非 dialog/menu 语义），官方右侧栏则使用
+  `[data-sidebar-right-panel]`，两者都不应把可读性押在 backdrop-filter 上；移动端
+  虽有品牌层补 `blur(20px)`，但部分 WebView 声明支持却不真实渲染（软渲染/GPU
+  黑名单），桌面端也没有可靠的模糊补偿。`html[data-mew-glass]` 下将
+  `[data-dsh-panel]`/`[data-dsh-float-window]`、`[data-sidebar-right-panel]` 与
+  右侧浮层首层抬回不透明 `var(--mew-canvas)`，可读性不依赖模糊是否真实渲染；
+- 右坞折叠入口与顶部几何：官方右坞把唯一展开入口注入会话头部角落
+  （`data-sidebar-right-expand`），且只在折叠态渲染；品牌层不得全局隐藏该入口，
+  否则右坞收起后无法恢复。官方 push 面板以 `top:0; bottom:0`
+  填满右侧轨道，DockSurface 的 tab strip 就是面板顶部；品牌层只显式归零这两个边，
+  不得为对齐内容下移整个面板，避免顶部灰条、高度缩短和 chrome/icon 错位。
+  移动视口 `<768px` 时官方自动选择 fullscreen；品牌移动适配层显式保持
+  `position:fixed; inset:0; width:100%` 以防其他主题规则污染全视口几何。
 - 移动端顶栏收纳：会话头部顶栏控件按桌面密度排列，390px 下溢出重叠。
   `≤768px` 按容器隐藏桌面专属控件槽位（与语言无关）：`_titleRow` 内
   `_headerActions`（模式徽标 + "☁云端" 位置选择器、jobs/schedule/终端等，
   移动 Web 只有云端）与 `_headerUtilities`（外部编辑器入口）。
   坞簇内底部面板开关由 better-sidebar 按窄屏自行省略。保留面包屑、
   More actions 与坞簇开关；
+- 移动端文件预览工具栏收缩：文件编辑器的路径输入框与预览/编辑、保存、刷新、
+  文件树按钮同属一条 flex 行。`≤1023px` 为面板、pane、editor 和工具栏补齐
+  `min-width:0`/`max-width:100%` 收缩链，并让路径输入框以 `width:0` 参与剩余空间分配，
+  同时截断过长路径文本；规则同时覆盖 better-sidebar 坞面板与官方右侧栏，桌面端不变，
+  目标是手机视口 `scrollWidth ≤ clientWidth` 且所有操作按钮仍可点击；
 - 所有注册经 `ctx.effect()`/`ctx.slots.inject`，卸载即回收。
 
 ## 7 安全与信任
@@ -125,6 +134,9 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   不透明覆盖层抽屉、抽屉左滑/遮罩外点可收起、主列不被挤压、无横向溢出
   （`scrollWidth ≤ 视口宽`）；会话视图顶栏为左上角菜单键 + 面包屑 +
   More actions + 坞簇 Expand sidebar，无重叠；
+- 右坞布局：桌面 push 面板 `top === 0` 且 `bottom === 视口底部`，无顶部灰色空带；
+  390px 真实路径必须渲染 `data-sidebar-right-panel="fullscreen"`，面板四边为 0、高度等于
+  视口高度，`data-sidebar-right-mode` 与 `data-sidebar-right-toggle` 保持在顶部 tab strip 内且不溢出；
 - 门禁：`pnpm verify:dsh-brand`（官方完整性 + 品牌 slot 白名单）。
 
 ## 9 迁移映射
