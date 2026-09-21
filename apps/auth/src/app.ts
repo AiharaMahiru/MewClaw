@@ -43,7 +43,8 @@ export async function apply(ctx: Context): Promise<void> {
     dependencies: {
       createAuditModel: () => createPromptAuditModel({
         launchEnvironment: launchEnvironmentOf(ctx),
-        ...(config.promptAudit?.fallbackModel ? { fallbackModel: config.promptAudit.fallbackModel } : {}),
+        ...(config.promptAudit?.fallbackModels?.length ? { fallbackModels: config.promptAudit.fallbackModels } : {}),
+        ...(config.promptAudit?.stickyMs !== undefined ? { stickyMs: config.promptAudit.stickyMs } : {}),
       }),
       createSharedModels: () => createSharedModelRuntime({ launchEnvironment: launchEnvironmentOf(ctx) }),
     },

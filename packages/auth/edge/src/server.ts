@@ -256,7 +256,7 @@ export class AuthEdgeServer {
       if (input.kind !== "skip") {
         if (input.kind === "unsupported") console.warn(`[prompt-audit] 不支持的审计输入: ${decision.method}`);
         const result = input.kind === "text" && this.#promptAuditor
-          ? await this.#promptAuditor.audit(input.text).catch(() => "unavailable" as const)
+          ? await this.#promptAuditor.audit(input.text, input.sessionId).catch(() => "unavailable" as const)
           : "unavailable";
         if (result !== "allow") {
           // 这是已认证 RPC 的业务拒绝，不是 HTTP transport 故障。返回官方

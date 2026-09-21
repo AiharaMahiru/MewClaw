@@ -29,6 +29,13 @@ describe("网络安全审计契约", () => {
     expect(PROMPT_AUDIT_SYSTEM).toMatchSnapshot();
   });
 
+  it("会话粘性键透传进模型调用", async () => {
+    const generate = vi.fn(async (_input: { sessionId?: string }) => '{"decision":"allow"}');
+    const auditor = createPromptAuditor({ generate }, { timeoutMs: 100, maxConcurrent: 2 });
+    expect(await auditor.audit("文本", "session-1")).toBe("allow");
+    expect(generate.mock.calls[0]?.[0]).toMatchObject({ sessionId: "session-1" });
+  });
+
   it("截止时间后中止、释放名额，并且并发满时不创建模型请求", async () => {
     let signal: AbortSignal | undefined;
     const generate = vi.fn((input: { signal: AbortSignal }) => { signal = input.signal; return new Promise<string>(() => {}); });
@@ -124,6 +131,12 @@ describe("发送载荷提取", () => {
     expect(extract("session.updateQueue", { request: { action: { kind: "edit", content: [ref, { type: "text", text: "改成读这个" }] } } })).toEqual({ kind: "text", text: "改成读这个" });
     expect(extract("session.prompt", { request: { content: [{ type: "file" }] } })).toEqual({ kind: "unsupported" });
     expect(extract("session.prompt", { request: { content: [{ type: "image", attachment: { attachmentId: "a1", name: "图.png", bytes: 3 } }] } })).toEqual({ kind: "skip" });
+  });
+
+  it("审计输入携带会话粘性键：args 顶层与 request 嵌套两种形态", () => {
+    expect(extract("session.prompt", { sessionId: "session-1", request: { text: "你好" } })).toEqual({ kind: "text", text: "你好", sessionId: "session-1" });
+    expect(extract("session.prompt", { request: { sessionId: "session-2", text: "你好" } })).toEqual({ kind: "text", text: "你好", sessionId: "session-2" });
+    expect(extract("session.prompt", { request: { text: "你好" } })).toEqual({ kind: "text", text: "你好" });
   });
 
   it("不会审计只读请求", () => {

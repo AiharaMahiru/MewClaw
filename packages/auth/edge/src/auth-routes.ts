@@ -65,7 +65,7 @@ export class AuthRouteHandlers {
       if (!this.deps.generalLimiter.allow(`desktop-inference:${current.user.id}`)) throw httpError(429, "RATE_LIMITED");
       return desktopInference(req, res, { userId: current.user.id, service, shared: this.deps.sharedModels,
         maxBytes: config.desktopBodyLimit ?? 8 * 1024 * 1024, timeoutMs: config.desktopInferenceTimeoutMs ?? 120000,
-        audit: text => config.promptAudit?.enabled === false ? Promise.resolve('allow') : this.deps.promptAuditor?.audit(text) ?? Promise.resolve('unavailable'),
+        audit: text => config.promptAudit?.enabled === false ? Promise.resolve('allow') : this.deps.promptAuditor?.audit(text, `desktop:${current.user.id}`) ?? Promise.resolve('unavailable'),
         assertPublicUrl: assertPublicUserModelUrl, dispatcher: publicModelDispatcher() });
     }
     if (req.method === "GET" && url.pathname === "/auth/account") return this.redirectLegacyAccount(req, res);

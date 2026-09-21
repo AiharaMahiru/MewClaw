@@ -14,17 +14,24 @@ describe("resolveAuthConfig", () => {
     expect(resolveAuthConfig({ ...base, LARK_APP_ID: "cli_1234567890abcdef", LARK_APP_SECRET: "fake-old-secret" })).toEqual(resolveAuthConfig(base));
   });
   it("默认开启审计并严格校验开关和资源限制", () => {
-    expect(resolveAuthConfig(base).promptAudit).toEqual({ enabled: true, timeoutMs: 10_000, maxConcurrent: 4 });
+    expect(resolveAuthConfig(base).promptAudit).toEqual({ enabled: true, timeoutMs: 10_000, maxConcurrent: 4, stickyMs: 30 * 60_000 });
     expect(() => resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_TIMEOUT_MS: "60000" })).toThrow();
     expect(resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_ENABLED: "false" }).promptAudit?.enabled).toBe(false);
     expect(() => resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_ENABLED: "FALSE" })).toThrow("AUTH_PROMPT_AUDIT_ENABLED");
     expect(() => resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_TIMEOUT_MS: "0" })).toThrow();
     expect(() => resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_MAX_CONCURRENT: "100" })).toThrow();
   });
-  it("备用审计模型可选配置，空值不落配置", () => {
-    expect(resolveAuthConfig(base).promptAudit?.fallbackModel).toBeUndefined();
-    expect(resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_FALLBACK_MODEL: " glm-5.3-flash " }).promptAudit?.fallbackModel).toBe("glm-5.3-flash");
-    expect(resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_FALLBACK_MODEL: "  " }).promptAudit?.fallbackModel).toBeUndefined();
+  it("备用审计模型链可选配置，空值不落配置", () => {
+    expect(resolveAuthConfig(base).promptAudit?.fallbackModels).toBeUndefined();
+    expect(resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_FALLBACK_MODEL: " glm-5.3-flash " }).promptAudit?.fallbackModels).toEqual(["glm-5.3-flash"]);
+    expect(resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_FALLBACK_MODEL: "  " }).promptAudit?.fallbackModels).toBeUndefined();
+    expect(resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_FALLBACK_MODELS: " muse-spark-1.3 , glm-5.3-flash ," }).promptAudit?.fallbackModels).toEqual(["muse-spark-1.3", "glm-5.3-flash"]);
+    expect(resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_FALLBACK_MODELS: "muse-spark-1.3", AUTH_PROMPT_AUDIT_FALLBACK_MODEL: "glm-5.3-flash" }).promptAudit?.fallbackModels).toEqual(["muse-spark-1.3"]);
+  });
+  it("审计会话粘性窗口可配置，0 表示关闭", () => {
+    expect(resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_STICKY_MS: "60000" }).promptAudit?.stickyMs).toBe(60_000);
+    expect(resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_STICKY_MS: "0" }).promptAudit?.stickyMs).toBe(0);
+    expect(() => resolveAuthConfig({ ...base, AUTH_PROMPT_AUDIT_STICKY_MS: "-1" })).toThrow();
   });
   it("normalizes browser origins and derives loopback upstreams", () => {
     const config = resolveAuthConfig({ ...base, DSH_WEB_INTERNAL_PORT: "3081", AUTH_ADMIN_URL: "http://127.0.0.1:8791/" });

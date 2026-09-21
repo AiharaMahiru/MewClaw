@@ -27,7 +27,7 @@ export interface AuthEdgeConfig {
   /** 桌面推理 SSE 调用上限；默认 120 秒，界于 1 秒与 10 分钟。 */
   desktopInferenceTimeoutMs?: number;
   /** 默认开启；显式关闭仅用于不提供模型的隔离环境。 */
-  promptAudit?: { enabled: boolean; timeoutMs: number; maxConcurrent: number; fallbackModel?: string };
+  promptAudit?: { enabled: boolean; timeoutMs: number; maxConcurrent: number; fallbackModels?: string[]; stickyMs?: number };
   mail: MailConfig;
   feishu?: FeishuConfig;
 }
@@ -95,6 +95,7 @@ export function resolveAuthConfig(environment: Record<string, string | undefined
   const publicOrigin = normalizeOrigin(environment.AUTH_PUBLIC_ORIGIN || origins[0] || `http://127.0.0.1:${port}`, "AUTH_PUBLIC_ORIGIN");
   if (!origins.includes(publicOrigin)) throw new Error("AUTH_PUBLIC_ORIGIN 必须包含在 AUTH_TRUSTED_ORIGINS 中");
   if (new URL(publicOrigin).protocol === "https:" && !secure) throw new Error("HTTPS 公共 Origin 必须启用 AUTH_COOKIE_SECURE=true");
+  const fallbackModels = auditFallbackModels(environment);
   const result: AuthEdgeConfig = {
     host: environment.AUTH_HOST === "0.0.0.0" ? "0.0.0.0" : "127.0.0.1",
     port,
@@ -115,7 +116,8 @@ export function resolveAuthConfig(environment: Record<string, string | undefined
       enabled: auditEnabled(environment.AUTH_PROMPT_AUDIT_ENABLED),
       timeoutMs: boundedInteger(environment.AUTH_PROMPT_AUDIT_TIMEOUT_MS, 10_000, 100, 10_000),
       maxConcurrent: boundedInteger(environment.AUTH_PROMPT_AUDIT_MAX_CONCURRENT, 4, 1, 32),
-      ...(environment.AUTH_PROMPT_AUDIT_FALLBACK_MODEL?.trim() ? { fallbackModel: environment.AUTH_PROMPT_AUDIT_FALLBACK_MODEL.trim() } : {}),
+      ...(fallbackModels ? { fallbackModels } : {}),
+      stickyMs: boundedInteger(environment.AUTH_PROMPT_AUDIT_STICKY_MS, 30 * 60_000, 0, 24 * 60 * 60_000),
     },
     userModelEncryptionKey: required(environment.AUTH_USER_MODEL_ENCRYPTION_KEY, "AUTH_USER_MODEL_ENCRYPTION_KEY"),
     mail,
@@ -134,6 +136,12 @@ function auditEnabled(value: string | undefined): boolean {
   return value !== "false";
 }
 function split(value: string): string[] { return value.split(",").map((item) => item.trim()).filter(Boolean); }
+/** 逗号分隔的备用审计模型链；旧的单值 AUTH_PROMPT_AUDIT_FALLBACK_MODEL 仍兼容。 */
+function auditFallbackModels(environment: NodeJS.ProcessEnv): string[] | undefined {
+  const raw = environment.AUTH_PROMPT_AUDIT_FALLBACK_MODELS ?? environment.AUTH_PROMPT_AUDIT_FALLBACK_MODEL;
+  const list = raw ? split(raw) : [];
+  return list.length ? list : undefined;
+}
 function positivePort(value: string | undefined, fallback: number): number { const result = Number(value || fallback); if (!Number.isSafeInteger(result) || result < 1 || result > 65535) throw new Error("端口配置无效"); return result; }
 function boundedInteger(value: string | undefined, fallback: number, min: number, max: number): number { if (!value) return fallback; const result = Number(value); if (!Number.isSafeInteger(result) || result < min || result > max) throw new Error("认证请求体上限无效"); return result; }
 function internalUrl(value: string, name: string): string {

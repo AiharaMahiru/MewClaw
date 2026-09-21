@@ -8,7 +8,7 @@ import { createLaunchEnvironmentSnapshot } from "@deepseek-ai/dsh-launch-environ
 import type { GenerateOptions, StreamChunk } from "@deepseek-ai/dsh-llm";
 import { createPromptAuditModel, createPromptAuditModelClient } from "./prompt-audit-model.js";
 
-function fixture(chunks: StreamChunk[], options: { fallbackModel?: string } = {}) {
+function fixture(chunks: StreamChunk[], options: { fallbackModels?: string[]; stickyMs?: number } = {}) {
   const requests: GenerateOptions[] = [];
   const close = vi.fn(async () => {});
   const model = createPromptAuditModelClient(async function* (request) {
@@ -138,11 +138,121 @@ describe("审计模型协议", () => {
       }
       yield { type: "text-delta", index: 0, text: '{"decision":"allow"}' };
       yield { type: "finish", reason: { kind: "stop" } };
-    }, async () => {}, 512, { fallbackModel: "glm-5.3-flash" });
+    }, async () => {}, 512, { fallbackModels: ["glm-5.3-flash"] });
     await expect(model.generate(input())).resolves.toBe('{"decision":"allow"}');
     expect(requests.map((r) => r.model)).toEqual(["deepseek-v4.1-flash", "glm-5.3-flash"]);
-    expect(warn).toHaveBeenCalledWith("[prompt-audit] 主审计模型失败，切换备用模型 glm-5.3-flash: prompt audit: finish error SERVER");
+    expect(warn).toHaveBeenCalledWith("[prompt-audit] 审计模型 deepseek-v4.1-flash 失败，切换 glm-5.3-flash: prompt audit: finish error SERVER");
     warn.mockRestore();
+  });
+
+  it("备用链按序尝试直到成功", async () => {
+    const requests: GenerateOptions[] = [];
+    const model = createPromptAuditModelClient(async function* (request) {
+      requests.push(request);
+      if (request.model === "glm-5.3-flash") {
+        yield { type: "text-delta", index: 0, text: '{"decision":"allow"}' };
+        yield { type: "finish", reason: { kind: "stop" } };
+        return;
+      }
+      yield { type: "finish", reason: { kind: "error", failure: { code: "SERVER", message: "x" } } };
+    }, async () => {}, 512, { fallbackModels: ["muse-spark-1.3", "glm-5.3-flash"] });
+    await expect(model.generate(input())).resolves.toBe('{"decision":"allow"}');
+    expect(requests.map((r) => r.model)).toEqual(["deepseek-v4.1-flash", "muse-spark-1.3", "glm-5.3-flash"]);
+  });
+
+  it("会话粘性：成功模型在同一会话内优先，其他会话不受影响", async () => {
+    const requests: GenerateOptions[] = [];
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const model = createPromptAuditModelClient(async function* (request) {
+      requests.push(request);
+      if (request.model === "deepseek-v4.1-flash") {
+        yield { type: "finish", reason: { kind: "error", failure: { code: "SERVER", message: "x" } } };
+        return;
+      }
+      yield { type: "text-delta", index: 0, text: '{"decision":"allow"}' };
+      yield { type: "finish", reason: { kind: "stop" } };
+    }, async () => {}, 512, { fallbackModels: ["muse-spark-1.3", "glm-5.3-flash"], stickyMs: 60_000 });
+    const s1 = { ...input(), sessionId: "session-a" };
+    await expect(model.generate(s1)).resolves.toBe('{"decision":"allow"}');
+    await expect(model.generate(s1)).resolves.toBe('{"decision":"allow"}');
+    await expect(model.generate({ ...input(), sessionId: "session-b" })).resolves.toBe('{"decision":"allow"}');
+    expect(requests.map((r) => r.model)).toEqual([
+      "deepseek-v4.1-flash", "muse-spark-1.3",
+      "muse-spark-1.3",
+      "deepseek-v4.1-flash", "muse-spark-1.3",
+    ]);
+    vi.restoreAllMocks();
+  });
+
+  it("粘性模型失败即从粘性表剔除并重定指到链上成功者", async () => {
+    const requests: GenerateOptions[] = [];
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let failMuse = false;
+    const model = createPromptAuditModelClient(async function* (request) {
+      requests.push(request);
+      const dead = request.model === "deepseek-v4.1-flash" || (request.model === "muse-spark-1.3" && failMuse);
+      if (dead) {
+        yield { type: "finish", reason: { kind: "error", failure: { code: "SERVER", message: "x" } } };
+        return;
+      }
+      yield { type: "text-delta", index: 0, text: '{"decision":"allow"}' };
+      yield { type: "finish", reason: { kind: "stop" } };
+    }, async () => {}, 512, { fallbackModels: ["muse-spark-1.3", "glm-5.3-flash"], stickyMs: 60_000 });
+    const s1 = { ...input(), sessionId: "session-a" };
+    await expect(model.generate(s1)).resolves.toBe('{"decision":"allow"}');
+    failMuse = true;
+    await expect(model.generate(s1)).resolves.toBe('{"decision":"allow"}');
+    await expect(model.generate(s1)).resolves.toBe('{"decision":"allow"}');
+    expect(requests.map((r) => r.model)).toEqual([
+      "deepseek-v4.1-flash", "muse-spark-1.3",
+      "muse-spark-1.3", "deepseek-v4.1-flash", "glm-5.3-flash",
+      "glm-5.3-flash",
+    ]);
+    vi.restoreAllMocks();
+  });
+
+  it("粘性 TTL 到期回链首", async () => {
+    const requests: GenerateOptions[] = [];
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let failPrimary = true;
+    const model = createPromptAuditModelClient(async function* (request) {
+      requests.push(request);
+      if (request.model === "deepseek-v4.1-flash" && failPrimary) {
+        yield { type: "finish", reason: { kind: "error", failure: { code: "SERVER", message: "x" } } };
+        return;
+      }
+      yield { type: "text-delta", index: 0, text: '{"decision":"allow"}' };
+      yield { type: "finish", reason: { kind: "stop" } };
+    }, async () => {}, 512, { fallbackModels: ["muse-spark-1.3"], stickyMs: 20 });
+    const s1 = { ...input(), sessionId: "session-a" };
+    await expect(model.generate(s1)).resolves.toBe('{"decision":"allow"}');
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    failPrimary = false;
+    await expect(model.generate(s1)).resolves.toBe('{"decision":"allow"}');
+    expect(requests.map((r) => r.model)).toEqual(["deepseek-v4.1-flash", "muse-spark-1.3", "deepseek-v4.1-flash"]);
+    vi.restoreAllMocks();
+  });
+
+  it("stickyMs=0 关闭会话粘性", async () => {
+    const requests: GenerateOptions[] = [];
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const model = createPromptAuditModelClient(async function* (request) {
+      requests.push(request);
+      if (request.model === "deepseek-v4.1-flash") {
+        yield { type: "finish", reason: { kind: "error", failure: { code: "SERVER", message: "x" } } };
+        return;
+      }
+      yield { type: "text-delta", index: 0, text: '{"decision":"allow"}' };
+      yield { type: "finish", reason: { kind: "stop" } };
+    }, async () => {}, 512, { fallbackModels: ["muse-spark-1.3"], stickyMs: 0 });
+    const s1 = { ...input(), sessionId: "session-a" };
+    await expect(model.generate(s1)).resolves.toBe('{"decision":"allow"}');
+    await expect(model.generate(s1)).resolves.toBe('{"decision":"allow"}');
+    expect(requests.map((r) => r.model)).toEqual([
+      "deepseek-v4.1-flash", "muse-spark-1.3",
+      "deepseek-v4.1-flash", "muse-spark-1.3",
+    ]);
+    vi.restoreAllMocks();
   });
 
   it.each(["AUTH", "MODEL_DISABLED", "QUOTA_EXCEEDED"])("确定性 code %s 同属模型维度故障仍切换备用", async (code) => {
@@ -155,7 +265,7 @@ describe("审计模型协议", () => {
         return;
       }
       yield { type: "finish", reason: { kind: "error", failure: { code, message: "x" } } };
-    }, async () => {}, 512, { fallbackModel: "glm-5.3-flash" });
+    }, async () => {}, 512, { fallbackModels: ["glm-5.3-flash"] });
     await expect(model.generate(input())).resolves.toBe('{"decision":"block"}');
     expect(requests.map((r) => r.model)).toEqual(["deepseek-v4.1-flash", "glm-5.3-flash"]);
   });
@@ -163,7 +273,7 @@ describe("审计模型协议", () => {
   it("备用模型也失败时错误照常抛出", async () => {
     const model = createPromptAuditModelClient(async function* () {
       yield { type: "finish", reason: { kind: "error", failure: { code: "SERVER", message: "x" } } };
-    }, async () => {}, 512, { fallbackModel: "glm-5.3-flash" });
+    }, async () => {}, 512, { fallbackModels: ["glm-5.3-flash"] });
     await expect(model.generate(input())).rejects.toThrow("prompt audit: finish error SERVER");
   });
 
@@ -174,7 +284,7 @@ describe("审计模型协议", () => {
       requests.push(request);
       controller.abort();
       yield { type: "finish", reason: { kind: "error", failure: { code: "SERVER", message: "x" } } };
-    }, async () => {}, 512, { fallbackModel: "glm-5.3-flash" });
+    }, async () => {}, 512, { fallbackModels: ["glm-5.3-flash"] });
     await expect(model.generate({ ...input(), signal: controller.signal })).rejects.toThrow();
     expect(requests).toHaveLength(1);
   });
