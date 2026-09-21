@@ -1,5 +1,5 @@
 diff --git a/lib/client-registry.js b/lib/client-registry.js
-index 09bb7dcd5f5c9e81ba054c4d1f0db0248e3d4333..2d576de0b3e302a633c94c7f2fa87532db57ce5a 100644
+index 09bb7dcd5f5c9e81ba054c4d1f0db0248e3d4333..a53aa95e7819fdd5301106719950359cbcde7076 100644
 --- a/lib/client-registry.js
 +++ b/lib/client-registry.js
 @@ -3477,7 +3477,7 @@ window.__ModuleLoader__.load({
@@ -44,6 +44,15 @@ index 09bb7dcd5f5c9e81ba054c4d1f0db0248e3d4333..2d576de0b3e302a633c94c7f2fa87532
  		}
  		//#endregion
  		//#region node_modules/.pnpm/clsx@2.1.1/node_modules/clsx/dist/clsx.mjs
+@@ -13218,7 +13221,7 @@ Mode: this is a continuable side conversation. Your answers stay in this side th
+ 								onClick: () => void handleSend(),
+ 								disabled: composer.trim() === "" || busy !== null,
+ 								title: t("sideChatSend"),
+-								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSendOutline16, {})
++								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSendOutline14, {})
+ 							}, "send")]
+ 						})]
+ 					})
 @@ -15170,7 +15173,9 @@ Mode: this is a continuable side conversation. Your answers stay in this side th
  		//#region src/client/titlebar-strip.ts
  		function computeTitleBarStrip(env, wco, scheme, preset, customStripPx) {
