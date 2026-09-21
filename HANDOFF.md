@@ -24,9 +24,9 @@ D:\AI\dsh\MewClaw-desktop-candidate\release\MewClaw-1.0.0-win-x64
 
 | 产物 | 字节 | SHA-256 |
 | --- | ---: | --- |
-| `MewClaw-1.0.0-win-x64-Portable.exe` | 155448015 | `c14f81a7901c3e64e7481277e029b6ceeb75d6fc2c28c707e026dd41e332152d` |
-| `MewClaw-1.0.0-win-x64-Setup.exe` | 155691970 | `63bbe55d10fc08c413463c248b701f51ce3663c543ea2fcfdb2655789caf0e40` |
-| `MewClaw-1.0.0-win-x64.zip` | 197339299 | `195a4b62c290a2970844be708e2ead8025fc520df8de32b03cb25a3543097a62` |
+| `MewClaw-1.0.0-win-x64-Portable.exe` | 155490051 | `0420c7d089093cafe652ed89adcb2e3b8311cd6b39db237587b5e743ee6680ca` |
+| `MewClaw-1.0.0-win-x64-Setup.exe` | 155734008 | `15bf9c9dc1d820274653300508fcc9d3794317715da2a2874c2ae09833a04c9c` |
+| `MewClaw-1.0.0-win-x64.zip` | 197388544 | `aadf3ea65b071cd65b3566fa39b7eea5641758e9729ed4f3e7dd5f9b772bef49` |
 
 产物未签名。`win-unpacked` 与上述安装包位于同一 Release 目录，必须一起保留用于目录模式验收。**自本轮起发行形态为 `asar:false`**（应用根是 `resources/app/` 目录而非 `app.asar` 归档），与上游 2.0.10 发行形态一致——体积变大属预期。
 
@@ -325,3 +325,19 @@ pnpm service:status
 **2026-09-21 续十三——EdgeOne CDN 接入与真实 IP 链适配**：chat.rwr.ink 已 CNAME 至 EO（`chat.rwr.ink.eo.dnse1.com`），链路变为 客户端→EO 边缘→本机 nginx→auth edge。EO 回源默认携带 `EO-Connecting-IP`（与边缘建连的客户端地址，边缘剥离访客伪造的 EO-* 头）——探针实证该头真实送达。因官方 `api.edgeone.ai/ips` 段表接口已下线、回源 IP 段需控制台「源站防护」页取，源站采用**秘密回源头方案**：`zz-eo-edge.conf`（http 级 map，`/www/server/panel/vhost/nginx/`）定义 `map $http_x_mew_edge_auth $mew_client_ip`——仅携带 EO 控制台配置的 `X-Mew-Edge-Auth` 秘密头时采信 `EO-Connecting-IP`，否则用 TCP 对端地址（直连伪造 EO 头无效、直连本身仍记真实 IP）；chat.rwr.ink.conf 三处 location 的 `X-Real-IP` 改投 `$mew_client_ip`，auth 端 `clientIp`（loopback 对端采信 X-Real-IP）零改动兼容。三场景实测：直连伪造 EO 头被拒（=remote_addr）、秘密头+EO 头→采信、经 EO 无秘密头→回退节点 IP 无回归。待办：EO 控制台加自定义回源头 `X-Mew-Edge-Auth` 后即恢复按真实客户端分桶限流；若之后拿到官方回源段表可切 `set_real_ip_from`+`real_ip_header EO-Connecting-IP`（访问日志也能还原真实 IP）。注意 EO 边缘证书需确认已对本域名下发（实测个别节点回兜底证书 `*.cdn.myqcloud.com`）。
 
 **2026-09-21 续十四——better-sidebar 0.19.1 对 primitives 0.1.6 的 IconSendOutline16 兼容补丁已上线（R80）**：浏览器控制台 React #130（SideChatView 渲染 undefined 组件）实证根因：`dsh-better-sidebar@0.19.1` 按 `^0.1.5-rc.1` 构建引用了 `IconSendOutline16`，而部署的 `@deepseek-ai/dsh-client-ui-primitives@0.1.6-alpha.2` 已将其改名 `IconSendOutline14`（上游会话区发送键同源实证）——SideChatView 发送按钮子树整段渲染崩。修复：`pnpm patch` 流程对 0.19.1 patch 追加 hunk，`SideChatView.tsx` import/JSX 与 `lib/client.js` 产物三处 `IconSendOutline16→IconSendOutline14`（14px 即上游新规格，28px 圆形按钮内居中无视觉差）；patch-commit 顺带把此前 node_modules 手改全部收编进正式 patch 文件（`dsh-better-sidebar@0.18.0` 传递副本未被运行时加载——web-all profile 排除，未改）。注意 `lib/client-registry.js` 内含第二份 SideChatView 拷贝，首轮只改 client.js 会留一个未修复引用，须三产物同改（`351ee30`）。验证：dsh-web-composition 27/27、部署树双 bundle `IconSendOutline16` 计数归零；打包 `R80-iconsend-compat-20260921`（SHA-256 `ec3485b6ac2bb891f8399e4cad822269a53a74570a32e60628761bf238008392`）→ 原子翻转 → 6 服务 active、站点 200、公网 /internal 404。其余控制台项分诊为噪声/设计内：`generation is still not ready after 3000ms` 是 dsh-client-connection 握手超 3s 的预警（硬超时才取消，重连期瞬态）；`/plugins/events` upstream timeout 是 client-hmr 开发期 SSE 通道在生产的重连噪声（8/24 起 1369 次，先于 EO）；`/open-in-app/icon/cursor` 404 是 open-in-app 按 app id 取桌面图标、web 部署无图标时回退通用字形（客户端对 404 有去重设计）；KaTeX `strict mode warn` 是模型输出把中文包进 `$...$` 的排版告警；`.js.map` 404 是生产未随包发 sourcemap。
+
+### 5. 本地模式与云端体验对齐——preset 集 + 思考强度滑条 + 切换控件样式（2026-09-21）
+
+用户反馈本地模式三处与云端不一致：① 模式（preset）菜单只有官方 4 项，云端 7 项；② 无思考强度滑条（官方 picker 只给「强度 ›」菜单行，非 Web 版滑条形态）；③ 侧栏「云端|本地」切换是裸 button，不符合 DSH 视觉语言。
+
+**preset 对齐**：本地 roster 差异不是 UI 问题而是发现根不同——云端 bundle 注册三个 preset 根（lightweight → 全量 agent-presets → 官方 shipped），本地只发现官方根。实现：`apps/desktop/plugins/cloud/src/local-presets.ts` 的 `materializeLocalPresets(home)` 在插件启动时把 vendored preset 树物化到 `$DSH_HOME/mewclaw-presets/`（`agent-presets-lightweight/lark-lightweight`、`agent-presets/{cordis,lark-standard,liangshen}`、`agent-presets-oci/`、`tool-schema.mjs`），相对 `@deepseek-ai/dsh-agent-presets` 的 include 重写为宿主安装目录绝对路径，SHA-256 stamp 幂等；官方 shipped `cordis` 拷入全量根以保持云端同序（`cordis < lark-standard < liangshen` 字典序）。`dsh-plugin-desktop/src/profile.ts` 的 roots 生成加入两条物化根（在 shipped 根之前，`trust:'system'`，`includeUserRoot:false` 保留）——注意必须在 profile.ts 而非 `cordis.patch.yml`：`prepareDesktopProfile` 组合期重写 `agent-presets.roots` 会盖掉 patch 配置。`cloud-layout-bridge.patch` 已含对应 hunk（LF 行尾 + hunk 头已修正，新增 hunk 在上游 `5510cb1` 上独立 `--check` 通过；文件内既有 layout hunk 与上游漂移是既有状态）。
+
+**liangshen 本地降级**：vendored `liangshen` 的 `workflow-ptc`/`tool-workflow`/`tool-ralph` 三行一并 `disabled:true`——三者都注入 `workflowEngine`（由 workflow-ptc 提供），桌面 0.1.5-rc.2 线无该包（npm 上仅 0.1.6-alpha 线），禁单个会 mount/inject 失败。本地全能优化模式因此不含 run_code/workflow/ralph，属有意降级。
+
+**思考强度滑条**：新增 `effort-client.ts`（客户端模块，`/_dsh/desktop/effort-client.js` 路由下发），local 模式经 `session-boot.ts` 注入 BootGraph。**槽位是 `conversation.input.dock`（list/session scope）**——不是 `composer.dock`：后者仅在 `variant==='composer' && input!==void 0` 时挂载，冒烟实证 DOM 中不存在。组件复用 `ctx.modelDirectories.directoryFor(sessionId)` 共享目录（与 /model 弹层同一份状态），仅当前模型带 `reasoning` 元数据时渲染；交互复刻 mwseat：轨道拖动预览/松开提交、方向键逐档、Home/End 跳端点、pending 拇指待 store 确认、失败回退；无 `defaultEffort` 时首档「默认」= 清除显式 effort。**inject 必须含 `sessions`+`remote.session`**——`directoryFor` 内部经本模块 ambient scope 读 `ctx.remote.session`，缺声明抛 `cannot get property "remote.session" without inject`（首版冒烟实测命中）。
+
+**切换控件 DSH 化**：`location-client.ts` 的 footer 分段控件改走 dsw 令牌（`--dsw-alias-*`），胶囊容器 + 选中态高亮，截图核验与侧栏风格一致。
+
+**验证**：`effort-client.test.ts` 4 例（渲染/键盘写回/无 reasoning 不渲染/无 default 首档默认）+ `local-presets.test.ts` 2 例（物化布局/幂等/discoverPresets 7 项全健康）→ `WORKSPACE_OFFLINE_VERIFIED`（24 文件/85 测试）→ dev 冒烟 `DIRECTORY_COMPOSER_EDITABLE` + `EFFORT_SLIDER_OK 高` + `PRESET_ROSTER_OK 7` + `RENDERER_ERRORS 0` → `npm run build` 全绿 → 三产物重打 + `MEWCLAW_PACKAGE_OK`（包内确认 effort-client.js/presets/profile roots 均在）。
+
+**已知边界**：本地 preset 物化依赖 `dsh-lark-desktop-cloud` 启动——首次本地启动前 profile 里两根物化根目录不存在无碍（preset discovery 容忍缺失根）；升级旧安装时物化目录随首次启动自动补齐。

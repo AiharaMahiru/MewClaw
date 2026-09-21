@@ -19,6 +19,7 @@ import { installLocalBrand } from './local-brand.js';
 import { installLocalGlass } from './local-glass.js';
 import { sessionLocationHtml } from './session-boot.js';
 import { LocalHarnessWorkspaces } from './local-workspaces.js';
+import { materializeLocalPresets } from './local-presets.js';
 import type {} from '@deepseek-ai/dsh-agent-default-model';
 import { CloudAccountModel, CLOUD_MODEL_PROVIDER, hasSession } from './cloud-model.js';
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths';
@@ -74,6 +75,7 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
   private readonly location = new LocationPreference(resolveDshHome());
   private localBrandRevision = '';
   private localGlassRevision = '';
+  private effortRevision = '';
 
   constructor(ctx: Context, config: Config) {
     cloudOrigin(config.cloudOrigin);
@@ -84,14 +86,21 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     const manifest = JSON.parse(readFileSync(require.resolve('dsh-plugin-desktop/package.json'), 'utf8'));
     const workspaceScript = Buffer.from(readFileSync(new URL('../lib/workspace-client.js', import.meta.url), 'utf8').replace('\nexport {};', ''));
     const locationScript = Buffer.from(readFileSync(new URL('../lib/location-client.js', import.meta.url), 'utf8').replace('\nexport {};', ''));
+    const effortScript = Buffer.from(readFileSync(new URL('../lib/effort-client.js', import.meta.url), 'utf8').replace('\nexport {};', ''));
     const client = {
       workspaceRevision: createHash('sha256').update(workspaceScript).digest('hex').slice(0, 16),
       locationRevision: createHash('sha256').update(locationScript).digest('hex').slice(0, 16),
+      effortRevision: createHash('sha256').update(effortScript).digest('hex').slice(0, 16),
       revision: createHash('sha256').update(script).digest('hex').slice(0, 16),
       inject: manifest.dsh.client.inject as string[],
     };
+    this.effortRevision = client.effortRevision;
     this.localBrandRevision = installLocalBrand(ctx);
     this.localGlassRevision = installLocalGlass(ctx);
+    // 本地 preset 集对齐云端：profile patch 的 roots 指向此处物化的
+    // $DSH_HOME/mewclaw-presets；失败不阻塞启动（list 发现为空目录即降级）。
+    try { materializeLocalPresets(resolveDshHome()); }
+    catch (error) { ctx.logger.warn(`本地 preset 物化失败：${error instanceof Error ? error.message : String(error)}`); }
     this.cloud = new CloudProxy({ origin: config.cloudOrigin, timeoutMs: config.cloudTimeoutMs,
       sessionRetentionSeconds: config.cloudSessionRetentionSeconds ?? 2592000,
       maxIndexBytes: config.cloudMaxIndexBytes ?? 2097152,
@@ -100,6 +109,11 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     ctx.effect(() => () => this.cloud.dispose());
     this.installWorkspace(ctx, config, workspaceScript);
     this.installLocation(ctx, config, locationScript, client.locationRevision);
+    ctx.effect(() => this.register({ kind: 'exact', path: '/_dsh/desktop/effort-client.js', handler: (req, res) => {
+      const rejection = this.ctx.get('connection')?.requestRejection(req);
+      if (!this.ctx.get('connection') || rejection !== undefined) { res.writeHead(rejection ?? 503); res.end(); return; }
+      res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' }); res.end(effortScript);
+    } }));
     ctx.effect(() => this.register({ kind: 'exact', path: DESKTOP_CLIENT_PATH, handler: (req, res) => {
       const rejection = this.ctx.get('connection')?.requestRejection(req);
       if (!this.ctx.get('connection') || rejection !== undefined) { res.writeHead(rejection ?? 503); res.end(); return; }
@@ -217,18 +231,18 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     });
   }
 
-  private transformCloudIndex(html: string, client: { revision: string; inject: string[]; locationRevision: string; workspaceRevision: string }): string {
+  private transformCloudIndex(html: string, client: { revision: string; inject: string[]; locationRevision: string; workspaceRevision: string; effortRevision: string }): string {
     const location = this.location.location;
     const transformed = desktopCloudHtml(html, client, this.desktopParameters);
     const options: Parameters<typeof sessionLocationHtml>[1] = { location, locationRevision: client.locationRevision };
     if (location === 'cloud') options.workspaceRevision = client.workspaceRevision;
-    if (location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; }
+    if (location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; options.effortRevision = client.effortRevision; }
     return sessionLocationHtml(transformed, options);
   }
 
   private transformLocalIndex(html: string, revision: string): string {
     const options: Parameters<typeof sessionLocationHtml>[1] = { location: this.location.location, locationRevision: revision };
-    if (this.location.location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; }
+    if (this.location.location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; options.effortRevision = this.effortRevision; }
     return sessionLocationHtml(html, options);
   }
 

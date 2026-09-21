@@ -1,0 +1,8 @@
+# 飞书全功能模式：复用当前安装版本的官方 standard 组合，避免复制后漂移。
+# lark-standard 是持久化会话仍使用的稳定 ID；展示语义由 preset.yml 定义。
+# 使用官方 dsh-agent-presets 包中的 standard 组合；最新版已不再把
+# config/agent-presets 放在 @deepseek-ai/dsh 包内。
+- id: standard
+  name: '@deepseek-ai/cordis-plugin-include'
+  config:
+    path: ../../../../node_modules/@deepseek-ai/dsh-agent-presets/presets/standard/agent.cordis.yml

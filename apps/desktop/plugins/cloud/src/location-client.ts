@@ -82,25 +82,53 @@ global.__ModuleLoader__.load({ id: 'dsh-lark-desktop-location-client', factory: 
     const label = (mode: SessionLocation) => mode === 'cloud' ? '云端' : '本地';
     return React.createElement('div', {
       role: 'group', 'aria-label': 'Harness 位置', title: '账号和模型继续使用云端；本地模式只访问你授权的目录。',
-      style: { display: 'flex', flexDirection: 'column', gap: 4, padding: wide ? '4px 8px' : '4px 0' },
+      className: 'mewclaw-location',
+      style: { padding: wide ? '4px 8px' : '4px 0' },
     },
-      React.createElement('div', { style: { display: 'flex', gap: 4, justifyContent: wide ? 'stretch' : 'center' } },
+      React.createElement('div', { className: 'mewclaw-location-track' },
         ...(['cloud', 'local'] as const).map(mode => React.createElement('button', {
-          key: mode, type: 'button', disabled: busy, 'aria-pressed': mode === location,
+          key: mode, type: 'button', disabled: busy,
+          className: 'mewclaw-location-seg' + (mode === location ? ' is-active' : ''),
+          'aria-pressed': mode === location,
           'aria-label': `${label(mode)}模式`, title: `${label(mode)}模式`,
           onClick: () => { void change(mode); },
-          style: { flex: wide ? 1 : undefined, minWidth: wide ? 0 : 36, padding: '4px 6px' },
         }, wide ? label(mode) : mode === location ? '●' : '○'))),
       location === 'local' ? React.createElement('button', {
         type: 'button', disabled: busy, onClick: () => { void open(); },
+        className: 'mewclaw-location-open',
         'aria-label': '打开本地目录', title: '打开本地目录',
-        style: { width: '100%', padding: '4px 6px', textAlign: wide ? 'left' : 'center' },
+        style: { textAlign: wide ? 'left' : 'center' },
       }, wide ? '打开本地目录' : '目录') : null,
-      error ? React.createElement('span', { role: 'status', title: error, style: { fontSize: 11, overflowWrap: 'anywhere' } }, error) : null);
+      error ? React.createElement('span', { role: 'status', title: error, className: 'mewclaw-location-error' }, error) : null);
+  }
+
+  /** 控件样式跟随 dsw 令牌；轨道用交互悬停色，选中段浮起为 layer-3。 */
+  const LOCATION_CSS = `
+.mewclaw-location{display:flex;flex-direction:column;gap:6px}
+.mewclaw-location-track{display:flex;gap:2px;padding:2px;border-radius:10px;background:var(--dsw-alias-interactive-bg-hover,rgb(220 220 235 / 10%))}
+.mewclaw-location-seg{appearance:none;flex:1;min-width:0;height:26px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary,rgb(249 250 251 / 60%));font:inherit;font-size:12px;font-weight:500;line-height:26px;cursor:pointer;transition:background .12s,color .12s,box-shadow .12s}
+.mewclaw-location-seg:hover:not(:disabled):not(.is-active){color:var(--dsw-alias-label-primary,#f9fafb);background:var(--dsw-alias-interactive-bg-hover,rgb(220 220 235 / 10%))}
+.mewclaw-location-seg.is-active{background:var(--dsw-alias-bg-layer-3,#303035);color:var(--dsw-alias-label-primary,#f9fafb);box-shadow:0 1px 2px rgb(0 0 0 / 30%),inset 0 0 0 1px rgb(255 255 255 / 8%)}
+.mewclaw-location-seg:focus-visible{outline:2px solid var(--dsw-alias-label-primary-bluish,#8ab4f8);outline-offset:-2px}
+.mewclaw-location-seg:disabled{cursor:default;opacity:.55}
+.mewclaw-location-open{appearance:none;width:100%;height:30px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--dsw-alias-label-secondary,rgb(249 250 251 / 60%));font:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:background .12s,color .12s}
+.mewclaw-location-open:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,rgb(220 220 235 / 10%));color:var(--dsw-alias-label-primary,#f9fafb)}
+.mewclaw-location-open:focus-visible{outline:2px solid var(--dsw-alias-label-primary-bluish,#8ab4f8);outline-offset:-2px}
+.mewclaw-location-open:disabled{cursor:default;opacity:.55}
+.mewclaw-location-error{font-size:11px;color:var(--dsw-alias-state-warn-label,#f2994a);overflow-wrap:anywhere}
+`;
+
+  function ensureLocationStyle(): void {
+    if (document.getElementById('mewclaw-location-style')) return;
+    const style = document.createElement('style');
+    style.id = 'mewclaw-location-style';
+    style.textContent = LOCATION_CSS;
+    document.head.appendChild(style);
   }
 
   return { inject: ['slots', 'uiWorkspace'], apply(ctx: Context) {
     const workspace = (ctx as Context & { uiWorkspace: WorkspaceApi }).uiWorkspace;
+    ensureLocationStyle();
     ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
       name: 'sidebar.footer.action', id: 'mewclaw-location', order: -100,
     }, (props: LocationProps) => React.createElement(LocationActions, { ...props, workspace })));

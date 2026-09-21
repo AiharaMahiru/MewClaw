@@ -30,7 +30,9 @@ if (directoryTest) {
       mockCatalogHits++;
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ profiles: [], defaultProfileId: null,
-        sharedModels: [{ provider: 'deepseek-official', model: 'deepseek-smoke-v1', name: 'DeepSeek Smoke V1' }] }));
+        sharedModels: [{ provider: 'deepseek-official', model: 'deepseek-smoke-v1', name: 'DeepSeek Smoke V1',
+          reasoningEfforts: [{ id: 'low', name: '低' }, { id: 'medium', name: '中' }, { id: 'high', name: '高' }],
+          defaultReasoningEffort: 'high' }] }));
       return;
     }
     res.writeHead(404, { 'content-type': 'application/json' });
@@ -177,6 +179,28 @@ try {
     await writeFile(join(home, 'renderer-errors.json'), JSON.stringify(rendererErrors, null, 2));
     if (!editable) throw new Error('DIRECTORY_COMPOSER_DISABLED');
     console.log('DIRECTORY_COMPOSER_EDITABLE');
+    // 思考强度滑条：mock 目录带 reasoningEfforts，composer.dock 应渲染离散滑条。
+    const sliderDeadline = Date.now() + 10000;
+    let slider = null;
+    while (Date.now() < sliderDeadline) {
+      const probe = await client.send('Runtime.evaluate', { expression: "(()=>{const s=document.querySelector('.mewclaw-effort [role=\"slider\"]');return s?{label:s.getAttribute('aria-valuetext'),max:s.getAttribute('aria-valuemax'),text:s.parentElement?.textContent}:null})()", returnByValue: true });
+      slider = probe.result?.result?.value ?? null;
+      if (slider) break;
+      await delay(500);
+    }
+    if (!slider) {
+      const debug = await client.send('Runtime.evaluate', { expression: `(()=>{const g=globalThis.__DSH_BOOT__;return {entries:(g?.entries??[]).map(e=>e.id),hasEffort:!!document.querySelector('.mewclaw-effort'),style:!!document.getElementById('mewclaw-effort-style'),dockNames:[...document.querySelectorAll('[data-slot]')].map(e=>e.getAttribute('data-slot'))}})()`, returnByValue: true });
+      throw new Error(`EFFORT_SLIDER_MISSING ${JSON.stringify(debug.result?.result?.value)}`);
+    }
+    if (slider.label !== '高' || slider.max !== '2') throw new Error(`EFFORT_SLIDER_WRONG ${JSON.stringify(slider)}`);
+    console.log(`EFFORT_SLIDER_OK ${slider.label}`);
+    // preset roster：模式下拉应列出与云端同集的 7 项（物化到 mewclaw-presets）。
+    const roster = await client.send('Runtime.evaluate', { expression: `(()=>{const b=[...document.querySelectorAll('button')].find(x=>/标准模式|轻量|全功能|创造|PTC|极简|优化/.test(x.textContent));b?.click();return new Promise(r=>setTimeout(()=>{const items=[...document.querySelectorAll('[role="option"],[role="menuitem"],[role="menuitemradio"],li')].map(x=>x.textContent.trim()).filter(Boolean);document.body.click();r(items)},600))})()`, awaitPromise: true, returnByValue: true });
+    const rosterText = JSON.stringify(roster.result?.result?.value ?? []);
+    for (const expected of ['飞书轻量', '飞书全功能', '创造', '全能优化', '标准', 'PTC', '极简']) {
+      if (!rosterText.includes(expected)) throw new Error(`PRESET_MISSING_${expected} ${rosterText.slice(0, 400)}`);
+    }
+    console.log('PRESET_ROSTER_OK 7');
   }
   await delay(3000);
   await writeFile(join(home, 'renderer-errors.json'), JSON.stringify(rendererErrors, null, 2));
