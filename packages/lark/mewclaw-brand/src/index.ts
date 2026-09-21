@@ -33,7 +33,12 @@ const HERO_STYLE = `.mewclaw-hero-brand{display:inline-flex;align-items:center;g
 // DockSurface 的 tab strip 就是面板顶部；不得为“对齐内容”下移整个面板，否则会同时
 // 产生顶部灰条、可用高度缩短与 chrome/icon 错位。显式归零只是防止品牌/主题层污染
 // 官方几何，不改变右坞自身的展开、收起和尺寸逻辑。
-const RIGHT_PANEL_STYLE = `[data-sidebar-right-panel="push"]{top:0!important;bottom:0!important}`;
+// 分割线对齐：主区 header（标题行 + 会话 tab）底边在 y=85，而右坞内
+// dockkit strip(38) + editorHeader(41) 只到 y=79——两条横线在栏边界错开 6px。
+// 把右坞 editorHeader 撑到 47（85−38）使其底边框与主区分割线共线；box-sizing
+// 归一避免上游改 padding 时重复计算。只限 [data-sidebar-right-panel] 内：
+// 底部工作台（data-dsh-panel-host）无横向共线对象，保持原高。
+const RIGHT_PANEL_STYLE = `[data-sidebar-right-panel="push"]{top:0!important;bottom:0!important}[data-sidebar-right-panel] [class*="_editorHeader"]{box-sizing:border-box;min-height:47px}`;
 // 会话头部顶栏在手机上溢出：隐藏桌面专属控件容器——_headerActions（模式徽标、
 // 云端位置选择器、jobs/schedule/终端等槽位集合）与 _headerUtilities（外部编辑器
 // 入口）。按容器隐藏与语言无关；顶栏仅剩面包屑与 More actions。

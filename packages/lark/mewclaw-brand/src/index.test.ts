@@ -99,6 +99,9 @@ describe("dsh-lark-mewclaw-brand", () => {
     // 官方自动 fullscreen 断点（viewportWidth < 768）则显式铺满移动视口。
     expect(html).not.toContain("[data-sidebar-right-expand]{display:none!important}");
     expect(html).toContain('[data-sidebar-right-panel="push"]{top:0!important;bottom:0!important}');
+    // 右坞 editorHeader 撑高到 47：dockkit strip(38)+47=85，底边框与主区
+    // header 分割线共线；底部工作台（data-dsh-panel-host）不受此规则。
+    expect(html).toContain('[data-sidebar-right-panel] [class*="_editorHeader"]{box-sizing:border-box;min-height:47px}');
     expect(html).toContain('@media(max-width:767.98px){[data-sidebar-right-panel="fullscreen"]{position:fixed!important;inset:0!important;width:100%!important;max-width:none!important}}');
     expect(html).not.toContain('top:38px!important');
     expect(html).not.toContain('[aria-label="Open right sidebar"]');

@@ -107,6 +107,10 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   不得为对齐内容下移整个面板，避免顶部灰条、高度缩短和 chrome/icon 错位。
   移动视口 `<768px` 时官方自动选择 fullscreen；品牌移动适配层显式保持
   `position:fixed; inset:0; width:100%` 以防其他主题规则污染全视口几何。
+  右坞内 dockkit strip(38px) + editorHeader(41px) 的第一条分割线落在 y=79，
+  与主区会话 header 底边 y=85 错开 6px；品牌层把右坞内 `_editorHeader`
+  撑高到 47px（`box-sizing:border-box; min-height:47px`）使两条横线共线。
+  规则只限 `[data-sidebar-right-panel]` 内，底部工作台面板无横向共线对象、保持原高。
 - 移动端顶栏收纳：会话头部顶栏控件按桌面密度排列，390px 下溢出重叠。
   `≤768px` 按容器隐藏桌面专属控件槽位（与语言无关）：`_titleRow` 内
   `_headerActions`（模式徽标 + "☁云端" 位置选择器、jobs/schedule/终端等，
@@ -138,6 +142,7 @@ export function renderMewClawBrandMark(React: ReactApi, props: {size:number;clas
   （`scrollWidth ≤ 视口宽`）；会话视图顶栏为左上角菜单键 + 面包屑 +
   More actions + 坞簇 Expand sidebar，无重叠；
 - 右坞布局：桌面 push 面板 `top === 0` 且 `bottom === 视口底部`，无顶部灰色空带；
+  右坞内 `_editorHeader` 底边框与主区会话 header 底边共线（均在 y=85）；
   390px 真实路径必须渲染 `data-sidebar-right-panel="fullscreen"`，面板四边为 0、高度等于
   视口高度，`data-sidebar-right-mode` 与 `data-sidebar-right-toggle` 保持在顶部 tab strip 内且不溢出；
 - 门禁：`pnpm verify:dsh-brand`（官方完整性 + 品牌 slot 白名单）。
