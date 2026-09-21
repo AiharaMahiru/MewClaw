@@ -179,21 +179,32 @@ try {
     await writeFile(join(home, 'renderer-errors.json'), JSON.stringify(rendererErrors, null, 2));
     if (!editable) throw new Error('DIRECTORY_COMPOSER_DISABLED');
     console.log('DIRECTORY_COMPOSER_EDITABLE');
-    // 思考强度滑条：mock 目录带 reasoningEfforts，composer.dock 应渲染离散滑条。
-    const sliderDeadline = Date.now() + 10000;
-    let slider = null;
-    while (Date.now() < sliderDeadline) {
-      const probe = await client.send('Runtime.evaluate', { expression: "(()=>{const s=document.querySelector('.mewclaw-effort [role=\"slider\"]');return s?{label:s.getAttribute('aria-valuetext'),max:s.getAttribute('aria-valuemax'),text:s.parentElement?.textContent}:null})()", returnByValue: true });
-      slider = probe.result?.result?.value ?? null;
-      if (slider) break;
+    // 思考强度滑条：本地与云端同一 dsh-lark-model-seat——点模型芯片开弹层，
+    // 胶囊轨道在 .mwseat-menu 内（mock 目录带 reasoningEfforts）。
+    const seatDeadline = Date.now() + 10000;
+    let seatReady = false;
+    while (Date.now() < seatDeadline) {
+      const probe = await client.send('Runtime.evaluate', { expression: "(()=>{const t=document.querySelector('.mwseat-trigger');return t?t.textContent.trim():null})()", returnByValue: true });
+      if (probe.result?.result?.value?.includes('DeepSeek Smoke V1')) { seatReady = true; break; }
       await delay(500);
     }
-    if (!slider) {
-      const debug = await client.send('Runtime.evaluate', { expression: `(()=>{const g=globalThis.__DSH_BOOT__;return {entries:(g?.entries??[]).map(e=>e.id),hasEffort:!!document.querySelector('.mewclaw-effort'),style:!!document.getElementById('mewclaw-effort-style'),dockNames:[...document.querySelectorAll('[data-slot]')].map(e=>e.getAttribute('data-slot'))}})()`, returnByValue: true });
-      throw new Error(`EFFORT_SLIDER_MISSING ${JSON.stringify(debug.result?.result?.value)}`);
+    if (!seatReady) {
+      const debug = await client.send('Runtime.evaluate', { expression: `(()=>{const g=globalThis.__DSH_BOOT__;return {entries:(g?.entries??[]).map(e=>e.id),hasSeat:!!document.querySelector('.mwseat-trigger'),style:!!document.getElementById('dsh-lark-model-seat'),dockNames:[...document.querySelectorAll('[data-slot]')].map(e=>e.getAttribute('data-slot'))}})()`, returnByValue: true });
+      throw new Error(`MODEL_SEAT_MISSING ${JSON.stringify(debug.result?.result?.value)}`);
     }
+    await client.send('Runtime.evaluate', { expression: "document.querySelector('.mwseat-trigger')?.click()" });
+    const sliderDeadline = Date.now() + 8000;
+    let slider = null;
+    while (Date.now() < sliderDeadline) {
+      const probe = await client.send('Runtime.evaluate', { expression: "(()=>{const s=document.querySelector('.mwseat-menu [role=\"slider\"]');return s?{label:s.getAttribute('aria-valuetext'),max:s.getAttribute('aria-valuemax'),text:s.parentElement?.textContent}:null})()", returnByValue: true });
+      slider = probe.result?.result?.value ?? null;
+      if (slider) break;
+      await delay(400);
+    }
+    if (!slider) throw new Error('EFFORT_SLIDER_MISSING');
     if (slider.label !== '高' || slider.max !== '2') throw new Error(`EFFORT_SLIDER_WRONG ${JSON.stringify(slider)}`);
     console.log(`EFFORT_SLIDER_OK ${slider.label}`);
+    await client.send('Runtime.evaluate', { expression: 'document.body.click()' });
     // preset roster：本地模式下拉应与云端同款四项（remoteExportList 复刻 Edge
     // 过滤+改名，客户端字典再对 system preset 做 i18n 覆盖）。
     const roster = await client.send('Runtime.evaluate', { expression: `(()=>{const b=[...document.querySelectorAll('button')].find(x=>/标准模式|轻量|全功能|创造|PTC|极简|优化|助手|执行/.test(x.textContent));b?.click();return new Promise(r=>setTimeout(()=>{const items=[...document.querySelectorAll('[role="option"],[role="menuitem"],[role="menuitemradio"],li')].map(x=>x.textContent.trim()).filter(Boolean);document.body.click();r(items)},600))})()`, awaitPromise: true, returnByValue: true });

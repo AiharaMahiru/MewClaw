@@ -76,7 +76,7 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
   private readonly location = new LocationPreference(resolveDshHome());
   private localBrandRevision = '';
   private localGlassRevision = '';
-  private effortRevision = '';
+  private seatRevision = '';
 
   constructor(ctx: Context, config: Config) {
     cloudOrigin(config.cloudOrigin);
@@ -87,15 +87,17 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     const manifest = JSON.parse(readFileSync(require.resolve('dsh-plugin-desktop/package.json'), 'utf8'));
     const workspaceScript = Buffer.from(readFileSync(new URL('../lib/workspace-client.js', import.meta.url), 'utf8').replace('\nexport {};', ''));
     const locationScript = Buffer.from(readFileSync(new URL('../lib/location-client.js', import.meta.url), 'utf8').replace('\nexport {};', ''));
-    const effortScript = Buffer.from(readFileSync(new URL('../lib/effort-client.js', import.meta.url), 'utf8').replace('\nexport {};', ''));
+    // 与云端部署同一个 dsh-lark-model-seat 客户端包（vendor/ 内为 packages/lark/model-seat
+    // 的 client.js 产物）——本地 composer 模型座因此逐字节同款：弹层滑条、模型清单、priority:-1 遮蔽。
+    const seatScript = readFileSync(new URL('../vendor/model-seat-client.js', import.meta.url));
     const client = {
       workspaceRevision: createHash('sha256').update(workspaceScript).digest('hex').slice(0, 16),
       locationRevision: createHash('sha256').update(locationScript).digest('hex').slice(0, 16),
-      effortRevision: createHash('sha256').update(effortScript).digest('hex').slice(0, 16),
+      seatRevision: createHash('sha256').update(seatScript).digest('hex').slice(0, 16),
       revision: createHash('sha256').update(script).digest('hex').slice(0, 16),
       inject: manifest.dsh.client.inject as string[],
     };
-    this.effortRevision = client.effortRevision;
+    this.seatRevision = client.seatRevision;
     this.localBrandRevision = installLocalBrand(ctx);
     this.localGlassRevision = installLocalGlass(ctx);
     // 本地 preset 集对齐云端：profile patch 的 roots 指向此处物化的
@@ -111,10 +113,10 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     ctx.effect(() => () => this.cloud.dispose());
     this.installWorkspace(ctx, config, workspaceScript);
     this.installLocation(ctx, config, locationScript, client.locationRevision);
-    ctx.effect(() => this.register({ kind: 'exact', path: '/_dsh/desktop/effort-client.js', handler: (req, res) => {
+    ctx.effect(() => this.register({ kind: 'exact', path: '/_dsh/desktop/model-seat-client.js', handler: (req, res) => {
       const rejection = this.ctx.get('connection')?.requestRejection(req);
       if (!this.ctx.get('connection') || rejection !== undefined) { res.writeHead(rejection ?? 503); res.end(); return; }
-      res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' }); res.end(effortScript);
+      res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' }); res.end(seatScript);
     } }));
     ctx.effect(() => this.register({ kind: 'exact', path: DESKTOP_CLIENT_PATH, handler: (req, res) => {
       const rejection = this.ctx.get('connection')?.requestRejection(req);
@@ -248,18 +250,18 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     });
   }
 
-  private transformCloudIndex(html: string, client: { revision: string; inject: string[]; locationRevision: string; workspaceRevision: string; effortRevision: string }): string {
+  private transformCloudIndex(html: string, client: { revision: string; inject: string[]; locationRevision: string; workspaceRevision: string; seatRevision: string }): string {
     const location = this.location.location;
     const transformed = desktopCloudHtml(html, client, this.desktopParameters);
     const options: Parameters<typeof sessionLocationHtml>[1] = { location, locationRevision: client.locationRevision };
     if (location === 'cloud') options.workspaceRevision = client.workspaceRevision;
-    if (location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; options.effortRevision = client.effortRevision; }
+    if (location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; options.seatRevision = client.seatRevision; }
     return sessionLocationHtml(transformed, options);
   }
 
   private transformLocalIndex(html: string, revision: string): string {
     const options: Parameters<typeof sessionLocationHtml>[1] = { location: this.location.location, locationRevision: revision };
-    if (this.location.location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; options.effortRevision = this.effortRevision; }
+    if (this.location.location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; options.seatRevision = this.seatRevision; }
     return sessionLocationHtml(html, options);
   }
 
