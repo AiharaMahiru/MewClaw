@@ -55,7 +55,21 @@ global.__ModuleLoader__.load({ id: 'dsh-lark-desktop-location-client', factory: 
         // 键名与 switch-splash.ts 的 SWITCH_FLAG_KEY 保持同一字面量（本文件按静态脚本分发，不能引入模块依赖）。
         let bg = '';
         let ink = '';
-        try { const style = getComputedStyle(document.body); bg = style.backgroundColor; ink = style.color; } catch { /* 样式不可读时由新页面用默认色 */ }
+        try {
+          // body 常是透明底色（主题把底画在 html/root 上）：透明会让官方启动屏透上来与
+          // 过渡文案叠影——先 body 后 html 取首个不透明色，仍透明则交给新页面默认色。
+          const transparent = (value: string) => {
+            const alpha = /^rgba\([^)]*,\s*([\d.]+)\s*\)$/i.exec(value)?.[1];
+            if (alpha !== undefined) return Number.parseFloat(alpha) < 1;
+            const hex = /^#(?:[0-9a-f]{4}|[0-9a-f]{8})$/i.exec(value);
+            return hex !== null && (value.length === 5 ? value[4] === '0' : value.slice(7) === '00');
+          };
+          const body = getComputedStyle(document.body);
+          bg = body.backgroundColor;
+          if (transparent(bg)) bg = getComputedStyle(document.documentElement).backgroundColor;
+          if (transparent(bg)) bg = '';
+          ink = body.color;
+        } catch { /* 样式不可读时由新页面用默认色 */ }
         try { sessionStorage.setItem('mewclaw.location-switch', JSON.stringify({ to: target, bg, ink })); } catch { /* 意图缺失时新页面直接启动 */ }
         const overlay = document.createElement('div');
         overlay.id = 'mewclaw-location-splash';
