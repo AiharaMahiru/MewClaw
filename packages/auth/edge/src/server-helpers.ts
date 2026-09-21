@@ -3,11 +3,11 @@ import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from "node:
 import { hashOpaqueToken } from "dsh-lark-auth";
 import type { AdminUserPatch, AuthUser, UserModelProfileDraft, UserModelProfilePatch } from "dsh-lark-auth";
 import { FAVICON_PATH as BRAND_FAVICON_PATH, MANIFEST_PATH as BRAND_MANIFEST_PATH } from "dsh-lark-mewclaw-brand";
-import { UrlPolicy } from "dsh-lark-url-policy";
+import { UrlPolicy, type Dispatcher } from "dsh-lark-url-policy";
 
 import { DEFAULT_SESSION_TTL_MS, type AuthEdgeConfig } from "./config.js";
 import { appendCookie, CSRF_COOKIE, newCsrfToken, OAUTH_STATE_COOKIE, sessionCookieName } from "./cookies.js";
-import { csrfToken, httpError, sendJson } from "./http-utils.js";
+import { clientIp, csrfToken, httpError, sendJson } from "./http-utils.js";
 import { csrfValid, proxyCsrfValid } from "./origin.js";
 
 export const OAUTH_STATE_COOKIE_MAX_AGE_SECONDS = 10 * 60;
@@ -38,11 +38,12 @@ export function maskEmail(email: string): string {
 }
 export function metadata(req: IncomingMessage) {
   const result: { requestId: string; ip?: string; userAgent?: string } = { requestId: typeof req.headers["x-request-id"] === "string" ? req.headers["x-request-id"].slice(0, 128) : "edge" };
-  if (req.socket.remoteAddress) result.ip = req.socket.remoteAddress.slice(0, 128);
+  const ip = clientIp(req);
+  if (ip !== "unknown") result.ip = ip;
   if (typeof req.headers["user-agent"] === "string") result.userAgent = req.headers["user-agent"].slice(0, 512);
   return result;
 }
-export function clientKey(req: IncomingMessage): string { return req.socket.remoteAddress || "unknown"; }
+export function clientKey(req: IncomingMessage): string { return clientIp(req); }
 export function isLoopbackAddress(value: string | undefined): boolean {
   return value === "127.0.0.1" || value === "::1" || value === "::ffff:127.0.0.1";
 }
@@ -98,6 +99,12 @@ export async function assertPublicUserModelUrl(value: string): Promise<void> {
   } catch {
     throw httpError(400, "INVALID_USER_MODEL_BASE_URL");
   }
+}
+
+let userModelDispatcher: Dispatcher | undefined;
+/** 用户私有模型出站共用的连接期守卫 dispatcher（进程级连接池，随进程生命周期）。 */
+export function publicModelDispatcher(): Dispatcher {
+  return (userModelDispatcher ??= USER_MODEL_URL_POLICY.createGuardedDispatcher());
 }
 export function requireOnlyKeys(body: Record<string, unknown>, allowed: readonly string[]): void {
   if (Object.keys(body).some((key) => !allowed.includes(key))) throw httpError(400, "INVALID_REQUEST");

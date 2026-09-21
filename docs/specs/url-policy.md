@@ -28,12 +28,19 @@ class UrlPolicy {
   resolveAllowed(input: string, topLevel: boolean): Promise<ResolvedUrl>
 }
 function blockedAddress(input: string): boolean            // 单地址判定
+function guardedLookup(resolveDns?: DnsResolver)           // 连接期 lookup（undici/net 兼容）
 class UrlPolicyError extends Error                         // 公开错误，message 固定脱敏
 ```
 
 调用契约：**保存时与每次真实出站前各调一次**。后者重新 DNS 解析，配置保存后发生
 DNS rebinding 把域名指回私网也会在连接前被拒；browser 代理更进一步复用
 `resolveAllowed` 返回的地址直连，消除校验与连接之间的二次解析窗口。
+
+走 `fetch` 的调用方（无法复用 `resolveAllowed` 地址直连）必须用
+`UrlPolicy.createGuardedDispatcher()` 产出的 dispatcher：`fetch(url, { dispatcher })`
+把策略判定装进连接 lookup——连接所用解析即被检查解析，且每次新建 TCP 连接重新过
+判定；任一地址命中 `blockedAddress` 即整体拒绝，lookup 失败按 `ENOTFOUND` 上抛。
+域名在 assertAllowed 与 fetch 之间的二次解析窗口由此关闭。
 
 ## 3 配置契约
 
@@ -78,6 +85,7 @@ DNS rebinding 把域名指回私网也会在连接前被拒；browser 代理更�
 | --- | --- |
 | Auth Edge 用户私有模型 SSRF 检查（内联实现） | 抽为共享包 |
 | `apps/browser/src/url-policy.ts`（拷贝副本） | 已删除，改为 `dsh-lark-url-policy` workspace 依赖 |
+| Auth Edge desktop-inference 用户模型出站 | `assertPublicUrl` 保存/发起前校验 + `createGuardedDispatcher` 连接期判定 |
 
 行为变化：无（合并后语义逐行一致；测试集为两侧超集）。
 

@@ -208,7 +208,7 @@ describe("worker 组合（技能与 overlay）", () => {
     ];
     const flatten = (entries: PatchRow[]): PatchRow[] =>
       entries.flatMap((row) => [row, ...(row.group && Array.isArray(row.config) ? flatten(row.config as PatchRow[]) : [])]);
-    const rows = flatten(composeEntries(patches, () => undefined) as PatchRow[]);
+    const rows = flatten(composeEntries([patches], () => undefined) as PatchRow[]);
     const sandbox = rows.find((row) => row.id === "sandbox-oci");
     expect(sandbox?.config?.extraMounts).toEqual([
       expect.objectContaining({ target: "/opt/dsh-ptc-runtime" }),

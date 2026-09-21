@@ -114,16 +114,16 @@ it('共享路径不支持的内容部件映射 400', async () => {
   expect(await response.json()).toEqual({ error: 'INVALID_INFERENCE_REQUEST' });
 });
 
-it('审计仅覆盖最后一条 user 消息文本，不重审历史', async () => {
+it('审计覆盖全部 user 消息文本，历史位置无法藏匿载荷', async () => {
   const audited: string[] = [];
   const { url } = await fixture({ audit: async text => { audited.push(text); return 'allow'; } });
   const response = await fetch(url, { method: 'POST', body: JSON.stringify({ ...input, messages: [
-    { role: 'user', content: '历史输入不再重审' },
-    { role: 'assistant', content: '历史回复' },
+    { role: 'user', content: '历史输入同样审计' },
+    { role: 'assistant', content: '历史回复不审计' },
     { role: 'user', content: [{ type: 'text', text: '最新' }, { type: 'text', text: '输入' }] },
   ] }) });
   expect(response.status).toBe(200);
-  expect(audited).toEqual(['最新输入']);
+  expect(audited).toEqual(['历史输入同样审计\n最新输入']);
 });
 
 it('stop/max_tokens/温度等字段类型非法时 400，不触碰上游', async () => {

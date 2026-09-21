@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AuthService } from 'dsh-lark-auth';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import type { Dispatcher } from 'dsh-lark-url-policy';
 import { httpError, readJson, sendError } from './http-utils.js';
 
 const REQUEST_FIELDS = new Set(['model', 'messages', 'tools', 'tool_choice', 'stream', 'stream_options', 'max_tokens', 'max_completion_tokens', 'temperature', 'top_p', 'frequency_penalty', 'presence_penalty', 'stop', 'parallel_tool_calls', 'reasoning_effort']);
@@ -48,18 +49,22 @@ export function parseDesktopInference(body: Record<string, unknown>): Record<str
   return body;
 }
 
-/** 审计输入 = 最后一条 user 消息的文本（输入框语义）：历史消息只在其成为最新输入时审计过一次。 */
-function lastUserMessageText(messages: Array<{ role: string; content?: unknown }>): string {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const content = messages[index]!.content;
-    if (messages[index]!.role !== 'user') continue;
-    if (typeof content === 'string') return content;
+/**
+ * 审计输入 = 全部 user 消息文本拼接。本端点无状态：调用方每次提交完整
+ * messages 数组，历史位置的内容可能从未作为最新输入经过审计——只审末条
+ * 会让直连调用方把未审计载荷藏进靠前位置绕过门禁。
+ */
+function allUserMessagesText(messages: Array<{ role: string; content?: unknown }>): string {
+  const texts: string[] = [];
+  for (const message of messages) {
+    if (message.role !== 'user') continue;
+    const content = message.content;
+    if (typeof content === 'string') { texts.push(content); continue; }
     if (Array.isArray(content)) {
-      const text = content.map(part => part && typeof part === 'object' && (part as { type?: unknown }).type === 'text' ? String((part as { text?: unknown }).text ?? '') : '').join('');
-      if (text.trim()) return text;
+      texts.push(content.map(part => part && typeof part === 'object' && (part as { type?: unknown }).type === 'text' ? String((part as { text?: unknown }).text ?? '') : '').join(''));
     }
   }
-  return '';
+  return texts.join('\n');
 }
 
 /** 共享路径请求内容不被支持（非文本部件等）；映射为 400 而非上游 502。 */
@@ -106,12 +111,14 @@ export async function desktopInference(req: IncomingMessage, res: ServerResponse
   timeoutMs: number;
   audit(text: string): Promise<'allow' | 'block' | 'unavailable'>;
   assertPublicUrl(url: string): Promise<void>;
+  /** 连接期 URL 策略 dispatcher；缺省走全局 fetch 默认 dispatcher（测试注入）。 */
+  dispatcher?: Dispatcher;
   fetch?: typeof fetch;
 }): Promise<void> {
   const input = parseDesktopInference(await readJson(req, options.maxBytes));
   const selector = parseModelSelector(input.model);
   const messages = input.messages as Array<{ role: string; content?: unknown }>;
-  const text = lastUserMessageText(messages);
+  const text = allUserMessagesText(messages);
   if (await options.audit(text).catch(() => 'unavailable') !== 'allow') { sendError(res, 403, 'PROMPT_AUDIT_REJECTED'); return; }
 
   const abort = new AbortController();
@@ -150,6 +157,8 @@ export async function desktopInference(req: IncomingMessage, res: ServerResponse
       const endpoint = new URL(route.baseUrl.replace(/\/$/, '') + '/chat/completions');
       const response = await (options.fetch ?? fetch)(endpoint, {
         method: 'POST', redirect: 'error', signal,
+        // 连接期守卫：解析与连接同窗口，阻断 assertPublicUrl 之后的 DNS rebinding。
+        ...(options.dispatcher ? { dispatcher: options.dispatcher } : {}),
         headers: { 'content-type': 'application/json', authorization: `Bearer ${route.apiKey}` },
         body: JSON.stringify({ ...input, model: route.model }),
       });

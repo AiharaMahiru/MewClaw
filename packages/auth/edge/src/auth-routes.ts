@@ -14,6 +14,7 @@ import type { PromptAuditor } from "./prompt-audit.js";
 import type { LoginGuard, RateLimiter } from "./rate-limit.js";
 import {
   assertPublicUserModelUrl,
+  publicModelDispatcher,
   clearOAuthStateCookie,
   clientKey,
   isLoopbackAddress,
@@ -65,7 +66,7 @@ export class AuthRouteHandlers {
       return desktopInference(req, res, { userId: current.user.id, service, shared: this.deps.sharedModels,
         maxBytes: config.desktopBodyLimit ?? 8 * 1024 * 1024, timeoutMs: config.desktopInferenceTimeoutMs ?? 120000,
         audit: text => config.promptAudit?.enabled === false ? Promise.resolve('allow') : this.deps.promptAuditor?.audit(text) ?? Promise.resolve('unavailable'),
-        assertPublicUrl: assertPublicUserModelUrl });
+        assertPublicUrl: assertPublicUserModelUrl, dispatcher: publicModelDispatcher() });
     }
     if (req.method === "GET" && url.pathname === "/auth/account") return this.redirectLegacyAccount(req, res);
     if (req.method === "GET" && url.pathname === "/auth/me") { const current = await this.deps.current(req); if (!current) { sendError(res, 401, "UNAUTHORIZED"); return; } const cookies: string[] = []; this.deps.refreshSessionCookie(req, cookies); sendJson(res, 200, { user: publicUser(current.user) }, cookies); return; }

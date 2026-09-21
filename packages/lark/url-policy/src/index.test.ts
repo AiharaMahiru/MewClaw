@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { blockedAddress, UrlPolicy } from "./index.js";
+import { blockedAddress, guardedLookup, UrlPolicy, type ConnectLookupCallback } from "./index.js";
 
 describe("UrlPolicy", () => {
   it("仅允许解析到公网地址的 HTTP/HTTPS", async () => {
@@ -38,5 +38,47 @@ describe("UrlPolicy", () => {
 
   it.each(["1.1.1.1", "93.184.216.34", "2606:4700:4700::1111"])("接受公网地址 %s", (address) => {
     expect(blockedAddress(address)).toBe(false);
+  });
+});
+
+describe("guardedLookup", () => {
+  const call = (lookup: ReturnType<typeof guardedLookup>, hostname: string, all = false) =>
+    new Promise<{ address: unknown; family?: number | undefined }>((resolvePromise, reject) => {
+      const callback: ConnectLookupCallback = (error, address, family) =>
+        error ? reject(error) : resolvePromise({ address, family });
+      lookup(hostname, { all }, callback);
+    });
+
+  it("放行公网解析结果的首个地址", async () => {
+    const lookup = guardedLookup(async () => [
+      { address: "93.184.216.34", family: 4 },
+      { address: "1.1.1.1", family: 4 },
+    ]);
+    await expect(call(lookup, "example.com")).resolves.toEqual({ address: "93.184.216.34", family: 4 });
+  });
+
+  it("all=true（autoSelectFamily）回传全部安全地址", async () => {
+    const lookup = guardedLookup(async () => [
+      { address: "93.184.216.34", family: 4 },
+      { address: "1.1.1.1", family: 4 },
+    ]);
+    await expect(call(lookup, "example.com", true)).resolves.toEqual({
+      address: [{ address: "93.184.216.34", family: 4 }, { address: "1.1.1.1", family: 4 }],
+      family: undefined,
+    });
+  });
+
+  it("解析结果任一命中受保护地址则整体拒绝", async () => {
+    const lookup = guardedLookup(async () => [
+      { address: "93.184.216.34", family: 4 },
+      { address: "169.254.169.254", family: 4 },
+    ]);
+    await expect(call(lookup, "rebind.example")).rejects.toMatchObject({ code: "ENOTFOUND" });
+  });
+
+  it("元数据主机与解析失败同样拒绝", async () => {
+    await expect(call(guardedLookup(async () => [{ address: "93.184.216.34", family: 4 }]), "metadata.google.internal")).rejects.toMatchObject({ code: "ENOTFOUND" });
+    await expect(call(guardedLookup(async () => { throw new Error("dns down"); }), "example.com")).rejects.toMatchObject({ code: "ENOTFOUND" });
+    await expect(call(guardedLookup(async () => []), "example.com")).rejects.toMatchObject({ code: "ENOTFOUND" });
   });
 });

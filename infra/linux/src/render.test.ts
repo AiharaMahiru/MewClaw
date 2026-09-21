@@ -123,10 +123,17 @@ describe("Nginx overlay rendering", () => {
         ssl_certificate /etc/letsencrypt/live/chat.example/fullchain.pem;
         ssl_certificate_key /etc/letsencrypt/live/chat.example/privkey.pem;
 
+        # /internal/* 是 Worker/Gateway 直连 Auth Edge 的回环端点（Bearer 认证），
+        # 不得经公网反代暴露。
+        location ^~ /internal/ {
+          return 404;
+        }
+
         location / {
           proxy_pass http://dsh_auth_edge;
           proxy_http_version 1.1;
           proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
           proxy_set_header X-Forwarded-Proto https;
           proxy_set_header Upgrade $http_upgrade;

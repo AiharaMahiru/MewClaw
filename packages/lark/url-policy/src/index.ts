@@ -1,5 +1,8 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import { Agent, type Dispatcher } from "undici";
+
+export type { Dispatcher } from "undici";
 
 export class UrlPolicyError extends Error {
   constructor(message = "URL 被安全策略拒绝") {
@@ -57,6 +60,57 @@ export class UrlPolicy {
     if (addresses.length === 0 || addresses.some(({ address }) => blockedAddress(address))) throw new UrlPolicyError();
     return { url, addresses };
   }
+
+  /**
+   * 连接期守卫 Dispatcher：把策略判定装进 undici 的 connect lookup，
+   * 连接所用的解析结果即被检查的结果——消除 assertAllowed 与 fetch 之间
+   * 第二次系统解析留下的 DNS rebinding 窗口（域名在两次解析间翻向私网）。
+   * fetch(url, { dispatcher }) 专用；每次新建 TCP 连接都重新过判定。
+   */
+  createGuardedDispatcher(): Dispatcher {
+    return new Agent({ connect: { lookup: guardedLookup(this.resolveDns) } });
+  }
+}
+
+/** 兼容 net/dns lookup 回调签名（`all` 决定单地址或地址数组形态）。 */
+export type ConnectLookupCallback = (
+  error: NodeJS.ErrnoException | null,
+  address: string | ResolvedAddress[],
+  family?: number,
+) => void;
+
+/**
+ * 连接期 lookup：每次 TCP 连接前重新解析并逐地址过 blockedAddress，
+ * 任一命中即整体拒绝（与 resolveAllowed 同语义）；失败按 DNS 失败上抛，
+ * 不携带被检地址细节。`options.all` 为 true（autoSelectFamily）时按
+ * dns.lookup 约定回传全部安全地址，否则回传首个。
+ */
+export function guardedLookup(resolveDns: DnsResolver = systemResolver) {
+  return (hostname: string, options: { all?: boolean | undefined } | undefined, callback: ConnectLookupCallback): void => {
+    const normalized = hostname.toLowerCase().replace(/\.$/, "");
+    const fail = (): void => { callback(policyLookupError(), "", 0); };
+    if (!normalized || METADATA_HOSTS.has(normalized) || normalized.endsWith(".metadata.google.internal")) {
+      fail();
+      return;
+    }
+    resolveDns(normalized).then((addresses) => {
+      // 与 resolveAllowed 同语义：混合结果 fail closed，不挑安全子集。
+      if (!addresses.length || addresses.some(({ address }) => blockedAddress(address))) {
+        fail();
+        return;
+      }
+      if (options?.all === true) {
+        callback(null, addresses.map(({ address, family }) => ({ address, family })));
+        return;
+      }
+      callback(null, addresses[0]!.address, addresses[0]!.family);
+    }, fail);
+  };
+}
+
+/** lookup 失败必须像 DNS 失败一样上抛，且不携带被检地址细节。 */
+function policyLookupError(): NodeJS.ErrnoException {
+  return Object.assign(new UrlPolicyError(), { code: "ENOTFOUND" });
 }
 
 async function systemResolver(hostname: string): Promise<readonly ResolvedAddress[]> {

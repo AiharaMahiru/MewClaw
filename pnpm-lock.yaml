@@ -1917,7 +1917,11 @@ importers:
         specifier: 0.8.3
         version: 0.8.3
 
-  packages/lark/url-policy: {}
+  packages/lark/url-policy:
+    dependencies:
+      undici:
+        specifier: 8.10.1
+        version: 8.10.1
 
   packages/lark/vision:
     dependencies:

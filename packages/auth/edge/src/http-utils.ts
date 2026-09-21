@@ -4,7 +4,25 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readCookie } from "./cookies.js";
 
 export function requestId(req: IncomingMessage): string { return typeof req.headers["x-request-id"] === "string" ? req.headers["x-request-id"]!.slice(0, 128) : randomUUID(); }
-export function clientIp(req: IncomingMessage): string { return (req.socket.remoteAddress || "unknown").slice(0, 128); }
+
+/**
+ * 真实客户端地址：Auth Edge 只监听 loopback，TCP 对端恒为本机反代。
+ * 仅当对端是 loopback 时采信代理注入的地址头——生产 nginx 以
+ * `X-Real-IP $remote_addr` 覆盖赋值（客户端无法伪造），X-Forwarded-For
+ * 兼容追加语义、取最末一跳。直连对端不是 loopback 时忽略全部转发头，
+ * 避免服务被意外直接暴露时地址可伪造。
+ */
+export function clientIp(req: IncomingMessage): string {
+  const peer = req.socket.remoteAddress;
+  if (peer === "127.0.0.1" || peer === "::1" || peer === "::ffff:127.0.0.1") {
+    const real = req.headers["x-real-ip"];
+    if (typeof real === "string" && real.trim()) return real.trim().slice(0, 128);
+    const forwarded = req.headers["x-forwarded-for"];
+    const last = (Array.isArray(forwarded) ? forwarded.join(",") : forwarded ?? "").split(",").pop()?.trim();
+    if (last) return last.slice(0, 128);
+  }
+  return (peer || "unknown").slice(0, 128);
+}
 export function userAgent(req: IncomingMessage): string | undefined { return typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"].slice(0, 512) : undefined; }
 
 export async function readJson(req: IncomingMessage, maxBytes: number): Promise<Record<string, unknown>> {
