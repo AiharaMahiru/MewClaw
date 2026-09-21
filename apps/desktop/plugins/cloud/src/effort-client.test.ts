@@ -69,8 +69,9 @@ it('当前模型带 reasoning 元数据时在 input.dock 渲染思考强度滑�
     const rail = element.querySelector('[role="slider"]');
     expect(rail).not.toBeNull();
     expect(rail!.getAttribute('aria-valuetext')).toBe('高'); // defaultEffort: high
+    expect(rail!.getAttribute('aria-label')).toBe('思考强度');
     expect(element.querySelectorAll('.mewclaw-effort-tick').length).toBe(4);
-    expect(element.textContent).toContain('思考强度');
+    expect(element.querySelector('.mewclaw-effort-valueName')?.textContent).toBe('高');
     expect(element.textContent).toContain('3/4');
   } finally { await React.act(async () => root.unmount()); element.remove(); }
 });

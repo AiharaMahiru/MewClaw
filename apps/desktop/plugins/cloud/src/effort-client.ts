@@ -25,8 +25,8 @@ loader.load({ id: 'dsh-lark-desktop-effort-client', factory: (require: (id: stri
   /** 滑条档位：defaultEffort 缺失时首档为「默认」（选中即清除显式 effort，与官方语义一致）。 */
   function effortRows(reasoning: Reasoning, currentEffort: string | undefined) {
     const effective = currentEffort ?? reasoning.defaultEffort;
-    const rows: { key: string; effort: string | undefined; label: string; active: boolean }[] =
-      reasoning.efforts.map(e => ({ key: `effort:${e.id}`, effort: e.id, label: e.name, active: e.id === effective }));
+    const rows: { key: string; effort: string | undefined; label: string; description?: string; active: boolean }[] =
+      reasoning.efforts.map(e => ({ key: `effort:${e.id}`, effort: e.id, label: e.name, ...(e.description === undefined ? {} : { description: e.description }), active: e.id === effective }));
     if (reasoning.defaultEffort === undefined) rows.unshift({ key: 'provider-default', effort: undefined, label: '默认', active: currentEffort === undefined });
     return rows;
   }
@@ -54,9 +54,11 @@ loader.load({ id: 'dsh-lark-desktop-effort-client', factory: (require: (id: stri
     const index = Math.min(n - 1, Math.max(0, drag ?? pending ?? active));
     if (current === null || n === 0) return null;
     const frac = (i: number) => (n <= 1 ? 0.5 : i / (n - 1));
-    const PAD = 12; const HALF = 7;
+    // 拇指中心行程内边距与拇指半径，与 mwseat 胶囊轨道几何一致。
+    const PAD = 16; const HALF = 11;
     const pos = (i: number) => `calc(${PAD}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
-    const fill = (i: number) => `calc(${PAD + HALF + 4}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
+    // 填充越过拇指右缘再外延 5px：蓝色整段吞过白色拇指并留一点尾巴。
+    const fill = (i: number) => `calc(${PAD + HALF + 5}px + (100% - ${PAD * 2}px) * ${frac(i)})`;
     const indexAt = (clientX: number) => {
       const rect = trackRef.current?.getBoundingClientRect();
       if (rect === undefined || rect.width <= PAD * 2 || n <= 1) return index;
@@ -92,8 +94,8 @@ loader.load({ id: 'dsh-lark-desktop-effort-client', factory: (require: (id: stri
       else if (event.key === 'Home') { event.preventDefault(); commit(0); }
       else if (event.key === 'End') { event.preventDefault(); commit(n - 1); }
     };
+    // 与 mwseat 同构：整宽胶囊轨道 + 档位值居中在轨道下方（名称 + n/m）。
     return React.createElement('div', { className: 'mewclaw-effort' },
-      React.createElement('span', { className: 'mewclaw-effort-label' }, '思考强度'),
       React.createElement('div', {
         ref: trackRef,
         className: `mewclaw-effort-rail${drag !== null ? ' drag' : ''}`,
@@ -109,26 +111,31 @@ loader.load({ id: 'dsh-lark-desktop-effort-client', factory: (require: (id: stri
           className: `mewclaw-effort-tick${i <= index ? ' on' : ''}`, style: { left: pos(i) },
         })),
         React.createElement('span', { className: 'mewclaw-effort-thumb', 'aria-hidden': 'true', style: { left: pos(index) } })),
-      React.createElement('span', { className: 'mewclaw-effort-value', 'aria-live': 'polite' },
-        rows[index]?.label ?? '',
+      React.createElement('div', {
+        className: 'mewclaw-effort-value', 'aria-live': 'polite',
+        ...(rows[index]?.description === undefined ? {} : { title: rows[index].description }),
+      },
+        React.createElement('span', { className: 'mewclaw-effort-valueName' }, rows[index]?.label),
         React.createElement('span', { className: 'mewclaw-effort-pos' }, `${index + 1}/${n}`)));
   }
 
-  /** 胶囊轨道 + 拇指样式，全部走 dsw 令牌；轨道宽 168px 对齐 Web 弹层滑条密度。 */
+  /** 胶囊轨道 + 拇指样式，逐条复刻 Web 版 mwseat（dsw 令牌）；容器列布局占满坞位宽度。 */
   const EFFORT_CSS = `
-.mewclaw-effort{display:flex;align-items:center;gap:10px;padding:2px 4px 0;min-height:22px}
-.mewclaw-effort-label{flex:none;font-size:11px;color:var(--dsw-alias-label-tertiary,rgb(249 250 251 / 40%));letter-spacing:.02em}
-.mewclaw-effort-rail{position:relative;flex:none;width:168px;height:20px;border-radius:10px;background:var(--dsw-alias-interactive-bg-hover,rgb(220 220 235 / 10%));cursor:pointer;outline:none;touch-action:none}
-.mewclaw-effort-rail:focus-visible{outline:2px solid var(--dsw-alias-label-primary-bluish,#8ab4f8);outline-offset:2px}
+.mewclaw-effort{padding:2px 10px 6px;user-select:none}
+.mewclaw-effort-rail{position:relative;height:30px;border-radius:999px;cursor:pointer;touch-action:none;outline:none;background:var(--dsw-alias-interactive-bg-hover,rgb(220 220 235 / 10%));box-shadow:inset 0 1px 3px rgb(0 0 0 / 12%),inset 0 -1px 0 rgb(255 255 255 / 6%);transition:background-color .18s ease}
+.mewclaw-effort-rail:hover{background:var(--dsw-alias-interactive-bg-active,var(--dsw-alias-interactive-bg-hover))}
+.mewclaw-effort-rail:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary,Highlight);outline-offset:2px}
 .mewclaw-effort-rail[aria-disabled="true"]{cursor:default;opacity:.55}
-.mewclaw-effort-fill{position:absolute;left:0;top:0;bottom:0;border-radius:10px;background:var(--dsw-alias-label-primary-bluish,#8ab4f8);opacity:.85;transition:width .08s}
-.mewclaw-effort-rail.drag .mewclaw-effort-fill{transition:none}
-.mewclaw-effort-tick{position:absolute;top:50%;width:3px;height:3px;border-radius:50%;transform:translate(-50%,-50%);background:var(--dsw-alias-label-tertiary,rgb(249 250 251 / 40%))}
-.mewclaw-effort-tick.on{background:rgb(255 255 255 / 70%)}
-.mewclaw-effort-thumb{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;transform:translate(-50%,-50%);background:var(--dsw-alias-label-primary,#f9fafb);box-shadow:0 1px 3px rgb(0 0 0 / 35%),inset 0 0 0 1px rgb(0 0 0 / 6%);transition:left .08s}
-.mewclaw-effort-rail.drag .mewclaw-effort-thumb{transition:none}
-.mewclaw-effort-value{display:flex;align-items:baseline;gap:6px;font-size:12px;font-weight:500;color:var(--dsw-alias-label-primary,#f9fafb);min-width:0}
-.mewclaw-effort-pos{font-size:10px;color:var(--dsw-alias-label-tertiary,rgb(249 250 251 / 40%))}
+.mewclaw-effort-fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:linear-gradient(90deg,color-mix(in srgb,var(--dsw-alias-state-business-primary,#5c70c9) 38%,transparent),color-mix(in srgb,var(--dsw-alias-state-business-primary,#5c70c9) 88%,transparent));pointer-events:none}
+.mewclaw-effort-tick{position:absolute;top:50%;width:4px;height:4px;border-radius:50%;transform:translate(-50%,-50%);background:var(--dsw-alias-label-dimmed,rgb(249 250 251 / 35%));opacity:.5;pointer-events:none;transition:background-color .15s ease,opacity .15s ease}
+.mewclaw-effort-tick.on{background:var(--dsw-alias-label-primary,#f9fafb);opacity:.9}
+.mewclaw-effort-thumb{position:absolute;top:50%;width:22px;height:22px;border-radius:999px;transform:translate(-50%,-50%);background:var(--dsw-alias-label-primary,#f9fafb);border:1px solid rgb(255 255 255 / 28%);box-shadow:0 2px 6px rgb(0 0 0 / 32%),inset 0 1px 0 rgb(255 255 255 / 30%);pointer-events:none;transition:transform .15s ease}
+.mewclaw-effort-rail.drag .mewclaw-effort-thumb{transform:translate(-50%,-50%) scale(1.14)}
+.mewclaw-effort-rail:not(.drag) .mewclaw-effort-thumb{transition:left .14s ease,transform .15s ease}
+.mewclaw-effort-rail:not(.drag) .mewclaw-effort-fill,.mewclaw-effort-rail:not(.drag) .mewclaw-effort-tick{transition:left .14s ease,width .14s ease,background-color .15s ease,opacity .15s ease}
+.mewclaw-effort-value{display:flex;align-items:baseline;justify-content:center;gap:6px;height:20px;margin-top:5px;font-size:12px;line-height:18px}
+.mewclaw-effort-valueName{color:var(--dsw-alias-state-business-primary,var(--dsw-alias-label-primary,#f9fafb));font-weight:600}
+.mewclaw-effort-pos{color:var(--dsw-alias-label-dimmed,rgb(249 250 251 / 35%));font-size:11px}
 `;
 
   function ensureEffortStyle(): void {
