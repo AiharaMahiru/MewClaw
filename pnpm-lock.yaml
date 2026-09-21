@@ -222,7 +222,7 @@ patchedDependencies:
     hash: b606ffc117341d34a2706afcca20578b0dfe9d85c02614486cdd6ef7e472fb35
     path: patches/dsh-better-sidebar@0.18.0.patch
   dsh-better-sidebar@0.19.1:
-    hash: e8704700f0c2262a734b70d130633fafec86ea62a3d7a3f33e0015131d6fb2fb
+    hash: 26db6975ca7ee657089518bae559d51f2e9c84085335eba0eb102e1846be0a3e
     path: patches/dsh-better-sidebar@0.19.1.patch
 
 importers:
@@ -792,7 +792,7 @@ importers:
         version: 2.1.1
       dsh-better-sidebar:
         specifier: 0.19.1
-        version: 0.19.1(patch_hash=e8704700f0c2262a734b70d130633fafec86ea62a3d7a3f33e0015131d6fb2fb)(fcb6d3db19c78a40027aae3ad19a2504)
+        version: 0.19.1(patch_hash=26db6975ca7ee657089518bae559d51f2e9c84085335eba0eb102e1846be0a3e)(fcb6d3db19c78a40027aae3ad19a2504)
       dsh-context:
         specifier: 0.48.0
         version: 0.48.0(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-client-ui-primitives@0.1.6-alpha.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-session@0.1.6-alpha.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.6-alpha.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.6-alpha.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/dsh-settings@0.1.6-alpha.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-brand@0.1.6-alpha.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-invariants@0.1.6-alpha.2(@deepseek-ai/cordis@4.0.2))(@deepseek-ai/dsh-session@0.1.6-alpha.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-scope@0.1.6-alpha.2(@deepseek-ai/cordis@4.0.2)(@deepseek-ai/dsh-invariants@0.1.6-alpha.2(@deepseek-ai/cordis@4.0.2))))(@deepseek-ai/schemastery@3.18.2))(@deepseek-ai/schemastery@3.18.2)(react@18.3.1)
@@ -13454,7 +13454,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  dsh-better-sidebar@0.19.1(patch_hash=e8704700f0c2262a734b70d130633fafec86ea62a3d7a3f33e0015131d6fb2fb)(fcb6d3db19c78a40027aae3ad19a2504):
+  dsh-better-sidebar@0.19.1(patch_hash=26db6975ca7ee657089518bae559d51f2e9c84085335eba0eb102e1846be0a3e)(fcb6d3db19c78a40027aae3ad19a2504):
     dependencies:
       '@codemirror/commands': 6.11.0
       '@codemirror/lang-cpp': 6.0.3

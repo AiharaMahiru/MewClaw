@@ -1,5 +1,5 @@
 diff --git a/lib/client-registry.js b/lib/client-registry.js
-index 09bb7dc..92fa830 100644
+index 09bb7dcd5f5c9e81ba054c4d1f0db0248e3d4333..2d576de0b3e302a633c94c7f2fa87532db57ce5a 100644
 --- a/lib/client-registry.js
 +++ b/lib/client-registry.js
 @@ -3477,7 +3477,7 @@ window.__ModuleLoader__.load({
@@ -44,8 +44,63 @@ index 09bb7dc..92fa830 100644
  		}
  		//#endregion
  		//#region node_modules/.pnpm/clsx@2.1.1/node_modules/clsx/dist/clsx.mjs
+@@ -15170,7 +15173,9 @@ Mode: this is a continuable side conversation. Your answers stay in this side th
+ 		//#region src/client/titlebar-strip.ts
+ 		function computeTitleBarStrip(env, wco, scheme, preset, customStripPx) {
+ 			if (scheme === "web") return 0;
+-			if (wco.present) return wco.height;
++			// patched: WCO 仅在报告有效高度时才算权威——visible:true 但零高 rect
++			// 是退化读数（Electron 初始化期/坏读数），不得否决 inset/preset/custom。
++			if (wco.present && wco.height > 0) return wco.height;
+ 			if (env.titlebarInset > 0) return env.titlebarInset;
+ 			if (scheme === "preset") return presetStripFor(preset, env) ?? 0;
+ 			if (scheme === "custom") return customStripPx;
+@@ -15507,6 +15512,16 @@ Mode: this is a continuable side conversation. Your answers stay in this side th
+ 		* jump-back). All of it reacts to the host's live feeds for the CURRENT
+ 		* session; the sidebar shell only consumes the returned jump-back ref.
+ 		*/
++		/**
++		* Resolve the on-screen session id. Runtimes ≥0.1.6 removed
++		* `SidebarSessionList.current`: the main-view session is the row whose
++		* `retainedBy.mainView` count is positive (the same derivation upstream
++		* ui-layout / ui-workspace use). A legacy `current` field still wins when a
++		* pre-0.1.6 runtime populates it.
++		*/
++		function currentSessionIdOf(list) {
++			return list?.current ?? Object.values(list?.byId ?? {}).find((s) => (s.retainedBy?.mainView ?? 0) > 0)?.id;
++		}
+ 		/** How many consecutive reconnect failures stop the agent-terminals push loop
+ 		* (mirror of the terminal view's own cap; the loop restarts on session switch). */
+ 		const FAILURE_LIMIT = 3;
+@@ -15545,7 +15560,7 @@ Mode: this is a continuable side conversation. Your answers stay in this side th
+ 		*/
+ 		function activateTasksPage(ctx, sessionId, options) {
+ 			const column = ctx.get("sidebarRight");
+-			const park = options.background && ctx.sessions.list.getSnapshot().current === sessionId && isNarrowWidth(window.innerWidth) && column?.isExpanded?.() === false;
++			const park = options.background && currentSessionIdOf(ctx.sessions.list.getSnapshot()) === sessionId && isNarrowWidth(window.innerWidth) && column?.isExpanded?.() === false;
+ 			ctx.get("betterSidebar")?.openTab({
+ 				type: "subagent",
+ 				title: t("subagent")
+@@ -16015,7 +16030,7 @@ Mode: this is a continuable side conversation. Your answers stay in this side th
+ 			}, []);
+ 			const layoutViewportHeight = visualViewportHeight ?? viewport.height;
+ 			const sessionList = (0, react.useSyncExternalStore)((0, react.useMemo)(() => (callback) => ctx.sessions.list.subscribe(callback), [ctx]), (0, react.useCallback)(() => ctx.sessions.list.getSnapshot(), [ctx]));
+-			const current = sessionList.current;
++			const current = currentSessionIdOf(sessionList);
+ 			const snapshot = (0, react.useSyncExternalStore)((0, react.useCallback)((callback) => store.subscribe(callback), [store]), (0, react.useCallback)(() => store.getSnapshot(), [store]));
+ 			(0, react.useEffect)(() => {
+ 				store.setSession(current);
+@@ -17139,7 +17154,7 @@ Mode: this is a continuable side conversation. Your answers stay in this side th
+ 		/** The active session id, as the client list reports it. */
+ 		function activeSessionId(ctx) {
+ 			try {
+-				return ctx.sessions.list.getSnapshot().current;
++				return currentSessionIdOf(ctx.sessions.list.getSnapshot());
+ 			} catch {
+ 				return;
+ 			}
 diff --git a/lib/client.js b/lib/client.js
-index f137630..19cdfd7 100644
+index f137630721b2f11268ad498c0bda41851c96bdf1..02af47a0c988bc16c981547f6a1336fae49a991f 100644
 --- a/lib/client.js
 +++ b/lib/client.js
 @@ -3477,7 +3477,7 @@ window.__ModuleLoader__.load({
@@ -90,8 +145,115 @@ index f137630..19cdfd7 100644
  		}
  		//#endregion
  		//#region node_modules/.pnpm/clsx@2.1.1/node_modules/clsx/dist/clsx.mjs
+@@ -13218,7 +13221,7 @@ Mode: this is a continuable side conversation. Your answers stay in this side th
+ 								onClick: () => void handleSend(),
+ 								disabled: composer.trim() === "" || busy !== null,
+ 								title: t("sideChatSend"),
+-								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSendOutline16, {})
++								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSendOutline14, {})
+ 							}, "send")]
+ 						})]
+ 					})
+@@ -15170,7 +15173,9 @@ Mode: this is a continuable side conversation. Your answers stay in this side th
+ 		//#region src/client/titlebar-strip.ts
+ 		function computeTitleBarStrip(env, wco, scheme, preset, customStripPx) {
+ 			if (scheme === "web") return 0;
+-			if (wco.present) return wco.height;
++			// patched: WCO 仅在报告有效高度时才算权威——visible:true 但零高 rect
++			// 是退化读数（Electron 初始化期/坏读数），不得否决 inset/preset/custom。
++			if (wco.present && wco.height > 0) return wco.height;
+ 			if (env.titlebarInset > 0) return env.titlebarInset;
+ 			if (scheme === "preset") return presetStripFor(preset, env) ?? 0;
+ 			if (scheme === "custom") return customStripPx;
+@@ -15507,6 +15512,16 @@ Mode: this is a continuable side conversation. Your answers stay in this side th
+ 		* jump-back). All of it reacts to the host's live feeds for the CURRENT
+ 		* session; the sidebar shell only consumes the returned jump-back ref.
+ 		*/
++		/**
++		* Resolve the on-screen session id. Runtimes ≥0.1.6 removed
++		* `SidebarSessionList.current`: the main-view session is the row whose
++		* `retainedBy.mainView` count is positive (the same derivation upstream
++		* ui-layout / ui-workspace use). A legacy `current` field still wins when a
++		* pre-0.1.6 runtime populates it.
++		*/
++		function currentSessionIdOf(list) {
++			return list?.current ?? Object.values(list?.byId ?? {}).find((s) => (s.retainedBy?.mainView ?? 0) > 0)?.id;
++		}
+ 		/** How many consecutive reconnect failures stop the agent-terminals push loop
+ 		* (mirror of the terminal view's own cap; the loop restarts on session switch). */
+ 		const FAILURE_LIMIT = 3;
+@@ -15545,7 +15560,7 @@ Mode: this is a continuable side conversation. Your answers stay in this side th
+ 		*/
+ 		function activateTasksPage(ctx, sessionId, options) {
+ 			const column = ctx.get("sidebarRight");
+-			const park = options.background && ctx.sessions.list.getSnapshot().current === sessionId && isNarrowWidth(window.innerWidth) && column?.isExpanded?.() === false;
++			const park = options.background && currentSessionIdOf(ctx.sessions.list.getSnapshot()) === sessionId && isNarrowWidth(window.innerWidth) && column?.isExpanded?.() === false;
+ 			ctx.get("betterSidebar")?.openTab({
+ 				type: "subagent",
+ 				title: t("subagent")
+@@ -16015,7 +16030,7 @@ Mode: this is a continuable side conversation. Your answers stay in this side th
+ 			}, []);
+ 			const layoutViewportHeight = visualViewportHeight ?? viewport.height;
+ 			const sessionList = (0, react.useSyncExternalStore)((0, react.useMemo)(() => (callback) => ctx.sessions.list.subscribe(callback), [ctx]), (0, react.useCallback)(() => ctx.sessions.list.getSnapshot(), [ctx]));
+-			const current = sessionList.current;
++			const current = currentSessionIdOf(sessionList);
+ 			const snapshot = (0, react.useSyncExternalStore)((0, react.useCallback)((callback) => store.subscribe(callback), [store]), (0, react.useCallback)(() => store.getSnapshot(), [store]));
+ 			(0, react.useEffect)(() => {
+ 				store.setSession(current);
+@@ -17139,7 +17154,7 @@ Mode: this is a continuable side conversation. Your answers stay in this side th
+ 		/** The active session id, as the client list reports it. */
+ 		function activeSessionId(ctx) {
+ 			try {
+-				return ctx.sessions.list.getSnapshot().current;
++				return currentSessionIdOf(ctx.sessions.list.getSnapshot());
+ 			} catch {
+ 				return;
+ 			}
+diff --git a/src/client/SideChatView.tsx b/src/client/SideChatView.tsx
+index ed7861944d507d9b55a6b062f62bcec328eac405..68d9c3a31a7c51333c1c67fffd8afeba4db8424a 100644
+--- a/src/client/SideChatView.tsx
++++ b/src/client/SideChatView.tsx
+@@ -36,7 +36,7 @@ import {
+   IconNewChatOutline16,
+   IconPlusOutline16,
+   IconSearchOutline16,
+-  IconSendOutline16,
++  IconSendOutline14,
+   IconSparkle16,
+   IconStopFill16,
+   MarkdownText,
+@@ -802,7 +802,7 @@ export function SideChatView(props: {
+               disabled={composer.trim() === '' || busy !== null}
+               title={t('sideChatSend')}
+             >
+-              <IconSendOutline16 />
++              <IconSendOutline14 />
+             </button>
+           )}
+         </div>
+diff --git a/src/client/Sidebar.tsx b/src/client/Sidebar.tsx
+index 96f7014472583c42a89fb6710d44bb63c00a16ec..c2a9076ddd5da71a2d2fe17a77665860317c9d84 100644
+--- a/src/client/Sidebar.tsx
++++ b/src/client/Sidebar.tsx
+@@ -29,6 +29,7 @@ import { useSyncExternalStore } from 'react'
+ import clsx from 'clsx'
+ import { IconCloseFill14, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { Context } from '../context-types.ts'
++import { currentSessionIdOf } from '../context-types.ts'
+ import { referenceInChat as referenceInChatShared } from './reference-in-chat.ts'
+ import {
+   BOTTOM_MIN, CONVERSATION_MIN, agentUuidOf, firstLeaf, isAgentTabId,
+@@ -197,7 +198,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
+     useMemo(() => (callback: () => void) => ctx.sessions.list.subscribe(callback), [ctx]),
+     useCallback(() => ctx.sessions.list.getSnapshot(), [ctx]),
+   )
+-  const current = sessionList.current
++  const current = currentSessionIdOf(sessionList)
+ 
+   // Per-session sidebar state.
+   const snapshot = useSyncExternalStore(
 diff --git a/src/client/intercept.tsx b/src/client/intercept.tsx
-index b4f130b..1410a33 100644
+index b4f130bcdb4170b3cb065558a08d091032b7ec33..1410a33f71079d110153c708ccd38fb5f8d02a4b 100644
 --- a/src/client/intercept.tsx
 +++ b/src/client/intercept.tsx
 @@ -99,7 +99,7 @@ export function SidebarProducedFiles(props: {
@@ -136,39 +298,54 @@ index b4f130b..1410a33 100644
 -  }, SidebarProducedFiles))
 +  }, TurnTailEntry))
  }
-diff --git a/lib/client-registry.js b/lib/client-registry.js
-index 0000000..a100000 100644
---- a/lib/client-registry.js
-+++ b/lib/client-registry.js
-@@ -15171,6 +15171,8 @@ window.__ModuleLoader__.load({
- 		function computeTitleBarStrip(env, wco, scheme, preset, customStripPx) {
- 			if (scheme === "web") return 0;
--			if (wco.present) return wco.height;
-+			// patched: WCO 仅在报告有效高度时才算权威——visible:true 但零高 rect
-+			// 是退化读数（Electron 初始化期/坏读数），不得否决 inset/preset/custom。
-+			if (wco.present && wco.height > 0) return wco.height;
- 			if (env.titlebarInset > 0) return env.titlebarInset;
- 			if (scheme === "preset") return presetStripFor(preset, env) ?? 0;
- 			if (scheme === "custom") return customStripPx;
-diff --git a/lib/client.js b/lib/client.js
-index 0000000..a100001 100644
---- a/lib/client.js
-+++ b/lib/client.js
-@@ -15171,6 +15171,8 @@ window.__ModuleLoader__.load({
- 		function computeTitleBarStrip(env, wco, scheme, preset, customStripPx) {
- 			if (scheme === "web") return 0;
--			if (wco.present) return wco.height;
-+			// patched: WCO 仅在报告有效高度时才算权威——visible:true 但零高 rect
-+			// 是退化读数（Electron 初始化期/坏读数），不得否决 inset/preset/custom。
-+			if (wco.present && wco.height > 0) return wco.height;
- 			if (env.titlebarInset > 0) return env.titlebarInset;
- 			if (scheme === "preset") return presetStripFor(preset, env) ?? 0;
- 			if (scheme === "custom") return customStripPx;
+diff --git a/src/client/native/surface.ts b/src/client/native/surface.ts
+index 6dc086170f66ee8171dd600c436955d7aef498ff..894b80db3a49d3d72a7144f14b6d4e45dc42a80f 100644
+--- a/src/client/native/surface.ts
++++ b/src/client/native/surface.ts
+@@ -17,6 +17,7 @@
+  * - layout state is memory-only, so a queued open is not durable either.
+  */
+ import type { Context } from '../../context-types.ts'
++import { currentSessionIdOf } from '../../context-types.ts'
+ import { fileAddressFor } from '../resource-address.ts'
+ import type { NativeTabParams, SidebarSurface } from '../service.ts'
+ import type { NativeTabRecords } from './tab-adapter.tsx'
+@@ -48,7 +49,7 @@ export interface NativeSurface extends SidebarSurface {
+ /** The active session id, as the client list reports it. */
+ function activeSessionId(ctx: Context): string | undefined {
+   try {
+-    return ctx.sessions.list.getSnapshot().current
++    return currentSessionIdOf(ctx.sessions.list.getSnapshot())
+   } catch {
+     return undefined
+   }
+diff --git a/src/client/sidebar/use-host-feeds.ts b/src/client/sidebar/use-host-feeds.ts
+index d80e1c1ad110a22ea3723ceec9f7b2bc99b155bd..9603f975ee6afe93158e859f511b383138ee1c02 100644
+--- a/src/client/sidebar/use-host-feeds.ts
++++ b/src/client/sidebar/use-host-feeds.ts
+@@ -7,6 +7,7 @@
+  */
+ import { useEffect, useRef } from 'react'
+ import type { Context, SidebarSessionList } from '../../context-types.ts'
++import { currentSessionIdOf } from '../../context-types.ts'
+ import { mirrorAgentWaits, reconcileAgentTerminals, type SidebarStore } from '../state.ts'
+ import { isNarrowWidth } from '../breakpoints.ts'
+ import { detectNewDirectSubagent } from '../subagent-detect.ts'
+@@ -67,7 +68,7 @@ function activateTasksPage(ctx: Context, sessionId: string, options: { backgroun
+   const park = options.background
+     // The face acts on the MOUNTED session: parking is only meaningful (and
+     // only safe) when the activation targets the one on screen.
+-    && ctx.sessions.list.getSnapshot().current === sessionId
++    && currentSessionIdOf(ctx.sessions.list.getSnapshot()) === sessionId
+     && isNarrowWidth(window.innerWidth)
+     // Only a column the user had COLLAPSED is put back: an expanded one is in
+     // use, and closing it under the user would be worse than the takeover.
 diff --git a/src/client/titlebar-strip.ts b/src/client/titlebar-strip.ts
-index 0000000..a100002 100644
+index c5aada29585b4c18717acac98c85f37492adf048..00b629287269c7d72a23c0e307e8fb570fe70123 100644
 --- a/src/client/titlebar-strip.ts
 +++ b/src/client/titlebar-strip.ts
-@@ -31,5 +31,7 @@
+@@ -29,7 +29,9 @@ export function computeTitleBarStrip(
+   customStripPx: number,
  ): number {
    if (scheme === 'web') return 0
 -  if (wco.present) return wco.height
@@ -177,107 +354,12 @@ index 0000000..a100002 100644
 +  if (wco.present && wco.height > 0) return wco.height
    if (env.titlebarInset > 0) return env.titlebarInset
    if (scheme === 'preset') return presetStripFor(preset, env) ?? 0
-diff --git a/lib/client.js b/lib/client.js
-index 0000000..0000000 100644
---- a/lib/client.js
-+++ b/lib/client.js
-@@ -15512,6 +15512,16 @@
- 		* jump-back). All of it reacts to the host's live feeds for the CURRENT
- 		* session; the sidebar shell only consumes the returned jump-back ref.
- 		*/
-+		/**
-+		* Resolve the on-screen session id. Runtimes ≥0.1.6 removed
-+		* `SidebarSessionList.current`: the main-view session is the row whose
-+		* `retainedBy.mainView` count is positive (the same derivation upstream
-+		* ui-layout / ui-workspace use). A legacy `current` field still wins when a
-+		* pre-0.1.6 runtime populates it.
-+		*/
-+		function currentSessionIdOf(list) {
-+			return list?.current ?? Object.values(list?.byId ?? {}).find((s) => (s.retainedBy?.mainView ?? 0) > 0)?.id;
-+		}
- 		/** How many consecutive reconnect failures stop the agent-terminals push loop
- 		* (mirror of the terminal view's own cap; the loop restarts on session switch). */
- 		const FAILURE_LIMIT = 3;
-@@ -15550,7 +15560,7 @@
- 		*/
- 		function activateTasksPage(ctx, sessionId, options) {
- 			const column = ctx.get("sidebarRight");
--			const park = options.background && ctx.sessions.list.getSnapshot().current === sessionId && isNarrowWidth(window.innerWidth) && column?.isExpanded?.() === false;
-+			const park = options.background && currentSessionIdOf(ctx.sessions.list.getSnapshot()) === sessionId && isNarrowWidth(window.innerWidth) && column?.isExpanded?.() === false;
- 			ctx.get("betterSidebar")?.openTab({
- 				type: "subagent",
- 				title: t("subagent")
-@@ -16020,7 +16030,7 @@
- 			}, []);
- 			const layoutViewportHeight = visualViewportHeight ?? viewport.height;
- 			const sessionList = (0, react.useSyncExternalStore)((0, react.useMemo)(() => (callback) => ctx.sessions.list.subscribe(callback), [ctx]), (0, react.useCallback)(() => ctx.sessions.list.getSnapshot(), [ctx]));
--			const current = sessionList.current;
-+			const current = currentSessionIdOf(sessionList);
- 			const snapshot = (0, react.useSyncExternalStore)((0, react.useCallback)((callback) => store.subscribe(callback), [store]), (0, react.useCallback)(() => store.getSnapshot(), [store]));
- 			(0, react.useEffect)(() => {
- 				store.setSession(current);
-@@ -17144,7 +17154,7 @@
- 		/** The active session id, as the client list reports it. */
- 		function activeSessionId(ctx) {
- 			try {
--				return ctx.sessions.list.getSnapshot().current;
-+				return currentSessionIdOf(ctx.sessions.list.getSnapshot());
- 			} catch {
- 				return;
- 			}
-diff --git a/lib/client-registry.js b/lib/client-registry.js
-index 0000000..0000000 100644
---- a/lib/client-registry.js
-+++ b/lib/client-registry.js
-@@ -15512,6 +15512,16 @@
- 		* jump-back). All of it reacts to the host's live feeds for the CURRENT
- 		* session; the sidebar shell only consumes the returned jump-back ref.
- 		*/
-+		/**
-+		* Resolve the on-screen session id. Runtimes ≥0.1.6 removed
-+		* `SidebarSessionList.current`: the main-view session is the row whose
-+		* `retainedBy.mainView` count is positive (the same derivation upstream
-+		* ui-layout / ui-workspace use). A legacy `current` field still wins when a
-+		* pre-0.1.6 runtime populates it.
-+		*/
-+		function currentSessionIdOf(list) {
-+			return list?.current ?? Object.values(list?.byId ?? {}).find((s) => (s.retainedBy?.mainView ?? 0) > 0)?.id;
-+		}
- 		/** How many consecutive reconnect failures stop the agent-terminals push loop
- 		* (mirror of the terminal view's own cap; the loop restarts on session switch). */
- 		const FAILURE_LIMIT = 3;
-@@ -15550,7 +15560,7 @@
- 		*/
- 		function activateTasksPage(ctx, sessionId, options) {
- 			const column = ctx.get("sidebarRight");
--			const park = options.background && ctx.sessions.list.getSnapshot().current === sessionId && isNarrowWidth(window.innerWidth) && column?.isExpanded?.() === false;
-+			const park = options.background && currentSessionIdOf(ctx.sessions.list.getSnapshot()) === sessionId && isNarrowWidth(window.innerWidth) && column?.isExpanded?.() === false;
- 			ctx.get("betterSidebar")?.openTab({
- 				type: "subagent",
- 				title: t("subagent")
-@@ -16020,7 +16030,7 @@
- 			}, []);
- 			const layoutViewportHeight = visualViewportHeight ?? viewport.height;
- 			const sessionList = (0, react.useSyncExternalStore)((0, react.useMemo)(() => (callback) => ctx.sessions.list.subscribe(callback), [ctx]), (0, react.useCallback)(() => ctx.sessions.list.getSnapshot(), [ctx]));
--			const current = sessionList.current;
-+			const current = currentSessionIdOf(sessionList);
- 			const snapshot = (0, react.useSyncExternalStore)((0, react.useCallback)((callback) => store.subscribe(callback), [store]), (0, react.useCallback)(() => store.getSnapshot(), [store]));
- 			(0, react.useEffect)(() => {
- 				store.setSession(current);
-@@ -17144,7 +17154,7 @@
- 		/** The active session id, as the client list reports it. */
- 		function activeSessionId(ctx) {
- 			try {
--				return ctx.sessions.list.getSnapshot().current;
-+				return currentSessionIdOf(ctx.sessions.list.getSnapshot());
- 			} catch {
- 				return;
- 			}
+   if (scheme === 'custom') return customStripPx
 diff --git a/src/context-types.ts b/src/context-types.ts
-index 0000000..0000000 100644
+index 9f97b7dc3a6cd91e0a9a9205297d58fa103fafb9..acbf0ea9446ebd2aa20f1467ab72d86bd8ea9308 100644
 --- a/src/context-types.ts
 +++ b/src/context-types.ts
-@@ -146,6 +146,12 @@
+@@ -146,6 +146,12 @@ export interface SidebarSessionSummary {
    parentId?: string
    /** Whether the session's agent is currently running. */
    running?: boolean
@@ -290,7 +372,7 @@ index 0000000..0000000 100644
  }
  
  /** One healthy subagent catalog child row (structural mirror of the runtime). */
-@@ -328,7 +334,12 @@
+@@ -328,7 +334,12 @@ export interface SidebarSessionHandle {
  
  /** The client session list snapshot the sidebar subscribes to. */
  export interface SidebarSessionList {
@@ -304,7 +386,7 @@ index 0000000..0000000 100644
    byId: Record<string, SidebarSessionSummary>
    /** Direct durable catalogs keyed by their selected parent address. */
    subagentsByParent?: Readonly<Record<string, SidebarSubagentCatalog>>
-@@ -340,6 +351,17 @@
+@@ -340,6 +351,17 @@ export interface SidebarSessionList {
    jobsBySession?: Readonly<Record<string, readonly SidebarJobView[]>>
  }
  
@@ -322,66 +404,3 @@ index 0000000..0000000 100644
  /** The client sessions service face (only the list feed is needed). */
  export interface SidebarSessionsService {
    list: {
-diff --git a/src/client/Sidebar.tsx b/src/client/Sidebar.tsx
-index 0000000..0000000 100644
---- a/src/client/Sidebar.tsx
-+++ b/src/client/Sidebar.tsx
-@@ -29,6 +29,7 @@
- import clsx from 'clsx'
- import { IconCloseFill14, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
- import type { Context } from '../context-types.ts'
-+import { currentSessionIdOf } from '../context-types.ts'
- import { referenceInChat as referenceInChatShared } from './reference-in-chat.ts'
- import {
-   BOTTOM_MIN, CONVERSATION_MIN, agentUuidOf, firstLeaf, isAgentTabId,
-@@ -197,7 +198,7 @@
-     useMemo(() => (callback: () => void) => ctx.sessions.list.subscribe(callback), [ctx]),
-     useCallback(() => ctx.sessions.list.getSnapshot(), [ctx]),
-   )
--  const current = sessionList.current
-+  const current = currentSessionIdOf(sessionList)
- 
-   // Per-session sidebar state.
-   const snapshot = useSyncExternalStore(
-diff --git a/src/client/sidebar/use-host-feeds.ts b/src/client/sidebar/use-host-feeds.ts
-index 0000000..0000000 100644
---- a/src/client/sidebar/use-host-feeds.ts
-+++ b/src/client/sidebar/use-host-feeds.ts
-@@ -7,6 +7,7 @@
-  */
- import { useEffect, useRef } from 'react'
- import type { Context, SidebarSessionList } from '../../context-types.ts'
-+import { currentSessionIdOf } from '../../context-types.ts'
- import { mirrorAgentWaits, reconcileAgentTerminals, type SidebarStore } from '../state.ts'
- import { isNarrowWidth } from '../breakpoints.ts'
- import { detectNewDirectSubagent } from '../subagent-detect.ts'
-@@ -67,7 +68,7 @@
-   const park = options.background
-     // The face acts on the MOUNTED session: parking is only meaningful (and
-     // only safe) when the activation targets the one on screen.
--    && ctx.sessions.list.getSnapshot().current === sessionId
-+    && currentSessionIdOf(ctx.sessions.list.getSnapshot()) === sessionId
-     && isNarrowWidth(window.innerWidth)
-     // Only a column the user had COLLAPSED is put back: an expanded one is in
-     // use, and closing it under the user would be worse than the takeover.
-diff --git a/src/client/native/surface.ts b/src/client/native/surface.ts
-index 0000000..0000000 100644
---- a/src/client/native/surface.ts
-+++ b/src/client/native/surface.ts
-@@ -17,6 +17,7 @@
-  * - layout state is memory-only, so a queued open is not durable either.
-  */
- import type { Context } from '../../context-types.ts'
-+import { currentSessionIdOf } from '../../context-types.ts'
- import { fileAddressFor } from '../resource-address.ts'
- import type { NativeTabParams, SidebarSurface } from '../service.ts'
- import type { NativeTabRecords } from './tab-adapter.tsx'
-@@ -48,7 +49,7 @@
- /** The active session id, as the client list reports it. */
- function activeSessionId(ctx: Context): string | undefined {
-   try {
--    return ctx.sessions.list.getSnapshot().current
-+    return currentSessionIdOf(ctx.sessions.list.getSnapshot())
-   } catch {
-     return undefined
-   }
