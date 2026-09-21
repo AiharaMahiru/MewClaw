@@ -194,13 +194,17 @@ try {
     }
     if (slider.label !== '高' || slider.max !== '2') throw new Error(`EFFORT_SLIDER_WRONG ${JSON.stringify(slider)}`);
     console.log(`EFFORT_SLIDER_OK ${slider.label}`);
-    // preset roster：模式下拉应列出与云端同集的 7 项（物化到 mewclaw-presets）。
-    const roster = await client.send('Runtime.evaluate', { expression: `(()=>{const b=[...document.querySelectorAll('button')].find(x=>/标准模式|轻量|全功能|创造|PTC|极简|优化/.test(x.textContent));b?.click();return new Promise(r=>setTimeout(()=>{const items=[...document.querySelectorAll('[role="option"],[role="menuitem"],[role="menuitemradio"],li')].map(x=>x.textContent.trim()).filter(Boolean);document.body.click();r(items)},600))})()`, awaitPromise: true, returnByValue: true });
+    // preset roster：本地模式下拉应与云端同款四项（remoteExportList 复刻 Edge
+    // 过滤+改名，客户端字典再对 system preset 做 i18n 覆盖）。
+    const roster = await client.send('Runtime.evaluate', { expression: `(()=>{const b=[...document.querySelectorAll('button')].find(x=>/标准模式|轻量|全功能|创造|PTC|极简|优化|助手|执行/.test(x.textContent));b?.click();return new Promise(r=>setTimeout(()=>{const items=[...document.querySelectorAll('[role="option"],[role="menuitem"],[role="menuitemradio"],li')].map(x=>x.textContent.trim()).filter(Boolean);document.body.click();r(items)},600))})()`, awaitPromise: true, returnByValue: true });
     const rosterText = JSON.stringify(roster.result?.result?.value ?? []);
-    for (const expected of ['飞书轻量', '飞书全功能', '创造', '全能优化', '标准', 'PTC', '极简']) {
+    for (const expected of ['日常助手', '创造模式', '高效执行', '标准模式']) {
       if (!rosterText.includes(expected)) throw new Error(`PRESET_MISSING_${expected} ${rosterText.slice(0, 400)}`);
     }
-    console.log('PRESET_ROSTER_OK 7');
+    for (const hidden of ['飞书轻量', '飞书全功能', '全能优化', 'PTC', '极简']) {
+      if (rosterText.includes(hidden)) throw new Error(`PRESET_LEAKED_${hidden} ${rosterText.slice(0, 400)}`);
+    }
+    console.log('PRESET_ROSTER_OK 4');
   }
   await delay(3000);
   await writeFile(join(home, 'renderer-errors.json'), JSON.stringify(rendererErrors, null, 2));

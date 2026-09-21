@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
-import { materializeLocalPresets } from './local-presets.js';
+import { cloudPresetRoster, materializeLocalPresets } from './local-presets.js';
 
 it('物化云端 preset 集并按云端序接入三根', async () => {
   const home = mkdtempSync(join(tmpdir(), 'mewclaw-presets-'));
@@ -49,4 +49,30 @@ it('物化结果经官方 discoverPresets 全部健康', async () => {
   expect(presets.map(p => p.id).sort()).toEqual(['cordis', 'lark-lightweight', 'lark-standard', 'liangshen', 'minimal', 'ptc', 'standard']);
   expect(presets[0]?.id).toBe('lark-lightweight');
   expect(presets.slice(-3).map(p => p.id)).toEqual(['standard', 'ptc', 'minimal']);
+});
+
+it('roster 显示层复刻 Edge 过滤与改名', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'mewclaw-presets-'));
+  const dest = materializeLocalPresets(home)!;
+  const { discoverPresets } = await import('@deepseek-ai/dsh-agent-presets');
+  const { pathToFileURL } = await import('node:url');
+  const { createRequire } = await import('node:module');
+  const { dirname } = await import('node:path');
+  const require2 = createRequire(import.meta.url);
+  const harnessBase = pathToFileURL(join(dirname(require2.resolve('@deepseek-ai/dsh-agent-presets/package.json')), 'x')).href;
+  const shipped = join(dirname(require2.resolve('@deepseek-ai/dsh-agent-presets/package.json')), 'presets');
+  const roots = [
+    { path: join(dest, 'agent-presets-lightweight'), trust: 'system' as const },
+    { path: join(dest, 'agent-presets'), trust: 'system' as const },
+    { path: shipped, trust: 'system' as const },
+  ];
+  const presets = await discoverPresets(roots, harnessBase);
+  const visible = cloudPresetRoster(presets);
+  // 与云端菜单同款四项同序：其余 id 仍可按 id resolve（显示层变换）。
+  expect(visible.map(p => ({ id: p.id, name: p.name }))).toEqual([
+    { id: 'lark-lightweight', name: '日常助手' },
+    { id: 'cordis', name: '插件开发' },
+    { id: 'liangshen', name: '高效执行' },
+    { id: 'standard', name: '通用工作' },
+  ]);
 });

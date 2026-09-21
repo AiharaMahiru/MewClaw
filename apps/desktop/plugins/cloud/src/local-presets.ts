@@ -22,6 +22,24 @@ const STAMP_FILE = '.mewclaw-preset-stamp';
  * cordis——同名同位，cordis_mount 工具面在本机可工作），再 vendored 两目录。 */
 const AGENT_PRESET_ORDER = ['lark-standard', 'liangshen'];
 
+/** Edge rpc-policy 对 agentPresets/list 的显示层变换：只放行白名单 id 并改
+ * 显示名。本地 roster 复刻同一变换，客户端字典再对 trust=system 的 preset
+ * 做 i18n 覆盖，最终呈现与云端同款四项菜单；resolve/mount 不受影响。 */
+export const CLOUD_PRESET_NAMES: Record<string, string> = {
+  'lark-lightweight': '日常助手',
+  standard: '通用工作',
+  liangshen: '高效执行',
+  cordis: '插件开发',
+};
+
+/** 复刻 Edge rpc-policy 的 roster 变换（id 白名单过滤 + 显示名改写）。 */
+export function cloudPresetRoster<T extends { id: string }>(presets: readonly T[]): T[] {
+  return presets.flatMap(item => {
+    const name = CLOUD_PRESET_NAMES[item.id];
+    return name === undefined ? [] : [{ ...item, name }];
+  });
+}
+
 /** 递归收集目录下全部文件（相对路径 + 绝对路径）。 */
 function* entries(dir: string, base = dir): Generator<{ path: string; file: string }> {
   for (const item of readdirSync(dir, { withFileTypes: true })) {

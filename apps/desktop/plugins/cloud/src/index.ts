@@ -19,8 +19,9 @@ import { installLocalBrand } from './local-brand.js';
 import { installLocalGlass } from './local-glass.js';
 import { sessionLocationHtml } from './session-boot.js';
 import { LocalHarnessWorkspaces } from './local-workspaces.js';
-import { materializeLocalPresets } from './local-presets.js';
+import { cloudPresetRoster, materializeLocalPresets } from './local-presets.js';
 import type {} from '@deepseek-ai/dsh-agent-default-model';
+import type {} from '@deepseek-ai/dsh-agent-presets';
 import { CloudAccountModel, CLOUD_MODEL_PROVIDER, hasSession } from './cloud-model.js';
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths';
 
@@ -101,6 +102,7 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     // $DSH_HOME/mewclaw-presets；失败不阻塞启动（list 发现为空目录即降级）。
     try { materializeLocalPresets(resolveDshHome()); }
     catch (error) { ctx.logger.warn(`本地 preset 物化失败：${error instanceof Error ? error.message : String(error)}`); }
+    this.alignLocalPresetRoster(ctx);
     this.cloud = new CloudProxy({ origin: config.cloudOrigin, timeoutMs: config.cloudTimeoutMs,
       sessionRetentionSeconds: config.cloudSessionRetentionSeconds ?? 2592000,
       maxIndexBytes: config.cloudMaxIndexBytes ?? 2097152,
@@ -119,6 +121,21 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
       if (!this.ctx.get('connection') || rejection !== undefined) { res.writeHead(rejection ?? 503); res.end(); return; }
       res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' }); res.end(script);
     } }));
+  }
+
+  /** 本地 preset 菜单对齐云端：Edge rpc-policy 对 agentPresets/list 只放行白名单 id
+   * 并改显示名（客户端字典再对 trust=system 的 preset 做 i18n 覆盖，最终呈现与云端
+   * 同款的「日常助手 / 创造模式 / 高效执行 / 标准模式」）。只包显示层 remoteExportList，
+   * resolve/mount 与按 id 选择的语义不受影响；云端模式下本地 roster 不被消费。 */
+  private alignLocalPresetRoster(ctx: Context): void {
+    ctx.inject(['agentPresets'], local => {
+      const service = local.agentPresets;
+      const original = service.remoteExportList.bind(service);
+      service.remoteExportList = async () => {
+        const roster = await original();
+        return { ...roster, presets: cloudPresetRoster(roster.presets) };
+      };
+    });
   }
 
   private installWorkspace(ctx: Context, config: Config, script: Buffer): void {
