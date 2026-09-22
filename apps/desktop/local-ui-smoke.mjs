@@ -129,9 +129,21 @@ async function screenshot(name) {
   if (capture.result?.data) await writeFile(join(home, name + '.png'), Buffer.from(capture.result.data, 'base64'));
 }
 async function presetMenu(name) {
-  await evaluate(`(()=>{const button=[...document.querySelectorAll('button')].find(b=>/^(Standard mode|标准模式)$/.test(b.textContent.trim()));if(!button)throw Error('MODE_TRIGGER_MISSING');button.click()})()`);
-  await delay(500);
-  const text = await evaluate(`document.querySelector('[role="menu"]')?.innerText`);
+  // 位置控件先于模式菜单挂载；按可交互状态等待，避免在首屏水合中抢点。
+  const readyDeadline = Date.now() + 15000;
+  let opened = false;
+  while (Date.now() < readyDeadline) {
+    opened = await evaluate(`(()=>{const button=[...document.querySelectorAll('button')].find(b=>/^(Standard mode|标准模式)$/.test(b.textContent.trim()));if(!button||button.disabled)return false;button.click();return true})()`);
+    if (opened) break;
+    await delay(200);
+  }
+  if (!opened) throw new Error('MODE_TRIGGER_MISSING');
+  let text;
+  while (Date.now() < readyDeadline) {
+    text = await evaluate(`document.querySelector('[role="menu"]')?.innerText`);
+    if (text && /高效执行/.test(text)) break;
+    await delay(200);
+  }
   if (!text || !/高效执行/.test(text)) throw new Error('WEB_PRESET_ROSTER_MISSING');
   await screenshot(name + '-modes');
   await client.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
