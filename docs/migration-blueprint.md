@@ -3,6 +3,8 @@
 状态：**完成——M0–M5 全部里程碑 + 真实飞书全链路验收通过（evidence/m5-feishu-acceptance.md）**。本文档是迁移期间的最高决策依据；与它冲突的实现一律回改。
 组件级映射见 [component-map.md](component-map.md)。
 
+迁移完成后的 MewClaw 按 [统一架构与演进约定](mewclaw-architecture.md) 作为 Web、TUI、Windows Desktop、Feishu 四端一体演进：Web 为产品基线，DSH 官方上游为运行时与契约主线。本文继续约束飞书迁移决策与安全不变量；其中的历史版本、目录和阶段状态不代表当前四端发行状态。
+
 ## 1. 目标与范围
 
 把 `D:\AI\lark-claw`（Pi Coding Agent 驱动的飞书卡片机器人平台，约 3.6 万行 TypeScript）迁移为 `D:\AI\dsh` 下的 **dsh-lark**：同一产品目标（多用户沙箱隔离、私有/共享 RAG、声明式机器人模板），底层运行时从 Pi 换成 DeepSeek Harness（dsh），遵守 **一切皆插件**（Cordis）理念，并借迁移修复原实现中与框架重复的结构性债务。
