@@ -1,4 +1,19 @@
-# dsh-TUI 远程工作区
+# dsh-TUI 本机与云端工作区
+
+
+## 本机工作区（2026-09-23）
+
+使用本轮 TUI 候选包，启动 `dsh-tui "D:\项目\我的工程"`，或在主界面执行
+`/workspace open <本机目录>`。`/connect https://chat.rwr.ink` 登录后退出远程菜单，
+在主界面 `/model` 选择「MewClaw 云端账号」，普通聊天即可使用本机文件工具。
+账号模型使用 `/auth/desktop-inference`；Agent、文件工具和持久化在本机运行。
+本机目录不发送给云端 `workspace/create`，不依赖旧 `/desktop-workspace` 桥接。
+
+云端会话继续由 `/connect` 的远程菜单管理。下面的旧桥接章节只描述云端会话
+借用本机工具的另一路能力，不是本机工作区的前置条件。候选安装、验证与
+Windows 边界见 [本轮验收](client-local-workspaces.md)。
+
+## 旧远程桥接适配
 
 本分支 `feat/dsh-tui-remote-workspace` 为当前 dsh Web 增加了一个可供
 `ccch1mneyyy/dsh-TUI` 挂载的远程客户端包：`dsh-lark-tui-remote`。
