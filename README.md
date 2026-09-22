@@ -1,8 +1,8 @@
-# MewClaw Desktop 开发
+# MewClaw 客户端工作区集成
 
 MewClaw 基于 DeepSeek Harness（DSH）与 Cordis，为 Web、Windows Desktop 和 TUI 提供共享账号与模型能力。Agent、会话、工具、审批和持久化复用官方插件；自有功能通过 Provider、公开 slots 与配置组合接入，官方 DSH 包保持原样。
 
-本分支 `desktop-dev` 用于 **Desktop 本机工作区、Web 组件一致性及兼容性验证**，集成共享账号与 TUI 接入。Web 和共享服务以 `master` 为基线。Desktop 的完整客户端组合与发行配置见 [`desktop`](https://github.com/AiharaMahiru/MewClaw/tree/desktop)，TUI 实现见 [`AiharaMahiru/dsh-TUI`](https://github.com/AiharaMahiru/dsh-TUI)。
+本分支 `feat/dsh-tui-remote-workspace` 集成 **共享账号、Desktop 本机工作区与 TUI 接入**。Web 和共享服务以 `master` 为基线。Desktop 的完整客户端组合与发行配置见 [`desktop`](https://github.com/AiharaMahiru/MewClaw/tree/desktop)，TUI 实现见 [`AiharaMahiru/dsh-TUI`](https://github.com/AiharaMahiru/dsh-TUI)。
 
 ## 当前能力
 
