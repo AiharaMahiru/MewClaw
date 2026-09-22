@@ -10,6 +10,7 @@ assert.ok(candidate && isAbsolute(candidate), '需要独立候选绝对路径');
 const root = resolve(candidate);
 assert.equal(JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).name, 'mewclaw-desktop-candidate');
 const desktop = dirname(fileURLToPath(import.meta.url));
+cpSync(resolve(desktop, '../../packages/lark/web-auth/client.js'), join(root, 'mewclaw-cloud/web-auth-client.js'));
 cpSync(join(desktop, 'plugins/cloud'), join(root, 'mewclaw-cloud'), {
   recursive: true, filter: path => !path.split(sep).includes('lib'),
 });

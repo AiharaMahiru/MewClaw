@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, resolve } from 'node:path';
+import { isAbsolute, join, resolve, sep } from 'node:path';
 import { Script } from 'node:vm';
 
 const { releaseDirectoryName } = createRequire(import.meta.url)('./release-path.cjs');
@@ -18,20 +18,24 @@ const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).ver
 const release = resolve(root, process.argv.find(value => value.startsWith('--release-dir='))?.slice('--release-dir='.length)
   ?? join('release', releaseDirectoryName(version)));
 const output = join(release, 'win-unpacked');
-// 上游 rc.2 起官方发行禁用 ASAR：应用根是 resources/app/ 目录而非归档。
 const appRoot = join(output, 'resources', 'app');
 const executable = join(output, 'MewClaw.exe');
+const staticOnly = process.argv.includes('--static-only');
+const runtimeOnly = process.argv.includes('--runtime-only');
+const keepSmokeHome = process.argv.includes('--keep-smoke-home');
+assert.ok(!(staticOnly && runtimeOnly), '静态与运行时选项不能同时指定');
+const appFile = path => readFileSync(join(appRoot, path.split('/').join(sep)));
 
-function listAppFiles() {
+function listAppFiles(rootDirectory = appRoot) {
   const files = [];
   const walk = (directory, prefix) => {
     for (const name of readdirSync(directory)) {
-      const absolute = join(directory, name);
-      if (statSync(absolute).isDirectory()) walk(absolute, `${prefix}${name}/`);
+      const path = join(directory, name);
+      if (statSync(path).isDirectory()) walk(path, `${prefix}${name}/`);
       else files.push(`${prefix}${name}`);
     }
   };
-  walk(appRoot, '');
+  walk(rootDirectory, '');
   return files;
 }
 
@@ -40,36 +44,65 @@ function verifyLayout() {
   for (const path of ['launcher.mjs', 'UPSTREAM-LICENSE',
     'node_modules/dsh-plugin-desktop/lib/main.js',
     'node_modules/dsh-lark-mewclaw-brand-desktop/client.js',
-    'node_modules/dsh-lark-desktop-cloud/lib/index.js']) {
+    'node_modules/dsh-lark-desktop-cloud/lib/index.js',
+    'node_modules/dsh-lark-model-seat/client.js',
+    'node_modules/dsh-lark-desktop-cloud/web-auth-client.js',
+    'node_modules/dsh-lark-desktop-cloud/web.patch.yml']) {
     assert.ok(files.includes(path), `缺少发行入口：${path}`);
   }
   assert.ok(!files.some(value => /(?:^|\/)(?:\.env|\.git)(?:\/|$)/u.test(value)), '包含本地秘密或 Git 数据');
-  const manifest = JSON.parse(readFileSync(join(appRoot, 'package.json'), 'utf8'));
+  const manifest = JSON.parse(appFile('package.json').toString());
   assert.equal(manifest.main, 'launcher.mjs');
-  const launcher = readFileSync(join(appRoot, 'launcher.mjs'), 'utf8');
+  const launcher = appFile('launcher.mjs').toString();
   assert.match(launcher, /MEWCLAW_DESKTOP_CLOUD/u);
-  for (const name of ['index.js', 'workspace-controller.js', 'workspace-client.js', 'location-client.js', 'location.js', 'location-route.js', 'local-workspaces.js', 'local-brand.js', 'cloud-model.js', 'session-boot.js', 'session-ui-state.js']) {
+  for (const name of ['index.js', 'workspace-controller.js', 'workspace-client.js', 'location-client.js', 'location.js', 'location-route.js', 'local-workspaces.js', 'local-brand.js', 'local-account.js', 'graph-events.js', 'presets.js', 'standard-preset.js', 'cloud-model.js', 'session-boot.js', 'session-ui-state.js']) {
     const entry = 'node_modules/dsh-lark-desktop-cloud/lib/' + name;
-    const packed = readFileSync(join(appRoot, entry));
+    const packed = appFile(entry);
     assert.ok(packed.equals(readFileSync(join(root, 'mewclaw-cloud/lib', name))), '桌面工作区构建不一致：' + name);
     if (name === 'workspace-client.js' || name === 'location-client.js') new Script(packed.toString().replace('\nexport {};', ''));
+  }
+  for (const wrapper of ['agent-presets/lark-standard', 'agent-presets-lightweight/lark-lightweight']) {
+    const path = wrapper + '/agent.cordis.yml';
+    assert.ok(appFile('node_modules/dsh-lark-desktop-cloud/' + path).equals(readFileSync(join(root, 'mewclaw-cloud', path))), '模式配置与候选不一致');
   }
   console.log('APP_ENTRYPOINTS_OK');
 }
 
 function verifyOfficialFiles() {
-  const scripts = listAppFiles().filter(value => value.startsWith('node_modules/@deepseek-ai/')
-    && !value.slice('node_modules/'.length).includes('/node_modules/') && /\.[cm]?js$/u.test(value));
+  const marker = 'node_modules/@deepseek-ai/';
+  const scripts = listAppFiles().filter(value => value.slice(value.lastIndexOf('node_modules/') + 'node_modules/'.length).startsWith('@deepseek-ai/') && /\.[cm]?js$/u.test(value));
+  const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
+  const sources = new Map();
+  for (const [path, item] of Object.entries(lock.packages)) {
+    if (!path.includes(marker)) continue;
+    const name = path.slice(path.lastIndexOf('node_modules/') + 'node_modules/'.length);
+    const key = `${name}@${item.version}`;
+    const rows = sources.get(key) ?? [];
+    if (existsSync(join(root, path))) rows.push(join(root, path));
+    sources.set(key, rows);
+  }
+  const versions = new Map();
   assert.ok(scripts.length > 100, '官方运行时文件未完整收集');
   for (const entry of scripts) {
-    assert.ok(readFileSync(join(appRoot, entry)).equals(readFileSync(join(root, entry))),
+    const start = entry.lastIndexOf(marker);
+    const suffix = entry.slice(start + marker.length);
+    const slash = suffix.indexOf('/');
+    const packageRoot = entry.slice(0, start + marker.length + slash);
+    if (!versions.has(packageRoot)) versions.set(packageRoot, JSON.parse(appFile(`${packageRoot}/package.json`)).version);
+    const key = `@deepseek-ai/${suffix.slice(0, slash)}@${versions.get(packageRoot)}`;
+    const file = suffix.slice(slash + 1);
+    const packed = appFile(entry);
+    // electron-builder 会提升 npm 嵌套依赖；按包名/锁定版本定位原始文件。
+    assert.ok((sources.get(key) ?? []).some(directory => existsSync(join(directory, file)) && packed.equals(readFileSync(join(directory, file)))),
       `官方运行时在打包时发生变化：${entry}`);
   }
   console.log(`OFFICIAL_RUNTIME_UNCHANGED ${scripts.length}`);
 }
 
 function verifyNativeSpawn(home) {
+  const expectedElectron = require('electron/package.json').version;
   const code = `
+    if (process.versions.electron !== ${JSON.stringify(expectedElectron)}) throw new Error('Electron 运行时与锁定版本不符');
     const { createRequire } = require('node:module');
     const { spawnSync } = require('node:child_process');
     const r = createRequire(process.argv[1] + '/package.json');
@@ -109,14 +142,16 @@ function verifyRuntime() {
   const home = mkdtempSync(join(tmpdir(), 'mewclaw-package-smoke-'));
   try {
     verifyNativeSpawn(home);
-    runSmoke(home, 'node_modules/@deepseek-ai/dsh/lib/bin.js', ['--version'], /0\.1\.5-rc\.2/u);
+    runSmoke(home, 'node_modules/@deepseek-ai/dsh/lib/bin.js', ['--version'], /0\.1\.6-alpha\.2/u);
     runSmoke(home, 'node_modules/pnpm/bin/pnpm.mjs', ['--version'], /11\.8\.0/u);
     runSmoke(home, 'node_modules/dsh-plugin-desktop/lib/packaged-runtime-smoke.js', [], /DSH_PACKAGED_RUNTIME_OK/u);
     runSmoke(home, 'node_modules/dsh-plugin-desktop/lib/desktop-cli.js',
       ['--profile', 'headless', '--help'], /dsh --profile headless/u);
   } finally {
     // 只删除本次 mkdtemp 创建的烟雾目录。
-    rmSync(home, { recursive: true, force: true });
+    // Wine 的 junction 清理会跟随目标；兼容层验收保留临时目录，不能误删发行依赖。
+    if (keepSmokeHome) console.log(`SMOKE_HOME_RETAINED ${home}`);
+    else rmSync(home, { recursive: true, force: true });
   }
 }
 
@@ -131,18 +166,26 @@ function verifyArtifacts() {
   }
   const AdmZip = require('adm-zip');
   const zip = new AdmZip(join(release, artifacts.find(name => name.endsWith('.zip'))));
-  for (const entry of ['MewClaw.exe', 'resources/app/launcher.mjs',
-    'resources/app/node_modules/@vscode/ripgrep-win32-x64/bin/rg.exe']) {
+  assert.equal(zip.getEntry('resources/default_app.asar'), null, '不得携带 Electron 示例归档');
+  const payloadFiles = listAppFiles(output);
+  assert.equal(zip.getEntries().filter(entry => !entry.isDirectory).length, payloadFiles.length, 'ZIP 文件清单与发行目录不一致');
+  for (const entry of payloadFiles) {
     const data = zip.readFile(entry);
     assert.ok(data && data.equals(readFileSync(join(output, entry))), `ZIP 与已验证应用不一致：${entry}`);
   }
-  console.log('ZIP_PAYLOAD_MATCHES_VERIFIED_APP');
+  console.log(`ZIP_PAYLOAD_MATCHES_VERIFIED_APP ${payloadFiles.length}`);
 }
 
 assert.ok(existsSync(executable), '缺少打包 EXE');
-assert.ok(statSync(appRoot).isDirectory(), '应用根必须为 resources/app/ 目录（asar:false）');
+assert.ok(statSync(appRoot).isDirectory(), '应用根必须为物理目录，满足官方 BigInt stat 契约');
+assert.ok(!existsSync(join(output, 'resources/default_app.asar')), '不得携带 Electron 示例归档');
 verifyLayout();
 verifyOfficialFiles();
-verifyRuntime();
-verifyArtifacts();
-console.log('MEWCLAW_PACKAGE_OK');
+if (!staticOnly) {
+  assert.equal(process.platform, 'win32', '完整运行时门禁需要 Windows；静态核验可显式使用 --static-only');
+  verifyRuntime();
+  verifyOfficialFiles();
+}
+if (!runtimeOnly) verifyArtifacts();
+console.log(staticOnly ? 'MEWCLAW_PACKAGE_STATIC_OK (Windows runtime not executed)'
+  : runtimeOnly ? 'MEWCLAW_PACKAGE_RUNTIME_OK (archive validation separate)' : 'MEWCLAW_PACKAGE_OK');

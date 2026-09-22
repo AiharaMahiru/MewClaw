@@ -36,8 +36,9 @@ function switchSplashRuntime(flagKey: string): void {
     const doc = document;
     // 先铺满背景色，挡住 body 尚未建立时的首帧白闪。
     doc.documentElement.style.background = surface;
-    const MIN_VISIBLE_MS = 350;
-    const FADE_MS = 180;
+    const reduced = doc.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const MIN_VISIBLE_MS = 0;
+    const FADE_MS = reduced ? 0 : 180;
     const CAP_MS = 20000;
     let splash: HTMLElement | undefined;
     let finishing = false;
@@ -80,7 +81,7 @@ function switchSplashRuntime(flagKey: string): void {
       const animate = (spinner as HTMLElement & {
         animate?: (frames: unknown, timing: unknown) => void;
       }).animate;
-      animate?.call(spinner,
+      if (!reduced) animate?.call(spinner,
         [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }],
         { duration: 900, iterations: Infinity });
       const label = doc.createElement('div');

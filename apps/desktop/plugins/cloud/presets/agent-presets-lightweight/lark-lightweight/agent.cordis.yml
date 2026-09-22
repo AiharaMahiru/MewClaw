@@ -1,5 +1,0 @@
-# 保留 lark-lightweight 历史 ID，复用官方 standard，不再裁剪执行能力。
-- id: standard
-  name: '@deepseek-ai/cordis-plugin-include'
-  config:
-    path: ../../../../node_modules/@deepseek-ai/dsh-agent-presets/presets/standard/agent.cordis.yml

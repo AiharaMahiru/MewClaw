@@ -1,7 +1,18 @@
 # MewClaw Desktop 当前交接
 
-更新时间：2026-09-21
+更新时间：2026-09-23
 工作分支：`desktop-dev`
+
+## 2026-09-23 源码同步
+
+已保留并合并远端 `0848bd2`、共享主线 `64f560d` 和本机工作区实现 `c25a986`。当前 Desktop 使用 DSH `0.1.6-alpha.2`、Cordis `4.0.2`、Electron `44.0.0`；本地复用 Web 的 UI 组合、四种模式及滑条，目录入口在原有工作区选择器内。
+
+旧的 preset 物化副本、模型控件 vendor 副本和未调用的 profile patch 追加段已由 Web 同源准备及官方 Provider 子类取代，不再覆写官方实例方法。云端／本地切换的透明底色回退修复已合入。
+
+使用与验收边界以 [README](README.md)、[桌面说明](apps/desktop/README.md) 和 [本机工作区说明](docs/client-local-workspaces.md) 为准。本节仅记录源码同步；下方 Windows 目录、包摘要及生产记录是此前历史，不能视作本次新提交的构建或部署证明。
+
+## 历史交接记录（保留原文）
+
 本地同步基线：已合入 `origin/desktop@a36a7e0`（累计含 R32 计费纪元、R33 桌面推理三形态选择器与共享模型目录、R34-R37 品牌改名、R48 ws-crashguard、R49 bash schema、R52 OCI 出站网络 + 侧栏 10GB、R53 ui-sidebar-files 去重、R54 侧栏媒体流式转发、R55 移动端顶栏对齐、工具 schema 门禁与 STREAM_CLOSED/审计瞬态重试硬化）。途中远端 desktop-dev 已先行合入 `91bd7e6`（`de12683`），本分支在其上再合 desktop（`f48f39c`、`3b527c7`、`868fffa`、本轮 `a36a7e0`、`7e98458`）。最新合并 `b7f289d` 并入 `origin/desktop@7e98458`（`dd9a170` 移动端右坞毛玻璃 + `7e98458` master 合入），干净无冲突、仅触 `packages/lark/mewclaw-brand` 移动端文件，按既定边界不移植桌面变体；已推送并核验远端 `desktop-dev=b7f289d`。随后 VPS 侧再合 `origin/desktop@b5995ca`（`10114eb`，带入 R57 OCI 容器名冲突修复）+ 边界门禁宿主豁免（`7c8dc2c`），并以此发布生产 `R58-desktop-dev-reasoning-20260917`（见 §4）。**2026-09-18 续**：VPS 侧执行 DSH `0.1.6-alpha.2` 升级（master `a801f11`+`fdc7f35` → desktop `583b020` → 本分支 `8e62a32`+`b6629c7`），打包发布 `R59-dsh-0.1.6-alpha2-20260918`（gitCommit `b6629c7`、SHA-256 `45dbc96d9e137e2061959e7f028a1657c9b80404a645cdc5de38d80357938416`），升级细节与核验证据见 `docs/dsh-0.1.6-upgrade.md` §五；桌面候选 lane 仍钉 `0.1.5-rc.2`（`dsh-overrides.json`/candidate lock 未动，桌面底座 0.1.2 兼容面经 `0.1.2-rc.1 || 0.1.5-rc.2 || 0.1.6-alpha.2` peer 范围覆盖）。**2026-09-21 续**：本地 `desktop-dev` 快进至 `25dfa82`（主线 R71–R80：审计 failover、移动端右栏系列修复、IconSendOutline 兼容）；其中 `liquid-glass/surfaces.ts` 横向 tablist 排除 `[data-dockkit-strip]`（dockkit 面板条不再被 fit-content 收编挤位）已同步候选 vendored 副本并重建 `client.js`，本次 Release 产物即含此修复。注意：主线 `06dc1af` 首次挂接 `upstream/dsh-desktop` 于 `a1ddcda8`（比本分支 pin `5510cb1203` 老），合并时保持本分支较新 pin 不回退。按交接约定 `packages/auth/edge` 下 `desktop-inference.ts`/`desktop-inference.test.ts`/`auth-routes.ts`/`server.ts`/`config.ts` 冲突全部取主线版本——本轮为思考强度元数据新增了 `DesktopSharedModel` 接口字段（见下），属本分支对 edge 的**新增**改动而非冲突取线。候选 `mewclaw-brand` workspace 是桌面变体的**展开副本**（剥离移动代码、无 `mobile` 选项）：上游改动中仅全视口生效的 `DEDUPE_STYLE`（隐藏会话头部 "Open right sidebar"）已手工移植；`@media(max-width:768px)` 与 rail 脚本类改动按设计不进入桌面。
 
 ## 当前唯一交付目录

@@ -921,36 +921,3 @@ index c419c32d4b..922c99b5e8 100644
    it('defers hidden and loading documents', () => {
      expect(probeSurface({ hidden: true })).toBe('hidden')
      expect(probeSurface({ loading: true })).toBeNull()
-diff --git a/dsh-plugin-desktop/cordis.patch.yml b/dsh-plugin-desktop/cordis.patch.yml
---- a/dsh-plugin-desktop/cordis.patch.yml
-+++ b/dsh-plugin-desktop/cordis.patch.yml
-@@ -26,3 +26,8 @@
-     printUrl: false
-     surfaceContext: true
-     trustedHosts: []
-+
-+# MewClaw：本地会话的 deepseek-official 路由由云端账号桥接管（/auth/desktop-inference，
-+# 密钥不落本机）。官方原生适配器在本 profile 禁用，避免直连 api.deepseek.com 与目录分叉。
-+- id: llm-deepseek
-+  disabled: true
-diff --git a/dsh-plugin-desktop/src/profile.ts b/dsh-plugin-desktop/src/profile.ts
---- a/dsh-plugin-desktop/src/profile.ts
-+++ b/dsh-plugin-desktop/src/profile.ts
-@@ -1043,12 +1043,17 @@
-   const presets = rows.get(AGENT_PRESETS_ROW_ID)
-   if (presets !== undefined) {
-     const shippedRoot = shippedPresetRoot()
-+    // MewClaw：本地 preset 集与云端逐序对齐。dsh-lark-desktop-cloud 启动时把
-+    // vendored lark 系 preset 物化到 $DSH_HOME/mewclaw-presets（含官方 cordis
-+    // 拷贝以固定目录序）；官方 shipped 根退居第三兜底，用户根保持最后。
-     const roots: Array<{ path: string, trust: 'system' | 'user' }> = [
-+      { path: join(home, 'mewclaw-presets/agent-presets-lightweight'), trust: 'system' },
-+      { path: join(home, 'mewclaw-presets/agent-presets'), trust: 'system' },
-       { path: shippedRoot, trust: 'system' },
-       { path: join(home, USER_PRESET_DIRNAME), trust: 'user' },
-     ]
-     patches.push({
-       id: AGENT_PRESETS_ROW_ID,
-       config: { ...rowConfig(presets), roots, includeUserRoot: false },
-     })
-   }

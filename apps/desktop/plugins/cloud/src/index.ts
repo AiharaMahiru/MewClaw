@@ -8,7 +8,7 @@ import { CloudProxy, cloudOrigin } from './proxy.js';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { DESKTOP_CLIENT_PATH, desktopCloudHtml } from './boot.js';
+import { DESKTOP_CLIENT_PATH, desktopCloudHtml, composeDesktopGraph } from './boot.js';
 import { WorkspaceController } from './workspace-controller.js';
 import { localWorkspaceRoute } from './workspace-route.js';
 import type {} from '@deepseek-ai/dsh-shell';
@@ -17,11 +17,11 @@ import { LocationPreference } from './location.js';
 import { locationRoute } from './location-route.js';
 import { installLocalBrand } from './local-brand.js';
 import { installLocalGlass } from './local-glass.js';
-import { sessionLocationHtml } from './session-boot.js';
+import { installLocalAccount } from './local-account.js';
+import { sessionLocationHtml, composeSessionGraph, filterSessionClients, WEB_POLICY_CLIENTS, type SessionBootGraph } from './session-boot.js';
+import { GRAPH_EVENTS_PATH, localGraphEvents } from './graph-events.js';
 import { LocalHarnessWorkspaces } from './local-workspaces.js';
-import { cloudPresetRoster, materializeLocalPresets } from './local-presets.js';
 import type {} from '@deepseek-ai/dsh-agent-default-model';
-import type {} from '@deepseek-ai/dsh-agent-presets';
 import { CloudAccountModel, CLOUD_MODEL_PROVIDER, hasSession } from './cloud-model.js';
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths';
 
@@ -76,7 +76,9 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
   private readonly location = new LocationPreference(resolveDshHome());
   private localBrandRevision = '';
   private localGlassRevision = '';
-  private seatRevision = '';
+  private localAccountRevision = '';
+  private localLocationRevision = '';
+  private cloudHiddenClients = new Set<string>();
 
   constructor(ctx: Context, config: Config) {
     cloudOrigin(config.cloudOrigin);
@@ -87,57 +89,35 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     const manifest = JSON.parse(readFileSync(require.resolve('dsh-plugin-desktop/package.json'), 'utf8'));
     const workspaceScript = Buffer.from(readFileSync(new URL('../lib/workspace-client.js', import.meta.url), 'utf8').replace('\nexport {};', ''));
     const locationScript = Buffer.from(readFileSync(new URL('../lib/location-client.js', import.meta.url), 'utf8').replace('\nexport {};', ''));
-    // 与云端部署同一个 dsh-lark-model-seat 客户端包（vendor/ 内为 packages/lark/model-seat
-    // 的 client.js 产物）——本地 composer 模型座因此逐字节同款：弹层滑条、模型清单、priority:-1 遮蔽。
-    const seatScript = readFileSync(new URL('../vendor/model-seat-client.js', import.meta.url));
     const client = {
       workspaceRevision: createHash('sha256').update(workspaceScript).digest('hex').slice(0, 16),
       locationRevision: createHash('sha256').update(locationScript).digest('hex').slice(0, 16),
-      seatRevision: createHash('sha256').update(seatScript).digest('hex').slice(0, 16),
       revision: createHash('sha256').update(script).digest('hex').slice(0, 16),
       inject: manifest.dsh.client.inject as string[],
     };
-    this.seatRevision = client.seatRevision;
+    this.localLocationRevision = client.locationRevision;
     this.localBrandRevision = installLocalBrand(ctx);
     this.localGlassRevision = installLocalGlass(ctx);
-    // 本地 preset 集对齐云端：profile patch 的 roots 指向此处物化的
-    // $DSH_HOME/mewclaw-presets；失败不阻塞启动（list 发现为空目录即降级）。
-    try { materializeLocalPresets(resolveDshHome()); }
-    catch (error) { ctx.logger.warn(`本地 preset 物化失败：${error instanceof Error ? error.message : String(error)}`); }
-    this.alignLocalPresetRoster(ctx);
+    this.localAccountRevision = installLocalAccount(ctx);
     this.cloud = new CloudProxy({ origin: config.cloudOrigin, timeoutMs: config.cloudTimeoutMs,
       sessionRetentionSeconds: config.cloudSessionRetentionSeconds ?? 2592000,
       maxIndexBytes: config.cloudMaxIndexBytes ?? 2097152,
       transformIndex: html => this.transformCloudIndex(html, client),
+      transformGraph: graph => {
+        filterSessionClients(graph, this.cloudHiddenClients);
+        return composeSessionGraph(composeDesktopGraph(graph, client, this.desktopParameters), {
+          location: 'cloud', locationRevision: client.locationRevision, workspaceRevision: client.workspaceRevision,
+        });
+      },
     });
     ctx.effect(() => () => this.cloud.dispose());
     this.installWorkspace(ctx, config, workspaceScript);
     this.installLocation(ctx, config, locationScript, client.locationRevision);
-    ctx.effect(() => this.register({ kind: 'exact', path: '/_dsh/desktop/model-seat-client.js', handler: (req, res) => {
-      const rejection = this.ctx.get('connection')?.requestRejection(req);
-      if (!this.ctx.get('connection') || rejection !== undefined) { res.writeHead(rejection ?? 503); res.end(); return; }
-      res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' }); res.end(seatScript);
-    } }));
     ctx.effect(() => this.register({ kind: 'exact', path: DESKTOP_CLIENT_PATH, handler: (req, res) => {
       const rejection = this.ctx.get('connection')?.requestRejection(req);
       if (!this.ctx.get('connection') || rejection !== undefined) { res.writeHead(rejection ?? 503); res.end(); return; }
       res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' }); res.end(script);
     } }));
-  }
-
-  /** 本地 preset 菜单对齐云端：Edge rpc-policy 对 agentPresets/list 只放行白名单 id
-   * 并改显示名（客户端字典再对 trust=system 的 preset 做 i18n 覆盖，最终呈现与云端
-   * 同款的「日常助手 / 创造模式 / 高效执行 / 标准模式」）。只包显示层 remoteExportList，
-   * resolve/mount 与按 id 选择的语义不受影响；云端模式下本地 roster 不被消费。 */
-  private alignLocalPresetRoster(ctx: Context): void {
-    ctx.inject(['agentPresets'], local => {
-      const service = local.agentPresets;
-      const original = service.remoteExportList.bind(service);
-      service.remoteExportList = async () => {
-        const roster = await original();
-        return { ...roster, presets: cloudPresetRoster(roster.presets) };
-      };
-    });
   }
 
   private installWorkspace(ctx: Context, config: Config, script: Buffer): void {
@@ -188,10 +168,6 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
       res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' }); res.end(script);
     } }));
     ctx.effect(() => this.tapIndex(html => this.transformLocalIndex(html, revision)));
-    ctx.inject(['tools'], local => local.effect(() => local.tools.guard(exec => {
-      if (exec.name === 'desktop_workspace') return this.location.location === 'local' ? undefined : 'LOCAL_TOOL_NOT_AUTHORIZED';
-      return this.location.location === 'local' ? 'LOCAL_TOOL_NOT_AUTHORIZED' : undefined;
-    })));
     ctx.inject(['llm', 'agentDefaultModel'], async local => {
       // env 是测试逃生口（冒烟用 loopback mock 顶替目录）；部署走 cloudModelOrigin/cloudOrigin 配置。
       const adapter = new CloudAccountModel({ origin: cloudOrigin(process.env.MEWCLAW_CLOUD_MODEL_ORIGIN || config.cloudModelOrigin || config.cloudOrigin).origin,
@@ -250,18 +226,23 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
     });
   }
 
-  private transformCloudIndex(html: string, client: { revision: string; inject: string[]; locationRevision: string; workspaceRevision: string; seatRevision: string }): string {
+  private transformCloudIndex(html: string, client: { revision: string; inject: string[]; locationRevision: string; workspaceRevision: string }): string {
+    const wire = html.split('globalThis["__DSH_BOOT__"] = ')[1]?.split('</script>')[0];
+    if (wire) {
+      const graph = JSON.parse(wire.trim().replace(/;$/, '')) as SessionBootGraph;
+      this.cloudHiddenClients = new Set(WEB_POLICY_CLIENTS.filter(id => !graph.entries.some(entry => entry.id === id)));
+    }
     const location = this.location.location;
     const transformed = desktopCloudHtml(html, client, this.desktopParameters);
     const options: Parameters<typeof sessionLocationHtml>[1] = { location, locationRevision: client.locationRevision };
     if (location === 'cloud') options.workspaceRevision = client.workspaceRevision;
-    if (location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; options.seatRevision = client.seatRevision; }
+    if (location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; options.accountRevision = this.localAccountRevision; }
     return sessionLocationHtml(transformed, options);
   }
 
   private transformLocalIndex(html: string, revision: string): string {
     const options: Parameters<typeof sessionLocationHtml>[1] = { location: this.location.location, locationRevision: revision };
-    if (this.location.location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; options.seatRevision = this.seatRevision; }
+    if (this.location.location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; options.accountRevision = this.localAccountRevision; }
     return sessionLocationHtml(html, options);
   }
 
@@ -292,6 +273,14 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
   }
 
   override register(route: WebRoute): () => void {
+    if (route.path === GRAPH_EVENTS_PATH) {
+      const events = localGraphEvents(this.ctx, graph => composeSessionGraph(graph, {
+        location: 'local', locationRevision: this.localLocationRevision, brandRevision: this.localBrandRevision,
+        glassRevision: this.localGlassRevision, accountRevision: this.localAccountRevision,
+      }));
+      const dispose = super.register({ ...route, handler: this.wrap(events.handler) });
+      return () => { dispose(); events.dispose(); };
+    }
     return super.register({ ...route, handler: this.wrap(route.handler) });
   }
 
