@@ -151,7 +151,7 @@ export class DshTuiRemoteClient {
       body = await this.http.json(`/api/${canonical.split('/').map(encodeURIComponent).join('/')}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ rpcId, method: canonical, payload: { args } }),
+        body: JSON.stringify({ type: 'client-request', rpcId, method: canonical, payload: { args } }),
       }, signal);
     } catch (error) {
       throw await this.authBoundary(error);
@@ -198,8 +198,10 @@ export class DshTuiRemoteClient {
     return this.rpc('session/selectModel', { request: { sessionId: validId(sessionId), ...request } }, signal);
   }
 
-  async sessionModelCatalog(sessionId?: string, signal?: AbortSignal): Promise<unknown> {
-    return this.rpc('session/modelCatalog', sessionId ? { sessionId: validId(sessionId) } : {}, signal);
+  async sessionModelCatalog(_sessionId?: string, signal?: AbortSignal): Promise<unknown> {
+    // 官方 0.1.5-rc.1 descriptor 是零参数方法；会话身份只用于后续
+    // selectModel，不能把 sessionId 作为未知参数发送给严格 codec。
+    return this.rpc('session/modelCatalog', {}, signal);
   }
 
   async prompt(sessionId: string, text: string, extra: Record<string, unknown> = {}, signal?: AbortSignal): Promise<unknown> {
@@ -260,7 +262,23 @@ export class DshTuiRemoteClient {
     return this.executeCommand(sessionId, mode.active ? '/plan' : '/plan off', signal);
   }
 
-  async listWorkspaces(signal?: AbortSignal): Promise<{ items: WorkspaceEntry[]; raw: unknown }> { return parseWorkspaces(await this.rpc('workspace/list', {}, signal)); }
+  async listWorkspaces(signal?: AbortSignal): Promise<{ items: WorkspaceEntry[]; raw: unknown }> {
+    // 官方 0.1.5-rc.1 没有 unary workspace/list；每个 generation 的
+    // workspace/follow 第一帧都是完整 baseline。读取一帧后主动关闭逻辑流。
+    const timeout = AbortSignal.timeout(30_000);
+    const streamSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    for await (const frame of this.openStream('workspace/follow', { args: {} }, { signal: streamSignal })) {
+      if (!frame || typeof frame !== 'object' || Array.isArray(frame)) throw new RemoteClientError('INVALID_RESPONSE');
+      const record = frame as Record<string, unknown>;
+      if (record.type !== 'baseline' || !record.value || typeof record.value !== 'object' || Array.isArray(record.value)) {
+        throw new RemoteClientError('INVALID_RESPONSE');
+      }
+      const value = record.value as Record<string, unknown>;
+      const parsed = parseWorkspaces({ items: value.items });
+      return { items: parsed.items, raw: frame };
+    }
+    throw new RemoteClientError('STREAM_FAILED');
+  }
 
   async createWorkspace(options: WorkspaceCreateOptions, signal?: AbortSignal): Promise<WorkspaceEntry | Record<string, unknown>> {
     if (options.workspaceRoot) assertWorkspacePath(options.request.path, options.workspaceRoot);

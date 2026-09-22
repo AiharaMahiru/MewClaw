@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { MemoryCredentialStore } from './credential-store.js';
+import { CookieJar } from './cookie-jar.js';
 import { RemoteClientError } from './errors.js';
 import { DshTuiRemoteClient } from './client.js';
 import { RemoteWorkspaceBridge } from './local-workspace.js';
@@ -52,6 +53,7 @@ function fakeFetch(options: { quotaDenied?: boolean; badRpcId?: boolean; promptA
       if (command.action === 'sync') return response({ value: { synced: true } });
     }
     if (url.pathname.startsWith('/api/')) {
+      if (body?.type !== 'client-request') return response({ error: 'INVALID_REQUEST' }, 400);
       const rpcId = typeof body?.rpcId === 'string' ? body.rpcId : '';
       const method = typeof body?.method === 'string' ? body.method : '';
       if (method === 'session/list') return response({ type: 'server-response', rpcId: options.badRpcId ? 'wrong' : rpcId, result: { ok: true, value: { items: [{ sessionId: 's1', title: '会话' }] } } });
@@ -68,6 +70,13 @@ function fakeFetch(options: { quotaDenied?: boolean; badRpcId?: boolean; promptA
 }
 
 describe('dsh TUI 远程客户端', () => {
+  it('向同源 wss 连接发送 Secure 会话 Cookie，但不向明文 ws 发送', () => {
+    const cookies = new CookieJar();
+    cookies.setFromHeader('__Host-dsh_session=opaque; Secure; Path=/; HttpOnly', new URL('https://chat.example.com/'));
+    expect(cookies.header(new URL('wss://chat.example.com/api/remote.mux'))).toBe('__Host-dsh_session=opaque');
+    expect(cookies.header(new URL('ws://chat.example.com/api/remote.mux'))).toBeUndefined();
+  });
+
   it('建立登录态、读取额度/模型并保留 Cookie 而不保存密码', async () => {
     const stub = fakeFetch({ promptAccepted: true });
     const store = new MemoryCredentialStore();
@@ -89,11 +98,41 @@ describe('dsh TUI 远程客户端', () => {
     const sessions = await client.listSessions({ limit: 10 });
     expect(sessions.items[0]?.id).toBe('s1');
     const list = stub.requests.find(request => request.path === '/api/session/list');
+    expect(list?.body?.type).toBe('client-request');
     expect(list?.body?.payload).toEqual({ args: { _request: {} } });
     await client.createSession({ request: { cwd: '/work/project' }, workspaceRoot: '/work' });
     const create = stub.requests.find(request => request.path === '/api/session/create');
     expect(create?.body?.payload).toEqual({ args: { request: { cwd: '/work/project' } } });
     await expect(client.createWorkspace({ request: { path: '/tmp/outside' }, workspaceRoot: '/work' })).rejects.toMatchObject({ code: 'WORKSPACE_PATH_NOT_ALLOWED' });
+  });
+
+  it('从 workspace/follow baseline 读取工作区目录', async () => {
+    const stub = fakeFetch();
+    let socket: FakeSocket | undefined;
+    const client = new DshTuiRemoteClient({
+      endpoint: 'http://127.0.0.1:3080',
+      allowInsecureHttp: true,
+      fetch: stub.fetch,
+      credentialStore: new MemoryCredentialStore(),
+      websocketFactory: (_url, options) => {
+        expect(options.headers.cookie).toContain('dsh_session=session-cookie');
+        socket = new FakeSocket();
+        socket.readyState = 1;
+        setImmediate(() => {
+          const open = JSON.parse(socket!.sent[0]!) as { streamId: string; endpoint: string; payload: unknown };
+          expect(open.endpoint).toBe('workspace/follow');
+          expect(open.payload).toEqual({ args: {} });
+          socket!.emit('message', { data: JSON.stringify({
+            type: 'item',
+            streamId: open.streamId,
+            value: { type: 'baseline', value: { items: [{ workspaceId: 'w1', path: '/work', title: '工作区', sessionIds: [] }], archivedSessionIds: [] } },
+          }) });
+        });
+        return socket;
+      },
+    });
+    await client.login('u@example.com', 'password');
+    await expect(client.listWorkspaces()).resolves.toMatchObject({ items: [{ workspaceId: 'w1', path: '/work', title: '工作区' }] });
   });
 
   it('使用官方模型与模式 Remote 契约，不直接伪造 session 事件', async () => {
@@ -108,12 +147,14 @@ describe('dsh TUI 远程客户端', () => {
     await client.selectMode('s1', { kind: 'permission-preset', value: 'workspace-write' });
     await client.selectMode('s1', { kind: 'plan', active: true });
     await client.selectModel('s1', { provider: 'deepseek-official', model: 'deepseek-chat', reasoningEffort: 'high' });
+    await client.sessionModelCatalog('s1');
     await client.prompt('s1', 'hello');
     const bodies = stub.requests.filter(request => request.path.startsWith('/api/')).map(request => request.body);
     expect(bodies).toContainEqual(expect.objectContaining({ method: 'agentPresets/select', payload: { args: { agentId: 's1', agentPreset: 'standard' } } }));
     expect(bodies).toContainEqual(expect.objectContaining({ method: 'commands/execute', payload: { args: { agentId: 's1', line: '/permission workspace-write', submittedAttachments: [] } } }));
     expect(bodies).toContainEqual(expect.objectContaining({ method: 'commands/execute', payload: { args: { agentId: 's1', line: '/plan', submittedAttachments: [] } } }));
     expect(bodies).toContainEqual(expect.objectContaining({ method: 'session/selectModel', payload: { args: { request: { sessionId: 's1', provider: 'deepseek-official', model: 'deepseek-chat', reasoningEffort: 'high' } } } }));
+    expect(bodies).toContainEqual(expect.objectContaining({ method: 'session/modelCatalog', payload: { args: {} } }));
     const prompt = bodies.find(body => body?.method === 'session/prompt');
     expect(prompt?.payload).toEqual({ args: { request: expect.objectContaining({ sessionId: 's1', mode: 'queue', content: [{ type: 'text', text: 'hello' }] }) } });
   });

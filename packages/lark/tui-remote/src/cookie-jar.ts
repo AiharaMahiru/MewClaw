@@ -72,8 +72,9 @@ export class CookieJar {
 
   header(requestUrl: URL): string | undefined {
     this.prune();
+    const secureTransport = requestUrl.protocol === 'https:' || requestUrl.protocol === 'wss:';
     const values = [...this.cookies.values()]
-      .filter(cookie => (!cookie.secure || requestUrl.protocol === 'https:') && pathMatches(requestUrl.pathname, cookie.path))
+      .filter(cookie => (!cookie.secure || secureTransport) && pathMatches(requestUrl.pathname, cookie.path))
       .sort((left, right) => right.path.length - left.path.length)
       .map(cookie => `${cookie.name}=${encodeURIComponent(cookie.value)}`);
     return values.length > 0 ? values.join('; ') : undefined;
