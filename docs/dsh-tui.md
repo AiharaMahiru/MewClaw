@@ -1,5 +1,6 @@
 # dsh-TUI 本机与云端工作区
 
+TUI 与 Web、Windows Desktop、Feishu 属于同一个 MewClaw。产品与共享策略以 Web 为基线，运行时契约跟随 DSH 官方上游；统一能力归属与优化顺序见[统一架构](mewclaw-architecture.md)。
 
 ## 本机工作区（2026-09-23）
 
@@ -15,35 +16,32 @@ Windows 边界见 [本轮验收](client-local-workspaces.md)。
 
 ## 旧远程桥接适配
 
-本分支 `feat/dsh-tui-remote-workspace` 为当前 dsh Web 增加了一个可供
-`ccch1mneyyy/dsh-TUI` 挂载的远程客户端包：`dsh-lark-tui-remote`。
+MewClaw 共享主线提供可供 TUI adapter 消费的远程客户端包：`dsh-lark-tui-remote`。
 云端保存登录态、额度、模型目录、会话和工作区登记；TUI 只在本机执行被
 授权的文件操作，因此换电脑时不需要把云端工作区文件复制到 TUI 的会话目录。
 
-## 安装
+## 共享客户端开发
+
+当前 MewClaw TUI 使用 [AiharaMahiru/dsh-TUI](https://github.com/AiharaMahiru/dsh-TUI) 的源码构建。其 adapter 直接导入 `src/dsh-adapter/remote/index.ts`，该目录保存本仓库 `packages/lark/tui-remote/src` 的 11 个共享源码副本；截至 2026-09-23 字节一致，但尚无跨仓库同步门禁。`account-model.ts`、`account-inference.ts` 和 `local-files.ts` 是 TUI 专属扩展。下面的包依赖示例供共享客户端开发，不是当前 fork 的实际绑定方式。
 
 上游 TUI（当前缓存验证提交 `8e1931e7bbd376dc8838d74f2fe24f052012542c`，版本
-`0.10.2`）仍按上游方式安装：
+`0.10.2`）仍按上游方式安装；此命令不会安装 MewClaw fork 的新增能力：
 
 ```bash
 npm install -g @deepseek-ai/dsh @deepseek-harness-tui/dsh-tui
 dsh-tui version
 ```
 
-远程适配包目前随本仓库构建，尚未发布到 npm。开发/验收机可从本分支构建：
+远程适配包目前随本仓库构建，尚未发布到 npm。开发/验收机可从共享主线构建：
 
 ```bash
-git clone https://github.com/AiharaMahiru/MewClaw.git dsh-web
+git clone --recurse-submodules --branch master https://github.com/AiharaMahiru/MewClaw.git dsh-web
 cd dsh-web
-git fetch origin feat/dsh-tui-remote-workspace
-git switch --detach origin/feat/dsh-tui-remote-workspace
 pnpm install --frozen-lockfile
 pnpm --filter dsh-lark-tui-remote build
 ```
 
-将 `packages/lark/tui-remote` 的构建产物作为 TUI 适配器依赖（或在
-`dsh-TUI` 的 adapter 分支中以 workspace/link 方式接入）。生产发布前应由
-发布者另行生成 npm 包并签名；本分支不改变线上 `/opt/dsh/current`。
+后续可将 `packages/lark/tui-remote` 的构建产物作为 TUI 适配器依赖；迁移前先验证包导出、独立安装与官方 adapter 边界，再替代现有副本。构建产物不等于已经部署，也不要求把共享包发布到官方 npm 作用域。
 
 ## 最小挂载示例
 
@@ -128,9 +126,7 @@ await remote.workspace.serve(sessionId, async (operation, signal) => {
 - `/api/remote.mux` 流需要 TUI 提供带 Cookie 的 WebSocket 工厂。无 cursor 的
   流默认不自动重连，避免重复业务项；只有提供 `resumePayload` 时才建议开启
   `maxReconnects`。
-- 当前上游 `dsh-tui` 的 `Shift+Tab` 仍运行在本地 Harness Channel；本包已经
-  提供远程模式 facade，但要让已发布的 `dsh-tui` 真正显示云端会话/模式，仍需在
-  `ccch1mneyyy/dsh-TUI` 的 remote host/channel 分支挂载此 facade。
+- MewClaw fork 的 `/connect` 已接入云端会话、工作区和模式控制；普通聊天、转录与 `Shift+Tab` 仍由本机 Harness Channel 处理。共享远程 facade 不等于完整远程聊天界面。
 - 云端 `workspace/create` 的 `path` 必须是服务端用户工作区根内的路径；本机目录
   不应直接上传。电脑本地根目录由 TUI Host 自己授权，再通过 `/desktop-workspace`
   的 bind/poll/result 桥接执行相对路径操作。
@@ -139,6 +135,4 @@ await remote.workspace.serve(sessionId, async (operation, signal) => {
 
 ## 回滚
 
-本次改动只在 `feat/dsh-tui-remote-workspace`，没有重启服务、切换 release、
-修改生产凭证或迁移用户会话。停用方式是从 TUI profile 移除该 adapter，并删除
-本机 `remote-session.json`；云端现有 Web 登录和工作区数据不受影响。
+停用账号推理前先结束或取消运行中的本地回合，再通过 `/connect` 退出登录或由维护者调整 TUI profile。保留已有会话日志和工作区；登录、退出与配置调整按对应宿主执行，不以删除用户数据代替停用。Git 分支同步不触发服务重启或生产切换。
