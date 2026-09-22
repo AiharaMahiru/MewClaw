@@ -1,12 +1,13 @@
 # MewClaw 客户端工作区集成
 
-MewClaw 基于 DeepSeek Harness（DSH）与 Cordis，为 Web、Windows Desktop 和 TUI 提供共享账号与模型能力。Agent、会话、工具、审批和持久化复用官方插件；自有功能通过 Provider、公开 slots 与配置组合接入，官方 DSH 包保持原样。
+MewClaw 是覆盖 **Web、TUI、Windows Desktop 和 Feishu（飞书）** 的统一产品。Web 是产品与交互基线，DeepSeek Harness（DSH）官方上游是底层运行时与契约主线。Agent、会话、工具、审批和持久化复用官方插件；自有功能通过 Cordis Provider、Consumer、公开 slots 与配置组合接入，官方 DSH 包保持原样。见[统一架构与演进约定](docs/mewclaw-architecture.md)。
 
 本分支 `feat/dsh-tui-remote-workspace` 集成 **共享账号、Desktop 本机工作区与 TUI 接入**。Web 和共享服务以 `master` 为基线。Desktop 的完整客户端组合与发行配置见 [`desktop`](https://github.com/AiharaMahiru/MewClaw/tree/desktop)，TUI 实现见 [`AiharaMahiru/dsh-TUI`](https://github.com/AiharaMahiru/dsh-TUI)。
 
 ## 当前能力
 
 - Web 使用云端工作区、会话与工具。
+- Feishu（飞书）通过消息、卡片和交互 Provider 接入官方 Agent 与会话事件；Gateway 接入与 Worker 执行分离，跨端会话共享须经过身份与资源归属校验。
 - Windows Desktop 支持云端／本地切换；本地目录从原有工作区选择器进入。Desktop 分支复用 Web 的组件、自有插件、四种模式与思考强度滑条。
 - TUI 支持 `dsh-tui "D:\项目\我的工程"` 或 `/workspace open <目录>`。用 `/connect` 登录，在 `/model` 选择 MewClaw 云端账号后，普通聊天可调用本机工具。
 - 本机模式的 Agent、文件和会话日志在电脑运行，云端提供认证、模型目录及推理；不要求绑定云端工作区，不复制供应商 API Key。模型推理需要网络，工作目录本身不是沙箱。
@@ -39,13 +40,13 @@ pnpm verify:dsh-brand
 
 | 分支 / 仓库 | 职责 |
 | --- | --- |
-| `master` | Web、共享插件与云端服务 |
+| `master` | 以 Web 为基线的四端共享产品、插件与云端服务 |
 | `desktop` | Windows 客户端集成、候选与发行配置 |
 | `desktop-dev` | Desktop 集成开发及兼容性验证 |
 | `feat/dsh-tui-remote-workspace` | 本机工作区及跨客户端接入的集成分支 |
 | `AiharaMahiru/dsh-TUI` 的 `main` / 同名功能分支 | TUI 本身与官方 adapter |
 
-共享修复先进入 `master`，再按 `master → desktop-dev/desktop` 正常合并；保留共同历史，不反复 squash/cherry-pick，也不把整条桌面开发分支反向合并进 Web。各端独立发布，不随 Git 推送切换生产。
+共享修复先进入 `master`，再按 `master → desktop-dev/desktop` 正常合并，TUI 同步相应共享契约与 adapter；保留共同历史，不反复 squash/cherry-pick，也不把整条桌面开发分支反向合并进 Web。四端统一规划能力与兼容性验收，安装包和平台交付可以分别发布，不随 Git 推送切换生产。
 
 ## 项目结构
 
