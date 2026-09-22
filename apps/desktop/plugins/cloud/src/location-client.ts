@@ -55,7 +55,21 @@ global.__ModuleLoader__.load({ id: 'dsh-lark-desktop-location-client', factory: 
         // 键名与 switch-splash.ts 的 SWITCH_FLAG_KEY 保持同一字面量（本文件按静态脚本分发，不能引入模块依赖）。
         let bg = '';
         let ink = '';
-        try { const style = getComputedStyle(document.body); bg = style.backgroundColor; ink = style.color; } catch { /* 样式不可读时由新页面用默认色 */ }
+        try {
+          // body 常是透明底色（主题把底画在 html/root 上）：透明会让官方启动屏透上来与
+          // 过渡文案叠影——先 body 后 html 取首个不透明色，仍透明则交给新页面默认色。
+          const transparent = (value: string) => {
+            const alpha = /^rgba\([^)]*,\s*([\d.]+)\s*\)$/i.exec(value)?.[1];
+            if (alpha !== undefined) return Number.parseFloat(alpha) < 1;
+            const hex = /^#(?:[0-9a-f]{4}|[0-9a-f]{8})$/i.exec(value);
+            return hex !== null && (value.length === 5 ? value[4] === '0' : value.slice(7) === '00');
+          };
+          const body = getComputedStyle(document.body);
+          bg = body.backgroundColor;
+          if (transparent(bg)) bg = getComputedStyle(document.documentElement).backgroundColor;
+          if (transparent(bg)) bg = '';
+          ink = body.color;
+        } catch { /* 样式不可读时由新页面用默认色 */ }
         try { sessionStorage.setItem('mewclaw.location-switch', JSON.stringify({ to: target, bg, ink })); } catch { /* 意图缺失时新页面直接启动 */ }
         const overlay = document.createElement('div');
         overlay.id = 'mewclaw-location-splash';
@@ -82,25 +96,53 @@ global.__ModuleLoader__.load({ id: 'dsh-lark-desktop-location-client', factory: 
     const label = (mode: SessionLocation) => mode === 'cloud' ? '云端' : '本地';
     return React.createElement('div', {
       role: 'group', 'aria-label': 'Harness 位置', title: '账号和模型继续使用云端；本地模式只访问你授权的目录。',
-      style: { display: 'flex', flexDirection: 'column', gap: 4, padding: wide ? '4px 8px' : '4px 0' },
+      className: 'mewclaw-location',
+      style: { padding: wide ? '4px 8px' : '4px 0' },
     },
-      React.createElement('div', { style: { display: 'flex', gap: 4, justifyContent: wide ? 'stretch' : 'center' } },
+      React.createElement('div', { className: 'mewclaw-location-track' },
         ...(['cloud', 'local'] as const).map(mode => React.createElement('button', {
-          key: mode, type: 'button', disabled: busy, 'aria-pressed': mode === location,
+          key: mode, type: 'button', disabled: busy,
+          className: 'mewclaw-location-seg' + (mode === location ? ' is-active' : ''),
+          'aria-pressed': mode === location,
           'aria-label': `${label(mode)}模式`, title: `${label(mode)}模式`,
           onClick: () => { void change(mode); },
-          style: { flex: wide ? 1 : undefined, minWidth: wide ? 0 : 36, padding: '4px 6px' },
         }, wide ? label(mode) : mode === location ? '●' : '○'))),
       location === 'local' ? React.createElement('button', {
         type: 'button', disabled: busy, onClick: () => { void open(); },
+        className: 'mewclaw-location-open',
         'aria-label': '打开本地目录', title: '打开本地目录',
-        style: { width: '100%', padding: '4px 6px', textAlign: wide ? 'left' : 'center' },
+        style: { textAlign: wide ? 'left' : 'center' },
       }, wide ? '打开本地目录' : '目录') : null,
-      error ? React.createElement('span', { role: 'status', title: error, style: { fontSize: 11, overflowWrap: 'anywhere' } }, error) : null);
+      error ? React.createElement('span', { role: 'status', title: error, className: 'mewclaw-location-error' }, error) : null);
+  }
+
+  /** 控件样式跟随 dsw 令牌；轨道用交互悬停色，选中段浮起为 layer-3。 */
+  const LOCATION_CSS = `
+.mewclaw-location{display:flex;flex-direction:column;gap:6px}
+.mewclaw-location-track{display:flex;gap:2px;padding:2px;border-radius:10px;background:var(--dsw-alias-interactive-bg-hover,rgb(220 220 235 / 10%))}
+.mewclaw-location-seg{appearance:none;flex:1;min-width:0;height:26px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary,rgb(249 250 251 / 60%));font:inherit;font-size:12px;font-weight:500;line-height:26px;cursor:pointer;transition:background .12s,color .12s,box-shadow .12s}
+.mewclaw-location-seg:hover:not(:disabled):not(.is-active){color:var(--dsw-alias-label-primary,#f9fafb);background:var(--dsw-alias-interactive-bg-hover,rgb(220 220 235 / 10%))}
+.mewclaw-location-seg.is-active{background:var(--dsw-alias-bg-layer-3,#303035);color:var(--dsw-alias-label-primary,#f9fafb);box-shadow:0 1px 2px rgb(0 0 0 / 30%),inset 0 0 0 1px rgb(255 255 255 / 8%)}
+.mewclaw-location-seg:focus-visible{outline:2px solid var(--dsw-alias-label-primary-bluish,#8ab4f8);outline-offset:-2px}
+.mewclaw-location-seg:disabled{cursor:default;opacity:.55}
+.mewclaw-location-open{appearance:none;width:100%;height:30px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:var(--dsw-alias-label-secondary,rgb(249 250 251 / 60%));font:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:background .12s,color .12s}
+.mewclaw-location-open:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,rgb(220 220 235 / 10%));color:var(--dsw-alias-label-primary,#f9fafb)}
+.mewclaw-location-open:focus-visible{outline:2px solid var(--dsw-alias-label-primary-bluish,#8ab4f8);outline-offset:-2px}
+.mewclaw-location-open:disabled{cursor:default;opacity:.55}
+.mewclaw-location-error{font-size:11px;color:var(--dsw-alias-state-warn-label,#f2994a);overflow-wrap:anywhere}
+`;
+
+  function ensureLocationStyle(): void {
+    if (document.getElementById('mewclaw-location-style')) return;
+    const style = document.createElement('style');
+    style.id = 'mewclaw-location-style';
+    style.textContent = LOCATION_CSS;
+    document.head.appendChild(style);
   }
 
   return { inject: ['slots', 'uiWorkspace'], apply(ctx: Context) {
     const workspace = (ctx as Context & { uiWorkspace: WorkspaceApi }).uiWorkspace;
+    ensureLocationStyle();
     ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
       name: 'sidebar.footer.action', id: 'mewclaw-location', order: -100,
     }, (props: LocationProps) => React.createElement(LocationActions, { ...props, workspace })));
