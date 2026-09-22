@@ -1,6 +1,6 @@
 # AGENTS.md — dsh-lark 工作规则
 
-本仓库是 Lark Claw 迁移到 DeepSeek Harness（dsh）后的飞书卡片机器人平台：**独立插件仓库**，通过 npm 依赖 `@deepseek-ai/dsh-*`，一切皆插件（Cordis）。蓝图见 [docs/migration-blueprint.md](docs/migration-blueprint.md)。
+本仓库是 **MewClaw 的共享产品与插件仓库**，涵盖 Web、TUI、Windows Desktop 和 Feishu（飞书）四个接入端，通过 npm 依赖 `@deepseek-ai/dsh-*`，一切皆插件（Cordis）。统一架构见 [docs/mewclaw-architecture.md](docs/mewclaw-architecture.md)，飞书迁移历史见 [docs/migration-blueprint.md](docs/migration-blueprint.md)。
 
 框架侧完整惯例（vendored Cordis 语义、事件信封机制、类型规则原文）见 [docs/reference/dsh-AGENTS.md](docs/reference/dsh-AGENTS.md)；冲突时本文件优先，其次是蓝图与 SPEC。
 
@@ -9,6 +9,8 @@
 完整文档地图见 [README.md](README.md)。速查：蓝图 [docs/migration-blueprint.md](docs/migration-blueprint.md) · 组件映射 [docs/component-map.md](docs/component-map.md) · 思维模式 [docs/thinking-framework.md](docs/thinking-framework.md) · SPEC 标准 [docs/spec-standard.md](docs/spec-standard.md) · SPEC 索引 [docs/specs/](docs/specs/README.md)。
 
 ## 核心规则
+
+**四端一体，主线明确**：Web 是 MewClaw 产品、交互与共享策略基线，DSH 官方上游是运行时与能力契约主线。新功能、修复和升级评审必须说明四端影响；共享能力先进入 `master`，各端通过插件/Provider/Consumer 和配置组合消费。Windows 复用 Web UI，本地与云端的差异归于工作区及执行位置；TUI/飞书保留终端/卡片呈现，消费同一能力语义。仓库、分支、发布节奏不同不构成产品分叉，四端一体不取消 Scope、进程或资源归属检查。
 
 1. **SPEC 先行**：没有 SPEC 的包不得开始实施。SPEC 状态机与自检清单见 spec-standard.md；蓝图 / SPEC 冲突先改文档再改代码。
 2. **一切皆插件**：新行为落在插件或既有扩展点上；每个能力按 Definition / Provider / Consumer 三角色组织（能力缝完整，不做单角色）。动 dsh 框架源码属于范围外。
