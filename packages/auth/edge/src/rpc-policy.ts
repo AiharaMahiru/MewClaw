@@ -172,11 +172,15 @@ export async function authorizeRpc(body: Record<string, unknown>, options: RpcPo
     }
   }
   if (WORKSPACE_METHODS.has(method)) {
-    const workspaceId = stringValue(args.workspaceId);
+    // 官方 workspace Remote 的写方法都把身份放在 request 内；旧版
+    // 点号调用仍可能使用顶层字段。两种形态必须走同一归属检查，不能
+    // 因为 codec 版本差异让普通用户绕过 workspace owner 门禁。
+    const request = recordValue(args.request);
+    const workspaceId = stringValue(args.workspaceId) ?? stringValue(request?.workspaceId);
     if (workspaceId && !(await ownsResource(options, "workspace", workspaceId))) return { ...decision, denied: "RESOURCE_NOT_ALLOWED" };
-    const beforeWorkspaceId = stringValue(args.beforeWorkspaceId);
+    const beforeWorkspaceId = stringValue(args.beforeWorkspaceId) ?? stringValue(request?.beforeWorkspaceId);
     if (method === "workspace.insertBefore" && beforeWorkspaceId && !(await ownsResource(options, "workspace", beforeWorkspaceId))) return { ...decision, denied: "RESOURCE_NOT_ALLOWED" };
-    const beforeSessionId = stringValue(args.beforeSessionId);
+    const beforeSessionId = stringValue(args.beforeSessionId) ?? stringValue(request?.beforeSessionId);
     if (method === "workspace.insertSessionBefore" && beforeSessionId && !(await ownsResource(options, "session", beforeSessionId))) return { ...decision, denied: "RESOURCE_NOT_ALLOWED" };
   }
   return decision;

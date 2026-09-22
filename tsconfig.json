@@ -63,6 +63,7 @@
     { "path": "packages/auth/edge" },
     { "path": "packages/lark/web-auth" },
     { "path": "packages/lark/web-private-model" },
+    { "path": "packages/lark/tui-remote" },
     { "path": "packages/llm/deepseek-routing" },
     { "path": "packages/migration/dooragent" },
     { "path": "apps/auth" },
