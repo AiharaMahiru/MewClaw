@@ -184,6 +184,23 @@ describe("RPC authorization policy", () => {
     expect(value.archivedSessionIds).toEqual(["own-session"]);
   });
 
+  it("checks ownership for official nested workspace rename/delete requests", async () => {
+    const store = new MemoryAuthStore();
+    const service = new AuthService({ store, mail: { sendVerification: async () => undefined, sendPasswordReset: async () => undefined } });
+    await service.saveResource({ resourceType: "workspace", resourceId: "own-workspace", userId: "user-a", resourcePath: "D:/workspaces/users/user-a", createdAt: "2026-01-01T00:00:00.000Z" });
+    await service.saveResource({ resourceType: "workspace", resourceId: "foreign-workspace", userId: "user-b", resourcePath: "D:/workspaces/users/user-b", createdAt: "2026-01-01T00:00:00.000Z" });
+    for (const method of ["workspace/rename", "workspace/delete"]) {
+      await expect(authorizeRpc(
+        { method, payload: { args: { request: { workspaceId: "own-workspace", ...(method.endsWith("rename") ? { title: "mine" } : {}) } } } },
+        { service, user: userA, roots }, method,
+      )).resolves.not.toMatchObject({ denied: expect.any(String) });
+      await expect(authorizeRpc(
+        { method, payload: { args: { request: { workspaceId: "foreign-workspace", ...(method.endsWith("rename") ? { title: "stolen" } : {}) } } } },
+        { service, user: userA, roots }, method,
+      )).resolves.toMatchObject({ denied: "RESOURCE_NOT_ALLOWED" });
+    }
+  });
+
   it("allows read-only model catalog data but denies configuration writes", async () => {
     const store = new MemoryAuthStore();
     const service = new AuthService({ store, mail: { sendVerification: async () => undefined, sendPasswordReset: async () => undefined } });

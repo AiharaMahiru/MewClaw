@@ -13,7 +13,7 @@ function response(value: unknown, status = 200, cookies: string[] = []): Respons
   return new Response(value === undefined ? '' : JSON.stringify(value), { status, headers });
 }
 
-function fakeFetch(options: { quotaDenied?: boolean; badRpcId?: boolean } = {}): { fetch: FetchLike; requests: Array<{ path: string; headers: Headers; body: Record<string, unknown> | undefined }> } {
+function fakeFetch(options: { quotaDenied?: boolean; badRpcId?: boolean; promptAccepted?: boolean } = {}): { fetch: FetchLike; requests: Array<{ path: string; headers: Headers; body: Record<string, unknown> | undefined }> } {
   let session = '';
   let csrf = 'csrf-0';
   const requests: Array<{ path: string; headers: Headers; body: Record<string, unknown> | undefined }> = [];
@@ -55,8 +55,11 @@ function fakeFetch(options: { quotaDenied?: boolean; badRpcId?: boolean } = {}):
       const rpcId = typeof body?.rpcId === 'string' ? body.rpcId : '';
       const method = typeof body?.method === 'string' ? body.method : '';
       if (method === 'session/list') return response({ type: 'server-response', rpcId: options.badRpcId ? 'wrong' : rpcId, result: { ok: true, value: { items: [{ sessionId: 's1', title: '会话' }] } } });
+      if (method === 'agentPresets/list') return response({ type: 'server-response', rpcId, result: { ok: true, value: { presets: [{ id: 'standard', name: '通用工作', isDefault: true }] } } });
+      if (method === 'permissionPresets/catalog') return response({ type: 'server-response', rpcId, result: { ok: true, value: { options: [{ value: 'workspace-write', name: '工作区写入' }] } } });
+      if (method === 'commands/list') return response({ type: 'server-response', rpcId, result: { ok: true, value: [{ name: 'plan', description: '计划模式' }] } });
       if (method === 'workspace/create') return response({ type: 'server-response', rpcId, result: { ok: true, value: { workspace: { workspaceId: 'w1', path: '/work' } } } });
-      if (method === 'session/prompt') return response({ type: 'server-response', rpcId, result: { ok: false, error: { code: 'QUOTA_EXCEEDED', message: '内部文本不得泄漏', details: {} } } });
+      if (method === 'session/prompt' && !options.promptAccepted) return response({ type: 'server-response', rpcId, result: { ok: false, error: { code: 'QUOTA_EXCEEDED', message: '内部文本不得泄漏', details: {} } } });
       return response({ type: 'server-response', rpcId, result: { ok: true, value: { ok: true } } });
     }
     return response({ error: 'NOT_FOUND' }, 404);
@@ -66,7 +69,7 @@ function fakeFetch(options: { quotaDenied?: boolean; badRpcId?: boolean } = {}):
 
 describe('dsh TUI 远程客户端', () => {
   it('建立登录态、读取额度/模型并保留 Cookie 而不保存密码', async () => {
-    const stub = fakeFetch();
+    const stub = fakeFetch({ promptAccepted: true });
     const store = new MemoryCredentialStore();
     const client = new DshTuiRemoteClient({ endpoint: 'http://127.0.0.1:3080', allowInsecureHttp: true, fetch: stub.fetch, credentialStore: store });
     const user = await client.login('u@example.com', 'not-persisted');
@@ -85,10 +88,34 @@ describe('dsh TUI 远程客户端', () => {
     await client.login('u@example.com', 'password');
     const sessions = await client.listSessions({ limit: 10 });
     expect(sessions.items[0]?.id).toBe('s1');
+    const list = stub.requests.find(request => request.path === '/api/session/list');
+    expect(list?.body?.payload).toEqual({ args: { _request: {} } });
     await client.createSession({ request: { cwd: '/work/project' }, workspaceRoot: '/work' });
     const create = stub.requests.find(request => request.path === '/api/session/create');
     expect(create?.body?.payload).toEqual({ args: { request: { cwd: '/work/project' } } });
     await expect(client.createWorkspace({ request: { path: '/tmp/outside' }, workspaceRoot: '/work' })).rejects.toMatchObject({ code: 'WORKSPACE_PATH_NOT_ALLOWED' });
+  });
+
+  it('使用官方模型与模式 Remote 契约，不直接伪造 session 事件', async () => {
+    const stub = fakeFetch({ promptAccepted: true });
+    const client = new DshTuiRemoteClient({ endpoint: 'http://127.0.0.1:3080', allowInsecureHttp: true, fetch: stub.fetch, credentialStore: new MemoryCredentialStore() });
+    await client.login('u@example.com', 'password');
+    const presets = await client.agentPresets();
+    expect(presets.presets[0]?.id).toBe('standard');
+    const permissions = await client.permissionPresets();
+    expect(permissions.options[0]?.value).toBe('workspace-write');
+    await client.selectAgentPreset('s1', 'standard');
+    await client.selectMode('s1', { kind: 'permission-preset', value: 'workspace-write' });
+    await client.selectMode('s1', { kind: 'plan', active: true });
+    await client.selectModel('s1', { provider: 'deepseek-official', model: 'deepseek-chat', reasoningEffort: 'high' });
+    await client.prompt('s1', 'hello');
+    const bodies = stub.requests.filter(request => request.path.startsWith('/api/')).map(request => request.body);
+    expect(bodies).toContainEqual(expect.objectContaining({ method: 'agentPresets/select', payload: { args: { agentId: 's1', agentPreset: 'standard' } } }));
+    expect(bodies).toContainEqual(expect.objectContaining({ method: 'commands/execute', payload: { args: { agentId: 's1', line: '/permission workspace-write', submittedAttachments: [] } } }));
+    expect(bodies).toContainEqual(expect.objectContaining({ method: 'commands/execute', payload: { args: { agentId: 's1', line: '/plan', submittedAttachments: [] } } }));
+    expect(bodies).toContainEqual(expect.objectContaining({ method: 'session/selectModel', payload: { args: { request: { sessionId: 's1', provider: 'deepseek-official', model: 'deepseek-chat', reasoningEffort: 'high' } } } }));
+    const prompt = bodies.find(body => body?.method === 'session/prompt');
+    expect(prompt?.payload).toEqual({ args: { request: expect.objectContaining({ sessionId: 's1', mode: 'queue', content: [{ type: 'text', text: 'hello' }] }) } });
   });
 
   it('把额度错误归一化且不泄漏上游文本', async () => {

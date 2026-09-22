@@ -77,6 +77,56 @@ export interface SessionListOptions {
   readonly workspaceId?: string;
 }
 
+/** 官方 `agentPresets/list` 返回的无路径预设行。 */
+export interface AgentPresetEntry {
+  readonly id: string;
+  readonly name?: string;
+  readonly description?: string;
+  readonly trust?: string;
+  readonly isDefault?: boolean;
+  readonly broken?: string;
+  readonly raw: Record<string, unknown>;
+}
+
+export interface AgentPresetCatalog {
+  readonly presets: readonly AgentPresetEntry[];
+  readonly authorable?: boolean;
+  readonly modeSelectionEnabled?: boolean;
+  readonly raw: unknown;
+}
+
+/** 官方 `permissionPresets/catalog` 的完整进程级目录。 */
+export interface PermissionPresetEntry {
+  readonly value: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly raw: Record<string, unknown>;
+}
+
+export interface PermissionPresetCatalog {
+  readonly options: readonly PermissionPresetEntry[];
+  readonly raw: unknown;
+}
+
+export interface CommandEntry {
+  readonly name: string;
+  readonly description: string;
+  readonly input?: Record<string, unknown>;
+  readonly raw: Record<string, unknown>;
+}
+
+export interface SessionModelSelection {
+  readonly provider: string;
+  readonly model: string;
+  readonly reasoningEffort?: string;
+}
+
+/** TUI 可安全映射到官方 Remote 的模式动作。 */
+export type RemoteModeSelection =
+  | { readonly kind: 'agent-preset'; readonly value: string }
+  | { readonly kind: 'permission-preset'; readonly value: string }
+  | { readonly kind: 'plan'; readonly active: boolean };
+
 export interface SessionCreateRequest {
   readonly sessionId?: string;
   readonly workspaceId?: string;

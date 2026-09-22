@@ -1,5 +1,17 @@
 import { RemoteClientError } from './errors.js';
-import type { ModelCatalog, ModelProfile, QuotaSnapshot, RemoteUser, SessionSummary, WorkspaceEntry } from './types.js';
+import type {
+  AgentPresetCatalog,
+  AgentPresetEntry,
+  CommandEntry,
+  ModelCatalog,
+  ModelProfile,
+  PermissionPresetCatalog,
+  PermissionPresetEntry,
+  QuotaSnapshot,
+  RemoteUser,
+  SessionSummary,
+  WorkspaceEntry,
+} from './types.js';
 
 export function parseUser(value: unknown): RemoteUser {
   const record = object(value);
@@ -18,6 +30,33 @@ export function parseModels(value: unknown): ModelCatalog {
   const shared = array(record.sharedModels).filter(isObject).map(item => ({ ...item }));
   const defaultProfileId = typeof record.defaultProfileId === 'string' ? record.defaultProfileId : undefined;
   return { profiles, sharedModels: shared, ...(defaultProfileId ? { defaultProfileId } : {}), raw: value };
+}
+
+export function parseAgentPresets(value: unknown): AgentPresetCatalog {
+  const record = object(unwrapValue(value));
+  const source = array(record.presets ?? record.items);
+  const presets = source.map(parseAgentPreset).filter((item): item is AgentPresetEntry => item !== undefined);
+  return {
+    presets,
+    ...(typeof record.authorable === 'boolean' ? { authorable: record.authorable } : {}),
+    ...(typeof record.modeSelectionEnabled === 'boolean' ? { modeSelectionEnabled: record.modeSelectionEnabled } : {}),
+    raw: value,
+  };
+}
+
+export function parsePermissionPresets(value: unknown): PermissionPresetCatalog {
+  const record = object(unwrapValue(value));
+  const options = array(record.options).map(parsePermissionPreset).filter((item): item is PermissionPresetEntry => item !== undefined);
+  return { options, raw: value };
+}
+
+export function parseCommands(value: unknown): { items: CommandEntry[]; raw: unknown } {
+  const unwrapped = unwrapValue(value);
+  const source = Array.isArray(unwrapped)
+    ? unwrapped
+    : array(objectOrUndefined(unwrapped)?.items ?? objectOrUndefined(unwrapped)?.commands);
+  const items = source.map(parseCommand).filter((item): item is CommandEntry => item !== undefined);
+  return { items, raw: value };
 }
 
 export function parseQuota(value: unknown): QuotaSnapshot {
@@ -111,6 +150,42 @@ function parseModelProfile(value: unknown): ModelProfile {
     ...(typeof item.createdAt === 'string' ? { createdAt: item.createdAt } : {}),
     ...(typeof item.updatedAt === 'string' ? { updatedAt: item.updatedAt } : {}),
   };
+}
+
+function parseAgentPreset(value: unknown): AgentPresetEntry | undefined {
+  if (!isObject(value)) return undefined;
+  const id = stringAt(value, ['id', 'agentPreset']);
+  if (!id) return undefined;
+  const name = stringAt(value, ['name', 'displayName']);
+  const description = stringAt(value, ['description']);
+  const trust = stringAt(value, ['trust']);
+  return {
+    id,
+    ...(name ? { name } : {}),
+    ...(description ? { description } : {}),
+    ...(trust ? { trust } : {}),
+    ...(typeof value.isDefault === 'boolean' ? { isDefault: value.isDefault } : {}),
+    ...(typeof value.broken === 'string' ? { broken: value.broken } : {}),
+    raw: { ...value },
+  };
+}
+
+function parsePermissionPreset(value: unknown): PermissionPresetEntry | undefined {
+  if (!isObject(value)) return undefined;
+  const option = stringAt(value, ['value', 'id']);
+  const name = stringAt(value, ['name', 'label']) ?? option;
+  if (!option || !name) return undefined;
+  const description = stringAt(value, ['description']);
+  return { value: option, name, ...(description ? { description } : {}), raw: { ...value } };
+}
+
+function parseCommand(value: unknown): CommandEntry | undefined {
+  if (!isObject(value)) return undefined;
+  const name = stringAt(value, ['name']);
+  const description = stringAt(value, ['description']) ?? '';
+  if (!name) return undefined;
+  const input = isObject(value.input) ? { ...value.input } : undefined;
+  return { name, description, ...(input ? { input } : {}), raw: { ...value } };
 }
 
 function invalidResponse(): RemoteClientError { return new RemoteClientError('INVALID_RESPONSE'); }

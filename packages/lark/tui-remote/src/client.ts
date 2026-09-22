@@ -3,20 +3,36 @@ import { randomUUID } from 'node:crypto';
 import { MemoryCredentialStore, FileCredentialStore } from './credential-store.js';
 import { RemoteClientError, errorFromWire, normalizeErrorCode } from './errors.js';
 import { RemoteWorkspaceBridge } from './local-workspace.js';
-import { parseModels, parseQuota, parseSession, parseSessions, parseUser, parseWorkspaces, unwrapValue } from './parsers.js';
+import {
+  parseAgentPresets,
+  parseCommands,
+  parseModels,
+  parsePermissionPresets,
+  parseQuota,
+  parseSession,
+  parseSessions,
+  parseUser,
+  parseWorkspaces,
+  unwrapValue,
+} from './parsers.js';
 import { assertWorkspacePath } from './path-boundary.js';
 import { RemoteStreamTransport } from './remote-stream.js';
 import { RemoteHttpTransport } from './transport.js';
 import type {
   CredentialStore,
+  AgentPresetCatalog,
+  CommandEntry,
   ModelCatalog,
+  PermissionPresetCatalog,
   QuotaSnapshot,
   RemoteCapabilities,
   RemoteClientOptions,
   RemoteUser,
   SessionCreateOptions,
   SessionListOptions,
+  SessionModelSelection,
   SessionSummary,
+  RemoteModeSelection,
   StreamOptions,
   WorkspaceCreateOptions,
   WorkspaceEntry,
@@ -144,7 +160,11 @@ export class DshTuiRemoteClient {
   }
 
   async listSessions(options: SessionListOptions = {}, signal?: AbortSignal): Promise<{ items: SessionSummary[]; nextCursor?: string }> {
-    const args = compact(options as unknown as Record<string, unknown>);
+    // 官方 session/list descriptor 的参数名是 `_request`，且当前版本只
+    // 接受 cursor；把旧版 TUI 的 limit/query/workspaceId 留在本地类型中
+    // 兼容调用方，但不能把未知字段透传给严格 Typert codec。
+    const request = compact({ cursor: options.cursor });
+    const args = { _request: request };
     return parseSessions(await this.rpc('session/list', args, signal));
   }
 
@@ -164,11 +184,18 @@ export class DshTuiRemoteClient {
   }
 
   async renameSession(sessionId: string, title: string, signal?: AbortSignal): Promise<unknown> {
-    return this.rpc('session/rename', { sessionId: validId(sessionId), title: validTitle(title) }, signal);
+    return this.rpc('session/rename', { request: { sessionId: validId(sessionId), title: validTitle(title) } }, signal);
   }
 
-  async selectModel(sessionId: string, model: string, signal?: AbortSignal): Promise<unknown> {
-    return this.rpc('session/selectModel', { sessionId: validId(sessionId), model: validTitle(model) }, signal);
+  async selectModel(sessionId: string, selection: string | SessionModelSelection, signal?: AbortSignal): Promise<unknown> {
+    const request = typeof selection === 'string'
+      ? modelSelectionFromString(selection)
+      : {
+          provider: validTitle(selection.provider),
+          model: validTitle(selection.model),
+          ...(selection.reasoningEffort === undefined ? {} : { reasoningEffort: validTitle(selection.reasoningEffort) }),
+        };
+    return this.rpc('session/selectModel', { request: { sessionId: validId(sessionId), ...request } }, signal);
   }
 
   async sessionModelCatalog(sessionId?: string, signal?: AbortSignal): Promise<unknown> {
@@ -177,7 +204,14 @@ export class DshTuiRemoteClient {
 
   async prompt(sessionId: string, text: string, extra: Record<string, unknown> = {}, signal?: AbortSignal): Promise<unknown> {
     if (!text.trim()) throw new RemoteClientError('INVALID_RESPONSE');
-    try { return await this.rpc('session/prompt', { request: { ...extra, sessionId: validId(sessionId), text } }, signal); }
+    const request = {
+      requestId: typeof extra.requestId === 'string' && extra.requestId ? extra.requestId : randomUUID(),
+      sessionId: validId(sessionId),
+      mode: extra.mode === 'steer' ? 'steer' : 'queue',
+      content: Array.isArray(extra.content) ? extra.content : [{ type: 'text', text }],
+      ...(typeof extra.clientTimeZone === 'string' ? { clientTimeZone: extra.clientTimeZone } : {}),
+    };
+    try { return await this.rpc('session/prompt', { request }, signal); }
     catch (error) {
       if (error instanceof RemoteClientError && /QUOTA|BALANCE|CREDIT/u.test(error.code)) throw new RemoteClientError('QUOTA_EXCEEDED', error.status === undefined ? {} : { status: error.status });
       if (error instanceof RemoteClientError && /MODEL|PROVIDER/u.test(error.code)) throw new RemoteClientError('MODEL_UNAVAILABLE', error.status === undefined ? {} : { status: error.status });
@@ -185,20 +219,65 @@ export class DshTuiRemoteClient {
     }
   }
 
-  async cancelSession(sessionId: string, signal?: AbortSignal): Promise<unknown> { return this.rpc('session/cancel', { sessionId: validId(sessionId) }, signal); }
+  async cancelSession(sessionId: string, signal?: AbortSignal): Promise<unknown> {
+    return this.rpc('session/cancel', { request: { sessionId: validId(sessionId) } }, signal);
+  }
+
+  /** 读取官方 agent preset 目录；响应中不包含本地路径。 */
+  async agentPresets(signal?: AbortSignal): Promise<AgentPresetCatalog> {
+    return parseAgentPresets(await this.rpc('agentPresets/list', {}, signal));
+  }
+
+  /** 为当前会话选择白名单 agent preset。服务端按 agentId 做归属校验。 */
+  async selectAgentPreset(sessionId: string, agentPreset: string, signal?: AbortSignal): Promise<unknown> {
+    return this.rpc('agentPresets/select', { agentId: validId(sessionId), agentPreset: validToken(agentPreset) }, signal);
+  }
+
+  /** 读取当前 Worker 的权限模式目录（read-only / workspace-write 等）。 */
+  async permissionPresets(signal?: AbortSignal): Promise<PermissionPresetCatalog> {
+    return parsePermissionPresets(await this.rpc('permissionPresets/catalog', {}, signal));
+  }
+
+  /** 读取一个会话可执行的 slash 命令目录。 */
+  async commands(sessionId: string, signal?: AbortSignal): Promise<{ items: CommandEntry[]; raw: unknown }> {
+    return parseCommands(await this.rpc('commands/list', { agentId: validId(sessionId) }, signal));
+  }
+
+  /** 通过官方 commands/execute 写入 plan/permission 等 durable 模式事件。 */
+  async executeCommand(sessionId: string, line: string, signal?: AbortSignal): Promise<unknown> {
+    if (typeof line !== 'string' || !line.trim() || line.length > 4096) throw new RemoteClientError('INVALID_RESPONSE');
+    return this.rpc('commands/execute', {
+      agentId: validId(sessionId),
+      line,
+      submittedAttachments: [],
+    }, signal);
+  }
+
+  /** 将 TUI 的三类模式动作映射到官方 Remote；不直接伪造 session 事件。 */
+  async selectMode(sessionId: string, mode: RemoteModeSelection, signal?: AbortSignal): Promise<unknown> {
+    if (mode.kind === 'agent-preset') return this.selectAgentPreset(sessionId, mode.value, signal);
+    if (mode.kind === 'permission-preset') return this.executeCommand(sessionId, `/permission ${validToken(mode.value)}`, signal);
+    return this.executeCommand(sessionId, mode.active ? '/plan' : '/plan off', signal);
+  }
 
   async listWorkspaces(signal?: AbortSignal): Promise<{ items: WorkspaceEntry[]; raw: unknown }> { return parseWorkspaces(await this.rpc('workspace/list', {}, signal)); }
 
   async createWorkspace(options: WorkspaceCreateOptions, signal?: AbortSignal): Promise<WorkspaceEntry | Record<string, unknown>> {
     if (options.workspaceRoot) assertWorkspacePath(options.request.path, options.workspaceRoot);
     // Auth Edge 的 workspace/create 契约只读取嵌套 request.path。
-    const value = await this.rpc('workspace/create', { request: { ...options.request } }, signal);
+    // 官方 workspace/create descriptor 只接受 request.path；标题通过
+    // 后续 workspace/rename 完成，未知字段不能穿过严格 codec。
+    const value = await this.rpc('workspace/create', { request: { path: options.request.path } }, signal);
     const parsed = parseWorkspaces(value).items[0];
     return parsed ?? objectResult(value);
   }
 
-  async renameWorkspace(workspaceId: string, title: string, signal?: AbortSignal): Promise<unknown> { return this.rpc('workspace/rename', { workspaceId: validId(workspaceId), title: validTitle(title) }, signal); }
-  async deleteWorkspace(workspaceId: string, signal?: AbortSignal): Promise<unknown> { return this.rpc('workspace/delete', { workspaceId: validId(workspaceId) }, signal); }
+  async renameWorkspace(workspaceId: string, title: string, signal?: AbortSignal): Promise<unknown> {
+    return this.rpc('workspace/rename', { request: { workspaceId: validId(workspaceId), title: validTitle(title) } }, signal);
+  }
+  async deleteWorkspace(workspaceId: string, signal?: AbortSignal): Promise<unknown> {
+    return this.rpc('workspace/delete', { request: { workspaceId: validId(workspaceId) } }, signal);
+  }
 
   openStream(endpoint: string, payload: unknown, options: StreamOptions = {}): AsyncIterable<unknown> {
     return this.openStreamAfterReady(endpoint, payload, options);
@@ -219,7 +298,7 @@ export class DshTuiRemoteClient {
     readonly location: 'remote';
     readonly auth: { readonly connect: () => Promise<RemoteUser | undefined>; readonly login: (email: string, password: string) => Promise<RemoteUser>; readonly logout: () => Promise<void>; readonly me: () => Promise<RemoteUser> };
     readonly capabilities: () => Promise<RemoteCapabilities>;
-    readonly sessions: Pick<DshTuiRemoteClient, 'listSessions' | 'createSession' | 'forkSession' | 'renameSession' | 'selectModel' | 'sessionModelCatalog' | 'prompt' | 'cancelSession'>;
+    readonly sessions: Pick<DshTuiRemoteClient, 'listSessions' | 'createSession' | 'forkSession' | 'renameSession' | 'selectModel' | 'sessionModelCatalog' | 'prompt' | 'cancelSession' | 'agentPresets' | 'selectAgentPreset' | 'permissionPresets' | 'commands' | 'executeCommand' | 'selectMode'>;
     readonly workspaces: Pick<DshTuiRemoteClient, 'listWorkspaces' | 'createWorkspace' | 'renameWorkspace' | 'deleteWorkspace'>;
     readonly workspace: RemoteWorkspaceBridge;
     readonly openStream: (endpoint: string, payload: unknown, options?: StreamOptions) => AsyncIterable<unknown>;
@@ -237,6 +316,12 @@ export class DshTuiRemoteClient {
         sessionModelCatalog: this.sessionModelCatalog.bind(this),
         prompt: this.prompt.bind(this),
         cancelSession: this.cancelSession.bind(this),
+        agentPresets: this.agentPresets.bind(this),
+        selectAgentPreset: this.selectAgentPreset.bind(this),
+        permissionPresets: this.permissionPresets.bind(this),
+        commands: this.commands.bind(this),
+        executeCommand: this.executeCommand.bind(this),
+        selectMode: this.selectMode.bind(this),
       },
       workspaces: {
         listWorkspaces: this.listWorkspaces.bind(this),
@@ -295,6 +380,20 @@ function validMethod(value: string): string {
 }
 function validId(value: string): string { if (typeof value !== 'string' || !value || value.length > 512) throw new RemoteClientError('INVALID_RESPONSE'); return value; }
 function validTitle(value: string): string { if (typeof value !== 'string' || !value.trim() || value.length > 512) throw new RemoteClientError('INVALID_RESPONSE'); return value; }
+function validToken(value: string): string {
+  if (typeof value !== 'string' || !value.trim() || value.length > 256 || !/^[A-Za-z0-9._:@/-]+$/u.test(value)) throw new RemoteClientError('INVALID_RESPONSE');
+  return value;
+}
+function modelSelectionFromString(value: string): SessionModelSelection {
+  const normalized = validTitle(value);
+  const slash = normalized.indexOf('/');
+  if (slash > 0 && slash < normalized.length - 1) {
+    return { provider: validTitle(normalized.slice(0, slash)), model: validTitle(normalized.slice(slash + 1)) };
+  }
+  // 兼容旧版只传 model 的调用方；新 TUI 应优先传模型目录返回的
+  // `{ provider, model }`，避免把共享 provider 误归到默认 provider。
+  return { provider: 'deepseek-official', model: normalized };
+}
 function compact(value: Record<string, unknown>): Record<string, unknown> { return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)); }
 function objectResult(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : { value }; }
 
