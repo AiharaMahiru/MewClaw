@@ -129,17 +129,18 @@ export class DshTuiRemoteClient {
   async rpc<T = unknown>(method: string, args: Record<string, unknown> = {}, signal?: AbortSignal): Promise<T> {
     await this.readyPromise;
     const canonical = validMethod(method);
+    const rpcId = randomUUID();
     let body: unknown;
     try {
       body = await this.http.json(`/api/${canonical.split('/').map(encodeURIComponent).join('/')}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ rpcId: randomUUID(), method: canonical, payload: { args } }),
+        body: JSON.stringify({ rpcId, method: canonical, payload: { args } }),
       }, signal);
     } catch (error) {
       throw await this.authBoundary(error);
     }
-    return unwrapRpc<T>(body);
+    return unwrapRpc<T>(body, rpcId);
   }
 
   async listSessions(options: SessionListOptions = {}, signal?: AbortSignal): Promise<{ items: SessionSummary[]; nextCursor?: string }> {
@@ -168,6 +169,10 @@ export class DshTuiRemoteClient {
 
   async selectModel(sessionId: string, model: string, signal?: AbortSignal): Promise<unknown> {
     return this.rpc('session/selectModel', { sessionId: validId(sessionId), model: validTitle(model) }, signal);
+  }
+
+  async sessionModelCatalog(sessionId?: string, signal?: AbortSignal): Promise<unknown> {
+    return this.rpc('session/modelCatalog', sessionId ? { sessionId: validId(sessionId) } : {}, signal);
   }
 
   async prompt(sessionId: string, text: string, extra: Record<string, unknown> = {}, signal?: AbortSignal): Promise<unknown> {
@@ -214,7 +219,7 @@ export class DshTuiRemoteClient {
     readonly location: 'remote';
     readonly auth: { readonly connect: () => Promise<RemoteUser | undefined>; readonly login: (email: string, password: string) => Promise<RemoteUser>; readonly logout: () => Promise<void>; readonly me: () => Promise<RemoteUser> };
     readonly capabilities: () => Promise<RemoteCapabilities>;
-    readonly sessions: Pick<DshTuiRemoteClient, 'listSessions' | 'createSession' | 'forkSession' | 'renameSession' | 'selectModel' | 'prompt' | 'cancelSession'>;
+    readonly sessions: Pick<DshTuiRemoteClient, 'listSessions' | 'createSession' | 'forkSession' | 'renameSession' | 'selectModel' | 'sessionModelCatalog' | 'prompt' | 'cancelSession'>;
     readonly workspaces: Pick<DshTuiRemoteClient, 'listWorkspaces' | 'createWorkspace' | 'renameWorkspace' | 'deleteWorkspace'>;
     readonly workspace: RemoteWorkspaceBridge;
     readonly openStream: (endpoint: string, payload: unknown, options?: StreamOptions) => AsyncIterable<unknown>;
@@ -229,6 +234,7 @@ export class DshTuiRemoteClient {
         forkSession: this.forkSession.bind(this),
         renameSession: this.renameSession.bind(this),
         selectModel: this.selectModel.bind(this),
+        sessionModelCatalog: this.sessionModelCatalog.bind(this),
         prompt: this.prompt.bind(this),
         cancelSession: this.cancelSession.bind(this),
       },
@@ -292,11 +298,12 @@ function validTitle(value: string): string { if (typeof value !== 'string' || !v
 function compact(value: Record<string, unknown>): Record<string, unknown> { return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)); }
 function objectResult(value: unknown): Record<string, unknown> { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : { value }; }
 
-function unwrapRpc<T>(value: unknown): T {
+function unwrapRpc<T>(value: unknown, expectedRpcId?: string): T {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value as T;
   const record = value as Record<string, unknown>;
   if (record.type === 'server-response') {
     const rpcId = record.rpcId;
+    if (expectedRpcId !== undefined && rpcId !== expectedRpcId) throw new RemoteClientError('INVALID_RESPONSE');
     const result = record.result;
     if (!result || typeof result !== 'object' || Array.isArray(result)) throw new RemoteClientError('INVALID_RESPONSE');
     const resultRecord = result as Record<string, unknown>;

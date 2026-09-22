@@ -60,7 +60,11 @@ export function parseSession(value: unknown): SessionSummary | undefined {
 export function parseWorkspaces(value: unknown): { items: WorkspaceEntry[]; raw: unknown } {
   const unwrapped = unwrapValue(value);
   const record = objectOrUndefined(unwrapped);
-  const source = Array.isArray(unwrapped) ? unwrapped : array(record?.items ?? record?.workspaces);
+  const source = Array.isArray(unwrapped)
+    ? unwrapped
+    : isObject(record?.workspace)
+      ? [record.workspace]
+      : array(record?.items ?? record?.workspaces);
   const items = source.map((item): WorkspaceEntry | undefined => {
     if (!isObject(item)) return undefined;
     const workspaceId = stringAt(item, ['workspaceId', 'id']);

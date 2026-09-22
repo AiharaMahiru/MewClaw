@@ -13,7 +13,7 @@ function response(value: unknown, status = 200, cookies: string[] = []): Respons
   return new Response(value === undefined ? '' : JSON.stringify(value), { status, headers });
 }
 
-function fakeFetch(options: { quotaDenied?: boolean } = {}): { fetch: FetchLike; requests: Array<{ path: string; headers: Headers; body: Record<string, unknown> | undefined }> } {
+function fakeFetch(options: { quotaDenied?: boolean; badRpcId?: boolean } = {}): { fetch: FetchLike; requests: Array<{ path: string; headers: Headers; body: Record<string, unknown> | undefined }> } {
   let session = '';
   let csrf = 'csrf-0';
   const requests: Array<{ path: string; headers: Headers; body: Record<string, unknown> | undefined }> = [];
@@ -54,7 +54,7 @@ function fakeFetch(options: { quotaDenied?: boolean } = {}): { fetch: FetchLike;
     if (url.pathname.startsWith('/api/')) {
       const rpcId = typeof body?.rpcId === 'string' ? body.rpcId : '';
       const method = typeof body?.method === 'string' ? body.method : '';
-      if (method === 'session/list') return response({ type: 'server-response', rpcId, result: { ok: true, value: { items: [{ sessionId: 's1', title: '会话' }] } } });
+      if (method === 'session/list') return response({ type: 'server-response', rpcId: options.badRpcId ? 'wrong' : rpcId, result: { ok: true, value: { items: [{ sessionId: 's1', title: '会话' }] } } });
       if (method === 'workspace/create') return response({ type: 'server-response', rpcId, result: { ok: true, value: { workspace: { workspaceId: 'w1', path: '/work' } } } });
       if (method === 'session/prompt') return response({ type: 'server-response', rpcId, result: { ok: false, error: { code: 'QUOTA_EXCEEDED', message: '内部文本不得泄漏', details: {} } } });
       return response({ type: 'server-response', rpcId, result: { ok: true, value: { ok: true } } });
@@ -96,6 +96,13 @@ describe('dsh TUI 远程客户端', () => {
     const client = new DshTuiRemoteClient({ endpoint: 'http://127.0.0.1:3080', allowInsecureHttp: true, fetch: stub.fetch, credentialStore: new MemoryCredentialStore() });
     await client.login('u@example.com', 'password');
     await expect(client.prompt('s1', 'hello')).rejects.toSatisfy((error: unknown) => error instanceof RemoteClientError && error.code === 'QUOTA_EXCEEDED' && !error.message.includes('内部文本'));
+  });
+
+  it('拒绝 correlation id 不匹配的 RPC 响应', async () => {
+    const stub = fakeFetch({ badRpcId: true });
+    const client = new DshTuiRemoteClient({ endpoint: 'http://127.0.0.1:3080', allowInsecureHttp: true, fetch: stub.fetch, credentialStore: new MemoryCredentialStore() });
+    await client.login('u@example.com', 'password');
+    await expect(client.listSessions()).rejects.toMatchObject({ code: 'INVALID_RESPONSE' });
   });
 
   it('CSRF 失败只刷新首页 Cookie 后重试，401 会清除持久会话', async () => {
