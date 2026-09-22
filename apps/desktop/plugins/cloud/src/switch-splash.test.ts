@@ -43,3 +43,19 @@ it('非法颜色回落默认色，不注入任意 CSS', () => {
   expect(style).toContain('#e8eaef');
   expect(style).not.toContain('evil');
 });
+
+it('减少动态效果偏好关闭旋转和淡出动画', () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: true }));
+  sessionStorage.setItem(SWITCH_FLAG_KEY, JSON.stringify({ to: 'local' }));
+  run();
+  expect(document.getElementById('mewclaw-location-splash')?.getAttribute('style')).toContain('opacity 0ms');
+  vi.unstubAllGlobals();
+});
+
+it.each(['rgba(32, 33, 36, 0)', 'rgba(32, 33, 36, 0.5)', '#abcd', '#11223380', 'transparent'])('过渡面拒绝透明色 %s，挡住下层启动画面', (color) => {
+  sessionStorage.setItem(SWITCH_FLAG_KEY, JSON.stringify({ to: 'local', bg: color, ink: color }));
+  run();
+  const style = document.getElementById('mewclaw-location-splash')?.getAttribute('style');
+  expect(style).toContain('background:#17181c');
+  expect(style).toContain('color:#e8eaef');
+});

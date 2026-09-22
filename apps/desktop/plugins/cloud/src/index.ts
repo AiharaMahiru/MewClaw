@@ -8,7 +8,7 @@ import { CloudProxy, cloudOrigin } from './proxy.js';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { DESKTOP_CLIENT_PATH, desktopCloudHtml } from './boot.js';
+import { DESKTOP_CLIENT_PATH, desktopCloudHtml, composeDesktopGraph } from './boot.js';
 import { WorkspaceController } from './workspace-controller.js';
 import { localWorkspaceRoute } from './workspace-route.js';
 import type {} from '@deepseek-ai/dsh-shell';
@@ -17,7 +17,9 @@ import { LocationPreference } from './location.js';
 import { locationRoute } from './location-route.js';
 import { installLocalBrand } from './local-brand.js';
 import { installLocalGlass } from './local-glass.js';
-import { sessionLocationHtml } from './session-boot.js';
+import { installLocalAccount } from './local-account.js';
+import { sessionLocationHtml, composeSessionGraph, filterSessionClients, WEB_POLICY_CLIENTS, type SessionBootGraph } from './session-boot.js';
+import { GRAPH_EVENTS_PATH, localGraphEvents } from './graph-events.js';
 import { LocalHarnessWorkspaces } from './local-workspaces.js';
 import type {} from '@deepseek-ai/dsh-agent-default-model';
 import { CloudAccountModel, CLOUD_MODEL_PROVIDER, hasSession } from './cloud-model.js';
@@ -74,6 +76,9 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
   private readonly location = new LocationPreference(resolveDshHome());
   private localBrandRevision = '';
   private localGlassRevision = '';
+  private localAccountRevision = '';
+  private localLocationRevision = '';
+  private cloudHiddenClients = new Set<string>();
 
   constructor(ctx: Context, config: Config) {
     cloudOrigin(config.cloudOrigin);
@@ -90,12 +95,20 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
       revision: createHash('sha256').update(script).digest('hex').slice(0, 16),
       inject: manifest.dsh.client.inject as string[],
     };
+    this.localLocationRevision = client.locationRevision;
     this.localBrandRevision = installLocalBrand(ctx);
     this.localGlassRevision = installLocalGlass(ctx);
+    this.localAccountRevision = installLocalAccount(ctx);
     this.cloud = new CloudProxy({ origin: config.cloudOrigin, timeoutMs: config.cloudTimeoutMs,
       sessionRetentionSeconds: config.cloudSessionRetentionSeconds ?? 2592000,
       maxIndexBytes: config.cloudMaxIndexBytes ?? 2097152,
       transformIndex: html => this.transformCloudIndex(html, client),
+      transformGraph: graph => {
+        filterSessionClients(graph, this.cloudHiddenClients);
+        return composeSessionGraph(composeDesktopGraph(graph, client, this.desktopParameters), {
+          location: 'cloud', locationRevision: client.locationRevision, workspaceRevision: client.workspaceRevision,
+        });
+      },
     });
     ctx.effect(() => () => this.cloud.dispose());
     this.installWorkspace(ctx, config, workspaceScript);
@@ -155,10 +168,6 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
       res.writeHead(200, { 'content-type': 'application/javascript', 'cache-control': 'no-store' }); res.end(script);
     } }));
     ctx.effect(() => this.tapIndex(html => this.transformLocalIndex(html, revision)));
-    ctx.inject(['tools'], local => local.effect(() => local.tools.guard(exec => {
-      if (exec.name === 'desktop_workspace') return this.location.location === 'local' ? undefined : 'LOCAL_TOOL_NOT_AUTHORIZED';
-      return this.location.location === 'local' ? 'LOCAL_TOOL_NOT_AUTHORIZED' : undefined;
-    })));
     ctx.inject(['llm', 'agentDefaultModel'], async local => {
       // env 是测试逃生口（冒烟用 loopback mock 顶替目录）；部署走 cloudModelOrigin/cloudOrigin 配置。
       const adapter = new CloudAccountModel({ origin: cloudOrigin(process.env.MEWCLAW_CLOUD_MODEL_ORIGIN || config.cloudModelOrigin || config.cloudOrigin).origin,
@@ -218,17 +227,22 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
   }
 
   private transformCloudIndex(html: string, client: { revision: string; inject: string[]; locationRevision: string; workspaceRevision: string }): string {
+    const wire = html.split('globalThis["__DSH_BOOT__"] = ')[1]?.split('</script>')[0];
+    if (wire) {
+      const graph = JSON.parse(wire.trim().replace(/;$/, '')) as SessionBootGraph;
+      this.cloudHiddenClients = new Set(WEB_POLICY_CLIENTS.filter(id => !graph.entries.some(entry => entry.id === id)));
+    }
     const location = this.location.location;
     const transformed = desktopCloudHtml(html, client, this.desktopParameters);
     const options: Parameters<typeof sessionLocationHtml>[1] = { location, locationRevision: client.locationRevision };
     if (location === 'cloud') options.workspaceRevision = client.workspaceRevision;
-    if (location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; }
+    if (location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; options.accountRevision = this.localAccountRevision; }
     return sessionLocationHtml(transformed, options);
   }
 
   private transformLocalIndex(html: string, revision: string): string {
     const options: Parameters<typeof sessionLocationHtml>[1] = { location: this.location.location, locationRevision: revision };
-    if (this.location.location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; }
+    if (this.location.location === 'local') { options.brandRevision = this.localBrandRevision; options.glassRevision = this.localGlassRevision; options.accountRevision = this.localAccountRevision; }
     return sessionLocationHtml(html, options);
   }
 
@@ -259,6 +273,14 @@ export default class MewClawDesktopWebServer extends DesktopWebServer {
   }
 
   override register(route: WebRoute): () => void {
+    if (route.path === GRAPH_EVENTS_PATH) {
+      const events = localGraphEvents(this.ctx, graph => composeSessionGraph(graph, {
+        location: 'local', locationRevision: this.localLocationRevision, brandRevision: this.localBrandRevision,
+        glassRevision: this.localGlassRevision, accountRevision: this.localAccountRevision,
+      }));
+      const dispose = super.register({ ...route, handler: this.wrap(events.handler) });
+      return () => { dispose(); events.dispose(); };
+    }
     return super.register({ ...route, handler: this.wrap(route.handler) });
   }
 

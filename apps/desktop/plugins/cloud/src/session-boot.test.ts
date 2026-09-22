@@ -44,3 +44,17 @@ it('本地模式停用云端工作区桥接并拒绝重复位置客户端', () =
   expect(output).not.toContain('dsh-lark-desktop-workspace-client');
   expect(() => sessionLocationHtml(output, { location: 'local', locationRevision: 'next' })).toThrow('DUPLICATE_LOCATION_CLIENT');
 });
+
+it('本地复用 Web 账号设置与模型位，设置依赖指向同一远程偏好 Provider', () => {
+  const ids = ['@deepseek-ai/dsh-client-ui-sidebar', '@deepseek-ai/dsh-client-ui-settings',
+    '@linxin666/dsh-web-all', 'dsh-lark-model-seat', 'dsh-plugin-desktop'];
+  const entries = ids.map(id => ({ id, rev: 'a', url: `/${id}`, inject: id === 'dsh-plugin-desktop' ? ['@deepseek-ai/dsh-client-ui-settings'] : [] }));
+  const html = '<script>globalThis["__DSH_BOOT__"] = ' + JSON.stringify({ rev: 'a', entries, batches: [{ phase: 'application', url: '/batch', rev: 'a', entries: ids }] }) + ';</script>';
+  const output = sessionLocationHtml(html, { location: 'local', locationRevision: 'location', accountRevision: 'account' });
+  const source = output.split('globalThis["__DSH_BOOT__"] = ')[1]!.split(';</script>')[0]!;
+  const graph = JSON.parse(source) as { entries: typeof entries };
+  expect(graph.entries.map(entry => entry.id)).toEqual(expect.arrayContaining(['dsh-lark-model-seat', 'dsh-lark-web-auth']));
+  expect(graph.entries.find(entry => entry.id === 'dsh-plugin-desktop')?.inject).toEqual(['dsh-lark-web-auth']);
+  expect(graph.entries.some(entry => entry.id === '@deepseek-ai/dsh-client-ui-settings')).toBe(false);
+  expect(output).toContain('__DSH_AUTH_EDGE__={remoteSettings:true}');
+});

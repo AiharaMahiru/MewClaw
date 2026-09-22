@@ -3,9 +3,11 @@ import { request as httpRequest, type IncomingMessage, type ServerResponse } fro
 import { request as httpsRequest } from 'node:https';
 import type { Duplex } from 'node:stream';
 import { desktopSessionCookie } from './cookies.js';
+import { GraphEventTransform, GRAPH_EVENTS_PATH } from './graph-events.js';
+import type { SessionBootGraph } from './session-boot.js';
 
 const HOP_HEADERS = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade']);
-export interface CloudProxyConfig { origin: string; timeoutMs: number; sessionRetentionSeconds?: number; maxIndexBytes?: number; transformIndex?: (html: string) => string }
+export interface CloudProxyConfig { origin: string; timeoutMs: number; sessionRetentionSeconds?: number; maxIndexBytes?: number; transformIndex?: (html: string) => string; transformGraph?: (graph: SessionBootGraph) => SessionBootGraph }
 
 /** 只接受无凭证 HTTPS origin；本机测试可使用回环 HTTP。 */
 export function cloudOrigin(value: string): URL {
@@ -43,7 +45,8 @@ export class CloudProxy {
       headers[key] = value;
     }
     headers.host = this.origin.host;
-    if (this.config.transformIndex && new URL(req.url ?? '/', this.origin).pathname === '/') headers['accept-encoding'] = 'identity';
+    const pathname = new URL(req.url ?? '/', this.origin).pathname;
+    if ((this.config.transformIndex && pathname === '/') || (this.config.transformGraph && pathname === GRAPH_EVENTS_PATH)) headers['accept-encoding'] = 'identity';
     if (req.headers.origin) headers.origin = this.origin.origin;
     if (req.headers.referer) headers.referer = `${this.origin.origin}/`;
     if (headers.cookie) {
@@ -102,6 +105,17 @@ export class CloudProxy {
             res.writeHead(200, { ...headers, 'cache-control': 'no-store' }); res.end(html);
           } catch { res.writeHead(502); res.end('CLOUD_DESKTOP_BOOT_INCOMPATIBLE'); }
         });
+        return;
+      }
+      if (this.config.transformGraph && target.pathname === GRAPH_EVENTS_PATH && response.statusCode === 200
+        && String(headers['content-type']).includes('text/event-stream')) {
+        const transform = new GraphEventTransform(this.config.transformGraph, this.config.maxIndexBytes ?? 2097152);
+        delete headers['content-length']; delete headers.etag;
+        res.writeHead(200, headers);
+        response.once('error', () => transform.destroy());
+        transform.once('error', () => { response.destroy(); res.destroy(); });
+        res.once('close', () => transform.destroy());
+        response.pipe(transform).pipe(res);
         return;
       }
       res.writeHead(response.statusCode ?? 502, headers);

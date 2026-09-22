@@ -14,20 +14,31 @@ function switchSplashRuntime(flagKey: string): void {
     sessionStorage.removeItem(flagKey);
     // 只放行可解析纯色，防止意图字段把任意 CSS 注进过渡面。
     const colorPattern = /^(#[0-9a-f]{3,8}|rgba?\([^)]{1,48}\))$/i;
+    // 透明/半透明底色会让官方启动屏透上来与过渡文案叠影——alpha<1 一律回退默认色。
+    const opaque = (value: unknown, fallback: string): string => {
+      if (typeof value !== 'string' || !colorPattern.test(value)) return fallback;
+      const rgba = /^rgba\([^)]*,\s*([\d.]+)\s*\)$/i.exec(value);
+      if (rgba && Number.parseFloat(rgba[1] ?? '0') < 1) return fallback;
+      const hexAlpha = /^#(?:[0-9a-f]{4}|[0-9a-f]{8})$/i.test(value)
+        ? (value.length === 5 ? value.charAt(4) : value.slice(7)) : '';
+      if (hexAlpha !== '' && hexAlpha.toLowerCase() !== 'f' && hexAlpha.toLowerCase() !== 'ff') return fallback;
+      return value;
+    };
     let target = 'cloud';
     let surface = '#17181c';
     let ink = '#e8eaef';
     try {
       const flag = JSON.parse(raw) as { to?: unknown; bg?: unknown; ink?: unknown };
       if (flag.to === 'local' || flag.to === 'cloud') target = flag.to;
-      if (typeof flag.bg === 'string' && colorPattern.test(flag.bg)) surface = flag.bg;
-      if (typeof flag.ink === 'string' && colorPattern.test(flag.ink)) ink = flag.ink;
+      surface = opaque(flag.bg, surface);
+      ink = opaque(flag.ink, ink);
     } catch { /* 意图损坏时按默认色继续，不阻断启动 */ }
     const doc = document;
     // 先铺满背景色，挡住 body 尚未建立时的首帧白闪。
     doc.documentElement.style.background = surface;
-    const MIN_VISIBLE_MS = 350;
-    const FADE_MS = 180;
+    const reduced = doc.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const MIN_VISIBLE_MS = 0;
+    const FADE_MS = reduced ? 0 : 180;
     const CAP_MS = 20000;
     let splash: HTMLElement | undefined;
     let finishing = false;
@@ -70,7 +81,7 @@ function switchSplashRuntime(flagKey: string): void {
       const animate = (spinner as HTMLElement & {
         animate?: (frames: unknown, timing: unknown) => void;
       }).animate;
-      animate?.call(spinner,
+      if (!reduced) animate?.call(spinner,
         [{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }],
         { duration: 900, iterations: Infinity });
       const label = doc.createElement('div');

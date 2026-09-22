@@ -6,7 +6,7 @@ import { PiAiAdapter, type PiAiAdapterOptions, type ResolvedPiAiProviderProfile 
 import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm';
 
 export const CLOUD_MODEL_PROVIDER = 'mewclaw-cloud';
-/** 与云端 Worker 相同的 provider id：会话选择（provider/model）在两种模式下完全一致。 */
+/** 优先沿用云端 Worker 的 provider id；本机同名注册时使用桥接选择器。 */
 export const PRIVATE_MODEL_PROVIDER = 'web-private';
 const LEGACY_DEFAULT = 'cloud-default';
 const CONTEXT_WINDOW = 262144;
@@ -91,7 +91,7 @@ export class CloudAccountModel extends LlmAdapter {
 
   invalidateCatalog(): void { this.cached = undefined; }
 
-  /** 目标路由集：web-private + 目录里的共享 provider + mewclaw-cloud（仅解析兼容，不列条目）。 */
+  /** 目标路由集：web-private + 共享 provider + mewclaw-cloud（兼容与冲突回退）。 */
   private desiredRoutes(catalog: CloudModelCatalog): string[] {
     return [PRIVATE_MODEL_PROVIDER, ...new Set(catalog.sharedModels.map(item => item.provider)), CLOUD_MODEL_PROVIDER];
   }
@@ -111,7 +111,13 @@ export class CloudAccountModel extends LlmAdapter {
     // 初始只有 mewclaw-cloud 一路由：对它的 listModels 是目录拉取与路由扩展的引导点。
     let catalog: CloudModelCatalog;
     try { catalog = await this.catalog(); } catch { return []; }
-    if (provider === CLOUD_MODEL_PROVIDER) return [];
+    if (provider === CLOUD_MODEL_PROVIDER) {
+      const selectors = [
+        ...defaultProfile(catalog) && !this.routes.includes(PRIVATE_MODEL_PROVIDER) ? [LEGACY_DEFAULT] : [],
+        ...catalog.sharedModels.filter(item => !this.routes.includes(item.provider)).map(item => `shared/${item.provider}/${item.model}`),
+      ];
+      return selectors.map(selector => this.info(provider, this.legacy(catalog, selector)));
+    }
     return provider === PRIVATE_MODEL_PROVIDER ? privateEntries(catalog) : sharedEntries(catalog, provider);
   }
 
@@ -153,7 +159,7 @@ export class CloudAccountModel extends LlmAdapter {
     const shared = /^shared\/([^/]+)\/(.+)$/.exec(selector);
     if (shared) {
       const entry = catalog.sharedModels.find(item => item.provider === shared[1] && item.model === shared[2]);
-      if (entry) return { id: selector, selector, name: entry.name, description: '部署共享模型' };
+      if (entry) return { id: selector, selector, name: entry.name, description: '部署共享模型', reasoning: sharedReasoning(entry) };
     }
     throw new LlmError('云端模型选择无效', 'MODEL_NOT_FOUND');
   }
@@ -187,12 +193,13 @@ export class CloudAccountModel extends LlmAdapter {
       throw new LlmError('请先在云端登录账号后再使用本地会话模型。', 'CLOUD_LOGIN_REQUIRED');
     }
     const entry = this.resolve(options.provider, options.model, await this.catalog());
-    const profile = gatewayProfile(this.options.origin, { cookie, origin: this.options.origin, 'x-csrf-token': decodeURIComponent(csrf) }, entry);
+    const effort = options.reasoningEffort ?? entry.reasoning?.defaultEffort;
+    const profile = gatewayProfile(this.options.origin, { cookie, origin: this.options.origin, 'x-csrf-token': decodeURIComponent(csrf) }, entry, effort);
     const adapter = new PiAiAdapter({ profiles: () => new Map([[CLOUD_MODEL_PROVIDER, profile]]),
       // 协议占位符不是凭证；服务器仅验证 Cookie/CSRF，不接受此 Bearer。
       resolveApiKey: async () => 'desktop-session', auth: EMPTY_AUTH });
     try {
-      for await (const chunk of adapter.stream({ ...options, provider: CLOUD_MODEL_PROVIDER, model: entry.selector })) {
+      for await (const chunk of adapter.stream({ ...options, ...effort === undefined ? {} : { reasoningEffort: effort }, provider: CLOUD_MODEL_PROVIDER, model: entry.selector })) {
         if (chunk.type === 'finish' && chunk.reason.kind === 'error') {
           yield { ...chunk, reason: { kind: 'error', failure: cloudFailure(chunk.reason.failure) } };
         } else yield chunk;
@@ -210,9 +217,13 @@ export class CloudAccountModel extends LlmAdapter {
   /** 进入本地模式时的默认选择：默认私有模型 → 首个共享模型 → 旧 cloud-default（无可用项时保留错误面）。 */
   defaultSelection(catalog: CloudModelCatalog): { provider: string; model: string } {
     const profile = defaultProfile(catalog);
-    if (profile) return { provider: PRIVATE_MODEL_PROVIDER, model: profile.defaultModel };
+    if (profile) return this.routes.includes(PRIVATE_MODEL_PROVIDER)
+      ? { provider: PRIVATE_MODEL_PROVIDER, model: profile.defaultModel }
+      : { provider: CLOUD_MODEL_PROVIDER, model: LEGACY_DEFAULT };
     const shared = catalog.sharedModels[0];
-    if (shared) return { provider: shared.provider, model: shared.model };
+    if (shared) return this.routes.includes(shared.provider)
+      ? { provider: shared.provider, model: shared.model }
+      : { provider: CLOUD_MODEL_PROVIDER, model: `shared/${shared.provider}/${shared.model}` };
     return { provider: CLOUD_MODEL_PROVIDER, model: LEGACY_DEFAULT };
   }
 
@@ -280,19 +291,13 @@ function sharedEntries(catalog: CloudModelCatalog, provider: string): LlmResolve
   });
 }
 
-/**
- * 服务端下发的强度表 → Harness reasoning 元数据。`off` 经 pi-ai 只能在请求里表达为
- * `reasoning_effort:"off"`（见 thinkingLevelMap），而它只在会话已固化默认值后可达：
- * 无默认值的模型若仍展示 off，未选强度的请求会被静默改写成"关闭思考"——此时摘掉 off 档。
- */
+/** 保留服务端的完整强度表；未选档位和显式 off 在推理适配层区分。 */
 function sharedReasoning(item: CloudSharedModel): CatalogEntry['reasoning'] {
   const efforts = item.reasoningEfforts;
   if (!efforts || efforts.length === 0) return undefined;
   const hasDefault = item.defaultReasoningEffort !== undefined && efforts.some(e => e.id === item.defaultReasoningEffort);
-  const visible = hasDefault ? efforts : efforts.filter(e => e.id !== 'off');
-  if (visible.length === 0) return undefined;
   return {
-    efforts: visible.map(e => ({ id: ReasoningEffortId(e.id), name: e.name, ...e.description === undefined ? {} : { description: e.description } })),
+    efforts: efforts.map(e => ({ id: ReasoningEffortId(e.id), name: e.name, ...e.description === undefined ? {} : { description: e.description } })),
     ...hasDefault ? { defaultEffort: ReasoningEffortId(item.defaultReasoningEffort!) } : {},
   };
 }
@@ -302,12 +307,12 @@ function defaultProfile(catalog: CloudModelCatalog): CloudModelProfile | undefin
     : catalog.profiles.find(item => item.id === catalog.defaultProfileId && item.keyConfigured);
 }
 
-function gatewayProfile(origin: string, headers: Record<string, string>, entry: CatalogEntry): ResolvedPiAiProviderProfile {
+function gatewayProfile(origin: string, headers: Record<string, string>, entry: CatalogEntry, effort: string | undefined): ResolvedPiAiProviderProfile {
   const baseURL = `${origin}/auth/desktop-inference`;
   // Edge 白名单直接吃强度词（off/minimal/low/medium/high/xhigh/max），map 恒等即够；
   // 'off' 必须有映射：pi-ai 把选中 off 剥成"不带强度"，回落分支再按 map.off 发出。
   const thinkingLevelMap = entry.reasoning === undefined ? undefined
-    : Object.fromEntries(entry.reasoning.efforts.map(e => [e.id, e.id]));
+    : Object.fromEntries(entry.reasoning.efforts.filter(e => e.id !== 'off' || effort === 'off').map(e => [e.id, e.id]));
   const model: Model<'openai-completions'> = { id: entry.selector, name: entry.name, api: 'openai-completions', provider: CLOUD_MODEL_PROVIDER,
     baseUrl: baseURL, reasoning: entry.reasoning !== undefined, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: CONTEXT_WINDOW, maxTokens: MAX_TOKENS,
     // Edge 按 REQUEST_FIELDS 白名单逐字段校验：pi-ai 对未知 provider 探测 supportsStore=true 会

@@ -1,8 +1,19 @@
 # MewClaw Desktop 当前交接
 
-更新时间：2026-09-19
+更新时间：2026-09-23
 工作分支：`desktop-dev`
-本地同步基线：已合入 `origin/desktop@a36a7e0`（累计含 R32 计费纪元、R33 桌面推理三形态选择器与共享模型目录、R34-R37 品牌改名、R48 ws-crashguard、R49 bash schema、R52 OCI 出站网络 + 侧栏 10GB、R53 ui-sidebar-files 去重、R54 侧栏媒体流式转发、R55 移动端顶栏对齐、工具 schema 门禁与 STREAM_CLOSED/审计瞬态重试硬化）。途中远端 desktop-dev 已先行合入 `91bd7e6`（`de12683`），本分支在其上再合 desktop（`f48f39c`、`3b527c7`、`868fffa`、本轮 `a36a7e0`、`7e98458`）。最新合并 `b7f289d` 并入 `origin/desktop@7e98458`（`dd9a170` 移动端右坞毛玻璃 + `7e98458` master 合入），干净无冲突、仅触 `packages/lark/mewclaw-brand` 移动端文件，按既定边界不移植桌面变体；已推送并核验远端 `desktop-dev=b7f289d`。随后 VPS 侧再合 `origin/desktop@b5995ca`（`10114eb`，带入 R57 OCI 容器名冲突修复）+ 边界门禁宿主豁免（`7c8dc2c`），并以此发布生产 `R58-desktop-dev-reasoning-20260917`（见 §4）。**2026-09-18 续**：VPS 侧执行 DSH `0.1.6-alpha.2` 升级（master `a801f11`+`fdc7f35` → desktop `583b020` → 本分支 `8e62a32`+`b6629c7`），打包发布 `R59-dsh-0.1.6-alpha2-20260918`（gitCommit `b6629c7`、SHA-256 `45dbc96d9e137e2061959e7f028a1657c9b80404a645cdc5de38d80357938416`），升级细节与核验证据见 `docs/dsh-0.1.6-upgrade.md` §五；桌面候选 lane 仍钉 `0.1.5-rc.2`（`dsh-overrides.json`/candidate lock 未动，桌面底座 0.1.2 兼容面经 `0.1.2-rc.1 || 0.1.5-rc.2 || 0.1.6-alpha.2` peer 范围覆盖）。注意：主线 `06dc1af` 首次挂接 `upstream/dsh-desktop` 于 `a1ddcda8`（比本分支 pin `5510cb1203` 老），合并时保持本分支较新 pin 不回退。按交接约定 `packages/auth/edge` 下 `desktop-inference.ts`/`desktop-inference.test.ts`/`auth-routes.ts`/`server.ts`/`config.ts` 冲突全部取主线版本——本轮为思考强度元数据新增了 `DesktopSharedModel` 接口字段（见下），属本分支对 edge 的**新增**改动而非冲突取线。候选 `mewclaw-brand` workspace 是桌面变体的**展开副本**（剥离移动代码、无 `mobile` 选项）：上游改动中仅全视口生效的 `DEDUPE_STYLE`（隐藏会话头部 "Open right sidebar"）已手工移植；`@media(max-width:768px)` 与 rail 脚本类改动按设计不进入桌面。
+
+## 2026-09-23 源码同步
+
+已保留并合并远端 `0848bd2`、共享主线 `64f560d` 和本机工作区实现 `c25a986`。当前 Desktop 使用 DSH `0.1.6-alpha.2`、Cordis `4.0.2`、Electron `44.0.0`；本地复用 Web 的 UI 组合、四种模式及滑条，目录入口在原有工作区选择器内。
+
+旧的 preset 物化副本、模型控件 vendor 副本和未调用的 profile patch 追加段已由 Web 同源准备及官方 Provider 子类取代，不再覆写官方实例方法。云端／本地切换的透明底色回退修复已合入。
+
+使用与验收边界以 [README](README.md)、[桌面说明](apps/desktop/README.md) 和 [本机工作区说明](docs/client-local-workspaces.md) 为准。本节仅记录源码同步；下方 Windows 目录、包摘要及生产记录是此前历史，不能视作本次新提交的构建或部署证明。
+
+## 历史交接记录（保留原文）
+
+本地同步基线：已合入 `origin/desktop@a36a7e0`（累计含 R32 计费纪元、R33 桌面推理三形态选择器与共享模型目录、R34-R37 品牌改名、R48 ws-crashguard、R49 bash schema、R52 OCI 出站网络 + 侧栏 10GB、R53 ui-sidebar-files 去重、R54 侧栏媒体流式转发、R55 移动端顶栏对齐、工具 schema 门禁与 STREAM_CLOSED/审计瞬态重试硬化）。途中远端 desktop-dev 已先行合入 `91bd7e6`（`de12683`），本分支在其上再合 desktop（`f48f39c`、`3b527c7`、`868fffa`、本轮 `a36a7e0`、`7e98458`）。最新合并 `b7f289d` 并入 `origin/desktop@7e98458`（`dd9a170` 移动端右坞毛玻璃 + `7e98458` master 合入），干净无冲突、仅触 `packages/lark/mewclaw-brand` 移动端文件，按既定边界不移植桌面变体；已推送并核验远端 `desktop-dev=b7f289d`。随后 VPS 侧再合 `origin/desktop@b5995ca`（`10114eb`，带入 R57 OCI 容器名冲突修复）+ 边界门禁宿主豁免（`7c8dc2c`），并以此发布生产 `R58-desktop-dev-reasoning-20260917`（见 §4）。**2026-09-18 续**：VPS 侧执行 DSH `0.1.6-alpha.2` 升级（master `a801f11`+`fdc7f35` → desktop `583b020` → 本分支 `8e62a32`+`b6629c7`），打包发布 `R59-dsh-0.1.6-alpha2-20260918`（gitCommit `b6629c7`、SHA-256 `45dbc96d9e137e2061959e7f028a1657c9b80404a645cdc5de38d80357938416`），升级细节与核验证据见 `docs/dsh-0.1.6-upgrade.md` §五；桌面候选 lane 仍钉 `0.1.5-rc.2`（`dsh-overrides.json`/candidate lock 未动，桌面底座 0.1.2 兼容面经 `0.1.2-rc.1 || 0.1.5-rc.2 || 0.1.6-alpha.2` peer 范围覆盖）。**2026-09-21 续**：本地 `desktop-dev` 快进至 `25dfa82`（主线 R71–R80：审计 failover、移动端右栏系列修复、IconSendOutline 兼容）；其中 `liquid-glass/surfaces.ts` 横向 tablist 排除 `[data-dockkit-strip]`（dockkit 面板条不再被 fit-content 收编挤位）已同步候选 vendored 副本并重建 `client.js`，本次 Release 产物即含此修复。注意：主线 `06dc1af` 首次挂接 `upstream/dsh-desktop` 于 `a1ddcda8`（比本分支 pin `5510cb1203` 老），合并时保持本分支较新 pin 不回退。按交接约定 `packages/auth/edge` 下 `desktop-inference.ts`/`desktop-inference.test.ts`/`auth-routes.ts`/`server.ts`/`config.ts` 冲突全部取主线版本——本轮为思考强度元数据新增了 `DesktopSharedModel` 接口字段（见下），属本分支对 edge 的**新增**改动而非冲突取线。候选 `mewclaw-brand` workspace 是桌面变体的**展开副本**（剥离移动代码、无 `mobile` 选项）：上游改动中仅全视口生效的 `DEDUPE_STYLE`（隐藏会话头部 "Open right sidebar"）已手工移植；`@media(max-width:768px)` 与 rail 脚本类改动按设计不进入桌面。
 
 ## 当前唯一交付目录
 
@@ -24,9 +35,9 @@ D:\AI\dsh\MewClaw-desktop-candidate\release\MewClaw-1.0.0-win-x64
 
 | 产物 | 字节 | SHA-256 |
 | --- | ---: | --- |
-| `MewClaw-1.0.0-win-x64-Portable.exe` | 155447616 | `8d0969b7e90f4db874008070f3a76a20fce8ba6c054bc6f7d8186fa25e8ab3e1` |
-| `MewClaw-1.0.0-win-x64-Setup.exe` | 155691552 | `4fdeb4f4932384ea1bcdf6d555cfb63e18207172881dde019b24beeba1e56b17` |
-| `MewClaw-1.0.0-win-x64.zip` | 197338819 | `cddb81c279358865b62fe65078ab37edd22e752ff8877a3c1cbd45056b432e5f` |
+| `MewClaw-1.0.0-win-x64-Portable.exe` | 155490051 | `0420c7d089093cafe652ed89adcb2e3b8311cd6b39db237587b5e743ee6680ca` |
+| `MewClaw-1.0.0-win-x64-Setup.exe` | 155734008 | `15bf9c9dc1d820274653300508fcc9d3794317715da2a2874c2ae09833a04c9c` |
+| `MewClaw-1.0.0-win-x64.zip` | 197388544 | `aadf3ea65b071cd65b3566fa39b7eea5641758e9729ed4f3e7dd5f9b772bef49` |
 
 产物未签名。`win-unpacked` 与上述安装包位于同一 Release 目录，必须一起保留用于目录模式验收。**自本轮起发行形态为 `asar:false`**（应用根是 `resources/app/` 目录而非 `app.asar` 归档），与上游 2.0.10 发行形态一致——体积变大属预期。
 
@@ -327,3 +338,24 @@ pnpm service:status
 **2026-09-21 续十四——better-sidebar 0.19.1 对 primitives 0.1.6 的 IconSendOutline16 兼容补丁已上线（R80）**：浏览器控制台 React #130（SideChatView 渲染 undefined 组件）实证根因：`dsh-better-sidebar@0.19.1` 按 `^0.1.5-rc.1` 构建引用了 `IconSendOutline16`，而部署的 `@deepseek-ai/dsh-client-ui-primitives@0.1.6-alpha.2` 已将其改名 `IconSendOutline14`（上游会话区发送键同源实证）——SideChatView 发送按钮子树整段渲染崩。修复：`pnpm patch` 流程对 0.19.1 patch 追加 hunk，`SideChatView.tsx` import/JSX 与 `lib/client.js` 产物三处 `IconSendOutline16→IconSendOutline14`（14px 即上游新规格，28px 圆形按钮内居中无视觉差）；patch-commit 顺带把此前 node_modules 手改全部收编进正式 patch 文件（`dsh-better-sidebar@0.18.0` 传递副本未被运行时加载——web-all profile 排除，未改）。注意 `lib/client-registry.js` 内含第二份 SideChatView 拷贝，首轮只改 client.js 会留一个未修复引用，须三产物同改（`351ee30`）。验证：dsh-web-composition 27/27、部署树双 bundle `IconSendOutline16` 计数归零；打包 `R80-iconsend-compat-20260921`（SHA-256 `ec3485b6ac2bb891f8399e4cad822269a53a74570a32e60628761bf238008392`）→ 原子翻转 → 6 服务 active、站点 200、公网 /internal 404。其余控制台项分诊为噪声/设计内：`generation is still not ready after 3000ms` 是 dsh-client-connection 握手超 3s 的预警（硬超时才取消，重连期瞬态）；`/plugins/events` upstream timeout 是 client-hmr 开发期 SSE 通道在生产的重连噪声（8/24 起 1369 次，先于 EO）；`/open-in-app/icon/cursor` 404 是 open-in-app 按 app id 取桌面图标、web 部署无图标时回退通用字形（客户端对 404 有去重设计）；KaTeX `strict mode warn` 是模型输出把中文包进 `$...$` 的排版告警；`.js.map` 404 是生产未随包发 sourcemap。
 
 **2026-09-21 续十五——提示词审计备用模型链 + 会话粘性已上线（R81）**：用户要求审计在 deepseek-v4.1-flash 不稳时自动转移 muse-spark-1.3 / glm-5.3-flash 且带会话粘性。原实现仅单个 `AUTH_PROMPT_AUDIT_FALLBACK_MODEL` 且每轮先撞主模型。改造（`28c3083`）：`prompt-audit-model.ts` 客户端改有序链 `[primary, ...fallbackModels]`，任一模型失败（含凭证/配额/模型禁用等确定性 code——模型维度故障）且调用方未中止时按序切换，全部失败仍失败关闭；新增进程内粘性表（上限 1024，超限先清过期再逐最旧），`AUTH_PROMPT_AUDIT_STICKY_MS` 默认 30 分钟（0 关闭）——携带 sessionId 的调用（`promptAuditInput` 从 `args.sessionId`/`args.request.sessionId` 提取，覆盖 session.prompt 族 RPC）在 TTL 内优先本会话上次成功的模型，成功重定指、失败剔除；桌面推理端点无 sessionId，以 `desktop:<userId>` 为粘性键。配置层 `AUTH_PROMPT_AUDIT_FALLBACK_MODELS` 逗号分隔（空项过滤），旧单值变量兼容保留、复数优先。SPEC §4/§7 同步。验证：prompt-audit-model 24 + prompt-audit 37 + config 11 测试全过（新增链序/粘性命中/失败剔除/TTL 到期/禁用粘性/双形态 sessionId 提取用例），tsc -b 与 lint 干净（修 `exactOptionalPropertyTypes` 两处：条件展开 fallbackModels、mock 参数签名）。生产 `/etc/dsh/production.env` 改 `AUTH_PROMPT_AUDIT_FALLBACK_MODELS=muse-spark-1.3,glm-5.3-flash`。打包 `R81-audit-model-chain-20260921`（SHA-256 `e9f9f624311be755e2754fdd240930dacb7034f164d68e54fb68664d03e1bf45`）→ 原子翻转 → 6 服务 active、站点 200。待观察：glm/muse 链路真实成功率看 `[prompt-audit] 审计模型 ... 切换` warn 日志。
+### 5. 本地模式与云端体验对齐——preset 集 + 思考强度滑条 + 切换控件样式（2026-09-21）
+
+用户反馈本地模式三处与云端不一致：① 模式（preset）菜单只有官方 4 项，云端 7 项；② 无思考强度滑条（官方 picker 只给「强度 ›」菜单行，非 Web 版滑条形态）；③ 侧栏「云端|本地」切换是裸 button，不符合 DSH 视觉语言。
+
+**preset 对齐**：本地 roster 差异不是 UI 问题而是发现根不同——云端 bundle 注册三个 preset 根（lightweight → 全量 agent-presets → 官方 shipped），本地只发现官方根。实现：`apps/desktop/plugins/cloud/src/local-presets.ts` 的 `materializeLocalPresets(home)` 在插件启动时把 vendored preset 树物化到 `$DSH_HOME/mewclaw-presets/`（`agent-presets-lightweight/lark-lightweight`、`agent-presets/{cordis,lark-standard,liangshen}`、`agent-presets-oci/`、`tool-schema.mjs`），相对 `@deepseek-ai/dsh-agent-presets` 的 include 重写为宿主安装目录绝对路径，SHA-256 stamp 幂等；官方 shipped `cordis` 拷入全量根以保持云端同序（`cordis < lark-standard < liangshen` 字典序）。`dsh-plugin-desktop/src/profile.ts` 的 roots 生成加入两条物化根（在 shipped 根之前，`trust:'system'`，`includeUserRoot:false` 保留）——注意必须在 profile.ts 而非 `cordis.patch.yml`：`prepareDesktopProfile` 组合期重写 `agent-presets.roots` 会盖掉 patch 配置。`cloud-layout-bridge.patch` 已含对应 hunk（LF 行尾 + hunk 头已修正，新增 hunk 在上游 `5510cb1` 上独立 `--check` 通过；文件内既有 layout hunk 与上游漂移是既有状态）。
+
+**liangshen 本地降级**：vendored `liangshen` 的 `workflow-ptc`/`tool-workflow`/`tool-ralph` 三行一并 `disabled:true`——三者都注入 `workflowEngine`（由 workflow-ptc 提供），桌面 0.1.5-rc.2 线无该包（npm 上仅 0.1.6-alpha 线），禁单个会 mount/inject 失败。本地全能优化模式因此不含 run_code/workflow/ralph，属有意降级。
+
+**思考强度滑条**：新增 `effort-client.ts`（客户端模块，`/_dsh/desktop/effort-client.js` 路由下发），local 模式经 `session-boot.ts` 注入 BootGraph。**槽位是 `conversation.input.dock`（list/session scope）**——不是 `composer.dock`：后者仅在 `variant==='composer' && input!==void 0` 时挂载，冒烟实证 DOM 中不存在。组件复用 `ctx.modelDirectories.directoryFor(sessionId)` 共享目录（与 /model 弹层同一份状态），仅当前模型带 `reasoning` 元数据时渲染；交互复刻 mwseat：轨道拖动预览/松开提交、方向键逐档、Home/End 跳端点、pending 拇指待 store 确认、失败回退；无 `defaultEffort` 时首档「默认」= 清除显式 effort。**inject 必须含 `sessions`+`remote.session`**——`directoryFor` 内部经本模块 ambient scope 读 `ctx.remote.session`，缺声明抛 `cannot get property "remote.session" without inject`（首版冒烟实测命中）。
+
+**切换控件 DSH 化**：`location-client.ts` 的 footer 分段控件改走 dsw 令牌（`--dsw-alias-*`），胶囊容器 + 选中态高亮，截图核验与侧栏风格一致。
+
+**验证**：`effort-client.test.ts` 4 例（渲染/键盘写回/无 reasoning 不渲染/无 default 首档默认）+ `local-presets.test.ts` 2 例（物化布局/幂等/discoverPresets 7 项全健康）→ `WORKSPACE_OFFLINE_VERIFIED`（24 文件/85 测试）→ dev 冒烟 `DIRECTORY_COMPOSER_EDITABLE` + `EFFORT_SLIDER_OK 高` + `PRESET_ROSTER_OK 7` + `RENDERER_ERRORS 0` → `npm run build` 全绿 → 三产物重打 + `MEWCLAW_PACKAGE_OK`（包内确认 effort-client.js/presets/profile roots 均在）。
+
+**已知边界**：本地 preset 物化依赖 `dsh-lark-desktop-cloud` 启动——首次本地启动前 profile 里两根物化根目录不存在无碍（preset discovery 容忍缺失根）；升级旧安装时物化目录随首次启动自动补齐。
+
+**续（同日复核·二）——滑条弃仿造、直接装载真实 mwseat 组件**：首版滑条是手写仿品（先单行紧凑条、后复刻胶囊轨道），用户截图对比仍与云端不一致。正确做法是把 `packages/lark/model-seat` 的 `client.js` **原物 vendor** 进 `plugins/cloud/vendor/model-seat-client.js`，本地模式经 session-boot 注入 BootGraph（条目 id `dsh-lark-model-seat`，inject 沿用该包 `dsh.client.inject` 声明：`dsh-api-session-controller`/`dsh-client-ui-conversation`/`dsh-client-ui-model-selection`），路由 `/_dsh/desktop/model-seat-client.js` 下发。该组件以 `priority:-1` 遮蔽官方 `conversation.input.model` 占据——本地 composer 的模型芯片、弹层（胶囊滑条+档位值+「更多」模型清单）与云端**逐字节同一组件**，手写 `effort-client.ts`/测试已删。装载器对 inject 里缺失的 id 只跳过不报错（`arriveGraphRow` 的 `dependency !== void 0` 守卫），宿主侧 `apply()` 为空函数无需挂载。
+
+**续（同日复核·三）——切换过渡面叠影修复**：截图实证切换时「正在切换到云端工作区」与官方「HARNESS / Loading plugins…」启动屏叠影——根因是 `location-client` 取 `getComputedStyle(body).backgroundColor` 常得 `rgba(0,0,0,0)`（主题底色画在 html/root 上），透明覆盖层让官方屏透出。双侧修复：取色先 body 后 `documentElement` 取首个不透明色；`switch-splash` 运行时的颜色校验新增 alpha<1 拒绝（`#RGBA`/`#RRGGBBAA`/`rgba` 第四通道不全不透明即回退默认色）。冒烟 `--switch` 双向 `LOCATION_SWITCH_OK` 复验通过。
+
+**续（同日复核）——roster 显示层对齐 Edge 过滤+改名**：用户截图实证云端菜单只有四项（日常助手/创造模式/高效执行/标准模式），而非前述七项同集——根因是云端 `agentPresets/list` 经过 **Edge `rpc-policy.ts` 双层变换**：① 服务端白名单过滤（只放行 `lark-lightweight`/`standard`/`liangshen`/`cordis`）+ 改名（`日常助手`/`通用工作`/`高效执行`/`插件开发`）；② 客户端 `dsh-client-ui-agent-preset` 的 `presetDisplayText` 对 `trust==='system'` 且在内置字典的 preset 再做 i18n 覆盖（`cordis→创造模式`、`standard→标准模式`），覆盖 Edge 改名。两层叠加后云端最终呈现 = 截图四项。修复：`local-presets.ts` 新增 `cloudPresetRoster()` 纯函数复刻 Edge 变换，`index.ts` 包装本地 `agentPresets.remoteExportList`（`ctx.inject(['agentPresets'])` 后覆写实例方法）——只动显示层 roster，resolve/mount 与按 id 选择不受影响（与 Edge 语义一致：隐藏 preset 仍可被会话引用）。冒烟断言更新为四项 + 负向断言（飞书轻量/PTC/极简等不得泄漏），`PRESET_ROSTER_OK 4`；`local-presets.test.ts` 新增 roster 变换用例（7 测试全过）→ `WORKSPACE_OFFLINE_VERIFIED`（24 文件/86 测试）→ 三产物重打 + `MEWCLAW_PACKAGE_OK`。
