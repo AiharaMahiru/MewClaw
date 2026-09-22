@@ -1,0 +1,22 @@
+{
+  "name": "dsh-lark-tui-remote",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "dsh Web 到 dsh-TUI 的认证远程工作区客户端",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["lib"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --root ../../../ packages/lark/tui-remote/src/client.test.ts"
+  }
+}
