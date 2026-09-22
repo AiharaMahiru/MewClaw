@@ -9,11 +9,15 @@ import { afterEach, expect, it, vi } from 'vitest';
 
 afterEach(() => vi.unstubAllGlobals());
 
-it('通过官方 sidebar.footer.action 提供本地目录入口并启动 workspace', async () => {
+it('通过官方侧栏切换位置，不增加单独的本地目录入口', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('__MEWCLAW_SESSION_LOCATION__', 'local');
   const reload = vi.fn();
   vi.stubGlobal('location', { reload });
+  vi.stubGlobal('getComputedStyle', (element: Element) => ({
+    backgroundColor: element === document.body ? 'rgba(240, 240, 242, 0.5)' : 'rgb(240, 240, 242)',
+    color: 'rgb(24, 25, 28)',
+  }));
   let component: React.ComponentType<{ wide: boolean }> | undefined;
   const registrations: any[] = [];
   const ctx = {
@@ -41,15 +45,14 @@ it('通过官方 sidebar.footer.action 提供本地目录入口并启动 workspa
   try {
     await React.act(async () => root.render(React.createElement(component!, { wide: true })));
     const buttons = [...element.querySelectorAll('button')];
-    expect(buttons.map(button => button.textContent)).toEqual(['云端', '本地', '打开本地目录']);
+    expect(buttons.map(button => button.textContent)).toEqual(['云端', '本地']);
     expect(buttons[1]?.getAttribute('aria-pressed')).toBe('true');
-    await React.act(async () => buttons[2]!.click());
-    expect(requests).toEqual([['/api/mewclaw-desktop/local-directory', {}]]);
-    expect(ctx.uiWorkspace.startSession).toHaveBeenCalledWith('local-workspace');
+    expect(element.querySelector('[aria-label="打开本地目录"]')).toBeNull();
     await React.act(async () => buttons[0]!.click());
     expect(requests.at(-1)).toEqual(['/api/mewclaw-desktop/location', { location: 'cloud' }]);
     // 切换意图写入 sessionStorage 并立即盖同色过渡面，再由整页重载应用新 BootGraph。
     expect(sessionStorage.getItem('mewclaw.location-switch')).toContain('"to":"cloud"');
+    expect(JSON.parse(sessionStorage.getItem('mewclaw.location-switch')!).bg).toBe('rgb(240, 240, 242)');
     expect(document.getElementById('mewclaw-location-splash')).not.toBeNull();
     expect(reload).toHaveBeenCalledOnce();
   } finally { await React.act(async () => root.unmount()); element.remove(); }
@@ -73,5 +76,14 @@ it('云端模式保留官方 sidebar，仅显示位置切换', async () => {
     await React.act(async () => root.render(React.createElement(component!, { wide: true })));
     expect([...element.querySelectorAll('button')].map(button => button.textContent)).toEqual(['云端', '本地']);
     expect(element.textContent).not.toContain('打开本地目录');
+    await React.act(async () => root.render(React.createElement(component!, { wide: false })));
+    const buttons = [...element.querySelectorAll('button')];
+    expect(buttons.map(button => button.getAttribute('aria-label'))).toEqual(['云端模式', '本地模式']);
+    expect(buttons.every(button => button.querySelector('svg'))).toBe(true);
+    buttons[0]!.focus();
+    await React.act(async () => buttons[0]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+    expect(document.activeElement).toBe(buttons[1]);
+    expect(buttons[0]?.getAttribute('aria-pressed')).toBe('true');
+
   } finally { await React.act(async () => root.unmount()); element.remove(); }
 });

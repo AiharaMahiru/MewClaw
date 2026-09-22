@@ -1,9 +1,8 @@
-/** 本机 Harness 文件工具 Consumer，授权来源始终为原生目录选择。 */
+/** 本机工作区原生目录入口；模型侧使用与 Web 相同的官方 preset 和工具。 */
 import type { Context } from '@deepseek-ai/cordis';
 import type {} from '@deepseek-ai/dsh-workspace';
 import type {} from '@deepseek-ai/dsh-session';
 import type {} from '@deepseek-ai/dsh-agent';
-import { defineTool } from '@deepseek-ai/dsh-tools';
 import { LocalWorkspaceFiles } from 'dsh-lark-desktop-host';
 import { realpath } from 'node:fs/promises';
 import type { FileLimits } from 'dsh-lark-desktop-host';
@@ -11,21 +10,30 @@ import type { FileLimits } from 'dsh-lark-desktop-host';
 export class LocalHarnessWorkspaces {
   private readonly grants = new Map<string, LocalWorkspaceFiles>();
   private picking = false;
+  private generation = 0;
   constructor(private readonly ctx: Context, private readonly limits: FileLimits) {}
 
   async pick(): Promise<{ workspaceId: string; path: string } | null> {
     if (this.picking) throw new Error('LOCAL_PICKER_BUSY');
     this.picking = true;
+    const generation = this.generation;
+    const assertCurrent = () => {
+      if (generation !== this.generation) throw new Error('LOCAL_WORKSPACE_AUTHORIZATION_REVOKED');
+    };
     try {
       const runtime = this.ctx.get('desktopRuntime') as { pickDirectory(): Promise<string | null> };
       const path = await runtime.pickDirectory();
+      assertCurrent();
       if (!path) return null;
       const canonical = await realpath(path);
       const files = await LocalWorkspaceFiles.create(this.ctx.fs, canonical, this.limits);
       try {
+        assertCurrent();
         const workspace = await this.ctx.workspaceRegistry.create(canonical);
-        this.grants.get(canonical)?.dispose();
-        this.grants.set(canonical, files);
+        assertCurrent();
+        const key = grantKey(canonical);
+        this.grants.get(key)?.dispose();
+        this.grants.set(key, files);
         return { workspaceId: workspace.id, path: canonical };
       } catch (error) { files.dispose(); throw error; }
     } finally { this.picking = false; }
@@ -35,34 +43,23 @@ export class LocalHarnessWorkspaces {
     const session = this.ctx.sessions.get(sessionId as Parameters<typeof this.ctx.sessions.get>[0]);
     if (!session?.header.cwd) throw new Error('LOCAL_WORKSPACE_NOT_AUTHORIZED：会话未绑定本地目录。请让用户通过侧栏「打开本地目录」选择工作目录并创建会话。');
     const root = await realpath(session.header.cwd);
-    const grant = this.grants.get(root);
+    const grant = this.grants.get(grantKey(root));
     if (!grant) throw new Error(`LOCAL_WORKSPACE_NOT_AUTHORIZED：${root} 的目录授权已失效（授权不跨重启、登出或模式切换保留）。请让用户通过侧栏「打开本地目录」重新选择该目录。`);
     return grant.execute(operation, signal);
   }
 
   dispose(): void {
+    this.generation += 1;
     for (const files of this.grants.values()) files.dispose();
     this.grants.clear();
   }
 
   install(ctx: Context): void {
     ctx.effect(() => () => this.dispose());
-    ctx.effect(() => ctx.tools.register(defineTool({
-      name: 'desktop_workspace', description: '读取、列出或按版本写入本机会话已通过原生选择授权的目录。仅接受相对路径。授权不跨重启或模式切换保留，报 LOCAL_WORKSPACE_NOT_AUTHORIZED 时提示用户重新选择目录。',
-      parameters: {
-        action: { type: 'string', enum: ['list', 'read', 'write'], required: true },
-        path: { type: 'string', required: true }, content: { type: 'string' }, version: { type: 'string' },
-      },
-      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
-      execute: async (operation, exec) => {
-        if (!exec.agent) throw new Error('LOCAL_WORKSPACE_NOT_AUTHORIZED');
-        return JSON.stringify(await this.execute(exec.agent.id, operation, exec.signal));
-      },
-    })));
-    ctx.on('agent/created', ({ agent }) => {
-      const tools = agent.ctx.get('tools');
-      if (!tools) throw new Error('LOCAL_TOOLS_UNAVAILABLE');
-      agent.ctx.effect(() => tools.restrict({ allow: ['desktop_workspace'] }));
-    });
   }
+}
+
+/** Windows 的同一规范目录可能以不同盘符/目录大小写出现在旧会话中。 */
+function grantKey(path: string): string {
+  return process.platform === 'win32' ? path.toLowerCase() : path;
 }

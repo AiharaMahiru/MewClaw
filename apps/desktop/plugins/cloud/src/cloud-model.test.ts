@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { ReasoningEffortId, type GenerateOptions } from '@deepseek-ai/dsh-llm';
+import { Context } from '@deepseek-ai/cordis';
+import Llm, { LlmAdapter, ReasoningEffortId, type GenerateOptions } from '@deepseek-ai/dsh-llm';
 import { CloudAccountModel, CLOUD_MODEL_PROVIDER, PRIVATE_MODEL_PROVIDER } from './cloud-model.js';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -221,6 +222,45 @@ const effortCatalog = {
     defaultReasoningEffort: 'high' }],
 };
 
+it('真实 Cordis 同名 provider 共存时，默认选择与目录都走云端桥接且保留强度', async () => {
+  const requests: string[] = [];
+  vi.stubGlobal('fetch', async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (String(url).endsWith('/auth/models')) return catalogResponse({ ...effortCatalog, profiles: [], defaultProfileId: null });
+    requests.push(JSON.parse(String(init?.body)).model);
+    return sseResponse();
+  });
+  const ctx = new Context();
+  class LocalModel extends LlmAdapter {
+    override async *stream() { throw new Error('不应调用本机供应商'); yield* []; }
+  }
+  try {
+    await ctx.plugin(Llm);
+    ctx.effect(() => ctx.llm.registerAdapter(['deepseek-official', PRIVATE_MODEL_PROVIDER], new LocalModel()));
+    const adapter = new CloudAccountModel({ origin: 'https://cloud.example', cookie: () => cookie });
+    ctx.effect(() => {
+      const handle = ctx.llm.registerAdapter([CLOUD_MODEL_PROVIDER], adapter);
+      adapter.bindRoutes(handle, () => ctx.llm.listProviders().map(item => item.id));
+      return handle;
+    });
+    const snapshot = await adapter.catalogSnapshot();
+    const selection = adapter.defaultSelection(snapshot!);
+    expect(selection).toEqual({ provider: CLOUD_MODEL_PROVIDER, model: 'shared/deepseek-official/deepseek-chat' });
+    expect(await adapter.listModels(CLOUD_MODEL_PROVIDER)).toMatchObject([{
+      provider: CLOUD_MODEL_PROVIDER, id: selection.model, reasoning: { defaultEffort: 'high' },
+    }]);
+    expect(adapter.defaultSelection(catalog)).toEqual({ provider: CLOUD_MODEL_PROVIDER, model: 'cloud-default' });
+    await expect(adapter.resolveModel(selection.provider, selection.model)).resolves.toMatchObject({ reasoning: { defaultEffort: 'high' } });
+    await collect(ctx.llm.stream({ ...selection, messages: [] }));
+    expect(requests).toEqual(['shared/deepseek-official/deepseek-chat']);
+    expect(selection).toMatchInlineSnapshot(`
+      {
+        "model": "shared/deepseek-official/deepseek-chat",
+        "provider": "mewclaw-cloud",
+      }
+    `);
+  } finally { await ctx.fiber.dispose(); }
+});
+
 it('共享目录携带强度元数据时透出 reasoning，picker 与云端同构', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => catalogResponse(effortCatalog)));
   const { adapter } = boundAdapter();
@@ -230,7 +270,7 @@ it('共享目录携带强度元数据时透出 reasoning，picker 与云端同�
   await expect(adapter.resolveModel('deepseek-official', 'deepseek-chat')).resolves.toMatchObject({ reasoning });
 });
 
-it('服务端未下发默认值时不展示 off 档（未选强度的请求不得被改写为关闭思考）', async () => {
+it('无默认强度时保留与 Web 相同的 off 档位', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => catalogResponse({
     ...catalog,
     sharedModels: [{ provider: 'deepseek-official', model: 'deepseek-chat', name: 'DeepSeek V4',
@@ -239,7 +279,7 @@ it('服务端未下发默认值时不展示 off 档（未选强度的请求不�
   const { adapter } = boundAdapter();
   await adapter.catalogSnapshot();
   const resolved = await adapter.resolveModel('deepseek-official', 'deepseek-chat');
-  expect(resolved.reasoning?.efforts.map(e => e.id)).toEqual(['high']);
+  expect(resolved.reasoning?.efforts.map(e => e.id)).toEqual(['off', 'high']);
   expect(resolved.reasoning?.defaultEffort).toBeUndefined();
 });
 
@@ -258,6 +298,23 @@ it('选中强度经 reasoning_effort 到达 Edge；off 档也能上线', async (
   // Edge parseDesktopInference 逐字段白名单校验，多一个字段即 INVALID_INFERENCE_REQUEST。
   const REQUEST_FIELDS = new Set(['model', 'messages', 'tools', 'tool_choice', 'stream', 'stream_options', 'max_tokens', 'max_completion_tokens', 'temperature', 'top_p', 'frequency_penalty', 'presence_penalty', 'stop', 'parallel_tool_calls', 'reasoning_effort']);
   for (const body of bodies) for (const key of Object.keys(JSON.parse(body))) expect(REQUEST_FIELDS.has(key), `unexpected field ${key}`).toBe(true);
+});
+
+it('完整 off 档位不把未选择强度的请求改成关闭思考', async () => {
+  const bodies: Record<string, unknown>[] = [];
+  vi.stubGlobal('fetch', async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (String(url).endsWith('/auth/models')) return catalogResponse({ ...catalog, sharedModels: [{
+      provider: 'deepseek-official', model: 'deepseek-chat', name: 'DeepSeek V4',
+      reasoningEfforts: [{ id: 'off', name: 'Off' }, { id: 'high', name: 'High' }],
+    }] });
+    bodies.push(JSON.parse(String(init?.body))); return sseResponse();
+  });
+  const { adapter } = boundAdapter();
+  const base = { provider: 'deepseek-official', model: 'deepseek-chat', messages: [] };
+  await collect(adapter.stream(base));
+  await collect(adapter.stream({ ...base, reasoningEffort: ReasoningEffortId('off') }));
+  expect(bodies[0]).not.toHaveProperty('reasoning_effort');
+  expect(bodies[1]?.reasoning_effort).toBe('off');
 });
 
 it('同步云端模型配置和密钥状态，但拒绝接收原始 API key', async () => {
